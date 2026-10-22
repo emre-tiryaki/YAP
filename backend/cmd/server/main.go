@@ -6,9 +6,18 @@ import (
 	"net/http"
 
 	"github.com/emre-tiryaki/YAP/backend/internal/handlers"
+	"github.com/emre-tiryaki/YAP/backend/internal/database"
 )
 
 func main() {
+	log.Println("Server is starting...")
+	db, err := database.New()
+	if err != nil {
+		log.Fatalf("Database error: %v", err)
+	}
+	defer db.Close()
+	log.Println("Database has started!")
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", handlers.HelloWorld)
 
