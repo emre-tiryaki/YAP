@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"net/http"
 
 	_ "modernc.org/sqlite"
 )
@@ -22,4 +23,8 @@ func NewWithDSN(dsn string) (*sql.DB, error) {
 	}
 
 	return db, nil;
+}
+
+func HelloWorldHandler(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("Server is working!!!"));
 }

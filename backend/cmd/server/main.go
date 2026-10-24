@@ -5,7 +5,6 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/emre-tiryaki/YAP/backend/internal/handlers"
 	"github.com/emre-tiryaki/YAP/backend/internal/database"
 )
 
@@ -19,7 +18,7 @@ func main() {
 	log.Println("Database has started!")
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", handlers.HelloWorld)
+	mux.HandleFunc("/hello-world", database.HelloWorldHandler)
 
 	port := ":8080"
 
