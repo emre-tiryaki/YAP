@@ -23,4 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 
-app.db
+.env
+*.db
+*.db-wal
+*.db-shm

@@ -1,34 +1,40 @@
 package main
 
 import (
+	"context"
 	"log"
-	"net"
 	"net/http"
+	"time"
 
+	"github.com/emre-tiryaki/YAP/backend/internal/config"
 	"github.com/emre-tiryaki/YAP/backend/internal/database"
+	"github.com/emre-tiryaki/YAP/backend/internal/handler"
 )
 
 func main() {
 	log.Println("Server is starting...")
-	db, err := database.New()
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("config error: %v", err)
+	}
+
+	db, err := database.New(context.Background(), cfg.DBPath)
 	if err != nil {
 		log.Fatalf("Database error: %v", err)
 	}
 	defer db.Close()
+
 	log.Println("Database has started!")
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/hello-world", database.HelloWorldHandler)
+	mux.HandleFunc("/hello-world", handler.HelloWorld)
 
-	port := ":8080"
-
-	ln, err := net.Listen("tcp", port)
-	if err != nil {
-		log.Fatalf("Port error: %v", err)
+	srv := &http.Server{
+		Addr:              ":" + cfg.Port,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
 	}
-	log.Printf("Server is running on http://localhost%s", port)
 
-	if err = http.Serve(ln, mux); err != nil {
-		log.Fatalf("Server stopped: %v", err)
-	}
+	log.Printf("listening on http://localhost%s", srv.Addr)
+	log.Fatal(srv.ListenAndServe())
 }
