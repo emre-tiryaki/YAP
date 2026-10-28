@@ -8,11 +8,11 @@ import (
 	"io/fs"
 )
 
-//go:embed migrations/*.sql
+//go:embed migrations/sqlite/*.sql
 var migrationFS embed.FS
 
 func migrate(ctx context.Context, conn *sql.DB) error {
-	files, err := fs.ReadDir(migrationFS, "migrations");
+	files, err := fs.ReadDir(migrationFS, "migrations/sqlite");
 	if err != nil {
 		return err
 	}
@@ -23,7 +23,7 @@ func migrate(ctx context.Context, conn *sql.DB) error {
 	}
 
 	for i := current; i < len(files); i++ {
-		body, err := migrationFS.ReadFile("migrations/" + files[i].Name())
+		body, err := migrationFS.ReadFile("migrations/sqlite/" + files[i].Name())
 		if err != nil {
 			return err
 		}
