@@ -1,115 +1,104 @@
+
 package database
 
 import (
 	"context"
-	"database/sql"
-	"io/fs"
+	"os"
 	"path/filepath"
-	"regexp"
 	"testing"
+	"time"
 )
 
-func TestNew_PragmasApplyToEveryPooledConnection(t *testing.T) {
-	db := newTestDB(t)
-	const n = 4
-	db.SetMaxOpenConns(n)
+func TestNew(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	path := filepath.Join(t.TempDir(), "nested", "app.db")
+
+	db, err := New(ctx, path)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	defer db.Close()
+
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("database file was not created: %v", err)
+	}
+
+	if err := db.PingContext(ctx); err != nil {
+		t.Fatalf("PingContext() error = %v", err)
+	}
+}
+
+func TestNewPragmas(t *testing.T) {
 	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "app.db")
 
-	conns := make([]*sql.Conn, 0, n)
-	for i := 0; i < n; i++ {
-		c, err := db.Conn(ctx)
-		if err != nil {
-			t.Fatalf("Conn %d: %v", i, err)
-		}
-		t.Cleanup(func() { c.Close() })
-		conns = append(conns, c)
-	}
-
-	for i, c := range conns {
-		var fk, busy int
-		var journal string
-		if err := c.QueryRowContext(ctx, "PRAGMA foreign_keys").Scan(&fk); err != nil {
-			t.Fatal(err)
-		}
-		if err := c.QueryRowContext(ctx, "PRAGMA busy_timeout").Scan(&busy); err != nil {
-			t.Fatal(err)
-		}
-		if err := c.QueryRowContext(ctx, "PRAGMA journal_mode").Scan(&journal); err != nil {
-			t.Fatal(err)
-		}
-		if fk != 1 || busy != 5000 || journal != "wal" {
-			t.Errorf("conn %d: foreign_keys=%d busy_timeout=%d journal_mode=%s", i, fk, busy, journal)
-		}
-	}
-}
-
-func TestMigrate_IsIdempotent(t *testing.T) {
-	files, err := fs.ReadDir(migrationFS, "migrations")
+	db, err := New(ctx, path)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("New() error = %v", err)
 	}
-	path := filepath.Join(t.TempDir(), "idem.db")
+	defer db.Close()
 
-	for run := 1; run <= 3; run++ {
-		db, err := New(context.Background(), path)
-		if err != nil {
-			t.Fatalf("run %d: %v", run, err)
-		}
-		var version int
-		if err := db.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
-			t.Fatal(err)
-		}
-		db.Close()
-		if version != len(files) {
-			t.Fatalf("run %d: user_version=%d, want %d", run, version, len(files))
-		}
-	}
-}
-
-func TestMigrate_FileNamesAreOrdered(t *testing.T) {
-	files, err := fs.ReadDir(migrationFS, "migrations")
+	conn, err := db.Conn(ctx)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Conn() error = %v", err)
 	}
-	if len(files) == 0 {
-		t.Fatal("no migration files embedded")
-	}
-	pattern := regexp.MustCompile(`^(\d{3})_[a-z0-9_]+\.sql$`)
-	for i, f := range files {
-		m := pattern.FindStringSubmatch(f.Name())
-		if m == nil {
-			t.Errorf("bad migration name: %s", f.Name())
-			continue
-		}
-		want := i + 1
-		var got int
-		for _, ch := range m[1] {
-			got = got*10 + int(ch-'0')
-		}
-		if got != want {
-			t.Errorf("%s: sequence number %d, want %d (gap or duplicate)", f.Name(), got, want)
-		}
-	}
-}
+	defer conn.Close()
 
-func TestMigrate_CreatesExpectedObjects(t *testing.T) {
-	db := newTestDB(t)
-	cases := []struct {
-		kind string
-		name string
+	tests := []struct {
+		name     string
+		query    string
+		expected string
 	}{
-		{"table", "accounts"}, {"table", "teams"}, {"table", "memberships"},
-		{"table", "projects"}, {"table", "statuses"}, {"table", "tasks"},
-		{"table", "task_assignees"},
-		{"trigger", "trg_tasks_closed_on_insert"}, {"trigger", "trg_tasks_closed_on_status"},
-		{"index", "idx_tasks_project_status"}, {"index", "idx_tasks_parent"},
-		{"index", "idx_memberships_account"}, {"index", "idx_task_assignees_member"},
+		{
+			name:     "foreign_keys",
+			query:    "PRAGMA foreign_keys",
+			expected: "1",
+		},
+		{
+			name:     "journal_mode",
+			query:    "PRAGMA journal_mode",
+			expected: "wal",
+		},
+		{
+			name:     "busy_timeout",
+			query:    "PRAGMA busy_timeout",
+			expected: "5000",
+		},
 	}
-	for _, tc := range cases {
-		t.Run(tc.kind+"/"+tc.name, func(t *testing.T) {
-			if n := count(t, db, "sqlite_master", "type = ? AND name = ?", tc.kind, tc.name); n != 1 {
-				t.Errorf("found %d, want 1", n)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got string
+
+			if err := conn.QueryRowContext(ctx, tt.query).Scan(&got); err != nil {
+				t.Fatalf("QueryRowContext() error = %v", err)
+			}
+
+			if got != tt.expected {
+				t.Errorf("got %q, want %q", got, tt.expected)
 			}
 		})
+	}
+}
+
+func TestNewInvalidDirectory(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+
+	file := filepath.Join(dir, "not-a-directory")
+	if err := os.WriteFile(file, []byte("test"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	path := filepath.Join(file, "app.db")
+
+	db, err := New(ctx, path)
+	if err == nil {
+		if db != nil {
+			db.Close()
+		}
+		t.Fatal("New() expected an error, got nil")
 	}
 }

@@ -70,6 +70,7 @@ Rules:
 | Team names are unique within a workspace. | Partial unique index: `WHERE deleted_at IS NULL`. |
 | A user can have only one membership in a given workspace. | Unique constraint on `(workspace_id, user_id)`. |
 | Enum values must be valid. | `CHECK` constraint. |
+| Task status and parent task should be in the same project | `tasks (status_id, project_id)` and `(parent_id, project_id)` composite FK |
 
 ### 4.2 Rules Enforced by the Service Layer
 
@@ -80,8 +81,7 @@ All of these rules are protected by unit tests.
 | Each user can have one `personal` workspace. | Teams cannot be created in a `personal` workspace. |
 | The last `owner` cannot leave or have their role downgraded. | |
 | A member who has left (`left_at` is set) cannot be assigned to a team or a task. | When a member leaves, the corresponding `team_members` and `task_assignees` rows are closed within the same transaction. |
-| A subtask must belong to the same project and must not create a cycle. | |
-| A task's status must belong to the task's project. | |
+| A subtask cannot create a cycle. | |
 | When a team is removed from a project or deleted. | The `team_id` of that team's tasks within the affected project is set to `NULL` within the same transaction. |
 | When a project is deleted. | Its `statuses`, `tasks`, and `project_teams` rows are individually marked with `deleted_at` / `removed_at` within the same transaction. The system does not rely on the parent being hidden, because each row needs its own deletion record for synchronization. |
 
@@ -93,7 +93,7 @@ All of these rules are protected by unit tests.
 | accounts       | Server   | Email address and password hash | Primary key is `user_id`; one-to-one relationship with `users`. |
 | workspaces     | Both     | Authorization and synchronization boundary | `kind` cannot be changed after creation. |
 | memberships    | Both     | Role connecting a user to a workspace | `created_by` and assignments reference this table. |
-| teams          | Both     | Groups of people within a workspace | |
+| teams          | Both     | Groups of people within a workspace | |ü
 | team_members   | Both     | Team membership | `role`: `lead` or `member`. |
 | projects       | Both     | Unit of work | `archived_at` indicates archival; `deleted_at` indicates deletion. |
 | project_teams  | Both     | Association between a project and a team | |
@@ -115,6 +115,7 @@ All of these rules are protected by unit tests.
 | `tasks (project_id, status_id, position)` | Order tasks on the board. |
 | `tasks (workspace_id, updated_at)` | Retrieve changed records during synchronization. |
 | `statuses (project_id, position)` | Order status columns. |
+| `projects (workspace_id) WHERE deleted_at IS NULL` | non-deleted projects of a workspace |
 
 ## 7. Synchronization Notes
 
