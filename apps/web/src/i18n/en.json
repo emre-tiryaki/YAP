@@ -1,0 +1,15 @@
+{
+  "app.name": "YAP",
+  "sidebar.home": "Home",
+  "sidebar.projects": "Projects",
+  "sidebar.tasks": "My Tasks",
+  "sidebar.teams": "Teams",
+  "sidebar.settings": "Settings",
+  "workspace.welcome": "Welcome",
+  "workspace.projects.title": "Projects",
+  "workspace.projects.empty": "There are no projects in this workspace yet.",
+  "workspace.projects.taskCount": "tasks",
+  "workspace.tasks.title": "Upcoming Tasks",
+  "workspace.tasks.empty": "You have no upcoming tasks.",
+  "workspace.tasks.dueDate": "Due"
+}
