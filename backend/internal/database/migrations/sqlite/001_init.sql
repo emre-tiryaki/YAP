@@ -116,6 +116,7 @@ CREATE TABLE tasks (
     title        TEXT NOT NULL,
     description  TEXT,
     position     TEXT NOT NULL,
+    due_date     TEXT,
     created_at   TEXT NOT NULL,
     updated_at   TEXT NOT NULL,
     deleted_at   TEXT,

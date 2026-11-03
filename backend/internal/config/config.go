@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"os/user"
 	"path/filepath"
 
 	"github.com/joho/godotenv"
@@ -11,6 +12,7 @@ import (
 type Config struct {
 	DBPath string
 	Port   string
+	DisplayName string
 }
 
 func Load() (Config, error) {
@@ -27,7 +29,15 @@ func Load() (Config, error) {
 	return Config{
 		DBPath: resolve(baseDir, getenv("DB_PATH", "./app.db")),
 		Port:   getenv("PORT", "8080"),
+		DisplayName: getenv("DISPLAY_NAME", defaultDisplayName()),
 	}, nil
+}
+
+func defaultDisplayName() string {
+	if u, err := user.Current(); err == nil && u.Username != "" {
+		return u.Username
+	}
+	return "user"
 }
 
 func resolve(baseDir, p string) string {
