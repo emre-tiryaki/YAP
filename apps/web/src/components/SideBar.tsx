@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { useTranslate } from "../hooks/useTranslate";
 import type { TranslationKey } from "../hooks/useTranslate";
+import { TbLayoutSidebarLeftCollapse, TbLayoutSidebarRightCollapse } from "react-icons/tb";
+
 
 type NavItem = {
   labelKey: TranslationKey;
@@ -20,10 +23,18 @@ type SidebarProps = {
 
 export function Sidebar({ activeHref }: SidebarProps) {
   const t = useTranslate();
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   return (
     <aside className="flex w-64 shrink-0 flex-col border-r border-gray-200 bg-gray-50 p-4">
-      <span className="mb-6 px-3 text-xl font-bold">{t("app.name")}</span>
+      <div className="">
+        <span className="mb-6 px-3 text-xl font-bold">{t("app.name")}</span>
+        <button
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="cursor-pointer">
+          {isCollapsed ? <TbLayoutSidebarLeftCollapse /> : <TbLayoutSidebarRightCollapse />}
+        </button>
+      </div>
       <nav className="flex flex-col gap-1">
         {navItems.map((item) => (
           <a

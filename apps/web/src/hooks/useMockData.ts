@@ -46,6 +46,6 @@ const tasks: Task[] = [
   },
 ];
 
-export function useWorkspaceHome() {
+export function useMockData() {
   return { userName: "Tiryaki", projects, tasks };
 }

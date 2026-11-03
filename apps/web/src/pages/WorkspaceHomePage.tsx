@@ -2,11 +2,11 @@ import { ProjectList } from "../components/ProjectList";
 import { Sidebar } from "../components/SideBar";
 import { TaskList } from "../components/TaskList";
 import { useTranslate } from "../hooks/useTranslate";
-import { useWorkspaceHome } from "../hooks/useWorkspaceHome";
+import { useMockData } from "../hooks/useMockData";
 
 export default function WorkspaceHomePage() {
   const t = useTranslate();
-  const { userName, projects, tasks } = useWorkspaceHome();
+  const { userName, projects, tasks } = useMockData();
 
   return (
     <div className="flex min-h-screen">

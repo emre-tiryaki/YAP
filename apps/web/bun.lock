@@ -6,8 +6,10 @@
       "name": "web",
       "dependencies": {
         "@tailwindcss/vite": "^4.3.3",
+        "@tanstack/react-query": "^5.105.3",
         "react": "^19.3.1",
         "react-dom": "^19.3.1",
+        "react-icons": "^5.7.0",
         "react-router": "^8.5.1",
         "tailwindcss": "^4.3.3",
       },
@@ -169,6 +171,10 @@
     "@tailwindcss/oxide-win32-x64-msvc": ["@tailwindcss/oxide-win32-x64-msvc@4.3.3", "https://registry.npmmirror.com/@tailwindcss/oxide-win32-x64-msvc/-/oxide-win32-x64-msvc-4.3.3.tgz", { "os": "win32", "cpu": "x64" }, "sha512-yJ0pwIVc/nYeGoV02WtsN8KYyLQv7kyI2wDnkezyJlGGjkd4QLwDGAwl47YpPJeuI0M0ObaXGSPjvWDPeTPggw=="],
 
     "@tailwindcss/vite": ["@tailwindcss/vite@4.3.3", "https://registry.npmmirror.com/@tailwindcss/vite/-/vite-4.3.3.tgz", { "dependencies": { "@tailwindcss/node": "4.3.3", "@tailwindcss/oxide": "4.3.3", "tailwindcss": "4.3.3" }, "peerDependencies": { "vite": "^5.2.0 || ^6 || ^7 || ^8" } }, "sha512-yYU8cogLeSh/ms2jh8Fj7jaba/EWa7Ja6GoUqYZaraEuCI5YS6ms6ObZgjjedm+jm6XZjdNRWBpPP6Z86oOxcw=="],
+
+    "@tanstack/query-core": ["@tanstack/query-core@5.105.3", "https://registry.npmmirror.com/@tanstack/query-core/-/query-core-5.105.3.tgz", {}, "sha512-v1rbNy7MB/4Akth7CQH+CerV13K7Ok9hAusEsfz4sCjDdu3/kOSJPoWfoB+YjdEX1eBFBWKNAGE5nqZCgdlHDw=="],
+
+    "@tanstack/react-query": ["@tanstack/react-query@5.105.3", "https://registry.npmmirror.com/@tanstack/react-query/-/react-query-5.105.3.tgz", { "dependencies": { "@tanstack/query-core": "5.105.3" }, "peerDependencies": { "@types/react": "^18 || ^19", "react": "^18 || ^19" }, "optionalPeers": ["@types/react"] }, "sha512-dj5hGWZmwoc9NG4enoXuYbiYwb5FxgJYPVv06eUgicMTfEMTRXn08Xv9D/r1V8TfjAv+BpxdvZFzJ1h3hSWZcQ=="],
 
     "@types/esrecurse": ["@types/esrecurse@4.3.1", "https://registry.npmmirror.com/@types/esrecurse/-/esrecurse-4.3.1.tgz", {}, "sha512-xJBAbDifo5hpffDBuHl0Y8ywswbiAp/Wi7Y/GtAgSlZyIABppyurxVueOPE8LUQOxdlgi6Zqce7uoEpqNTeiUw=="],
 
@@ -389,6 +395,8 @@
     "react": ["react@19.3.1", "https://registry.npmmirror.com/react/-/react-19.3.1.tgz", {}, "sha512-QNhWdt7nrgVWWQG58QuGsAR3jv3Hbe4mb4vz7w2csnHavciZJgda1CPNaldF6eVxv90ud3jUXpKlHL69gO38yw=="],
 
     "react-dom": ["react-dom@19.3.1", "https://registry.npmmirror.com/react-dom/-/react-dom-19.3.1.tgz", { "dependencies": { "scheduler": "^0.28.0" }, "peerDependencies": { "react": "^19.3.1" } }, "sha512-Y0bARz53lhEC1NMCASs0/j+faB/zqt3R8hpvg1e8+61ZVJ4UL0UdC4cBbXfZMcIuhrfgeILTLe+ZeBCavQPtKQ=="],
+
+    "react-icons": ["react-icons@5.7.0", "https://registry.npmmirror.com/react-icons/-/react-icons-5.7.0.tgz", { "peerDependencies": { "react": "*" } }, "sha512-LBLy340Rzqy6+/yVhZKT3B/QpP1BZaesGqasf09HPOBzRarcDIFH0WwXlXQfE7q7ipxK4MSiC5DIBWURCny6fw=="],
 
     "react-router": ["react-router@8.5.1", "https://registry.npmmirror.com/react-router/-/react-router-8.5.1.tgz", { "dependencies": { "@remix-run/route-pattern": "^0.22.1", "cookie-es": "^3.1.1" }, "peerDependencies": { "@types/react": ">=19.2.0", "@types/react-dom": ">=19.2.0", "react": ">=19.2.7", "react-dom": ">=19.2.7" }, "optionalPeers": ["@types/react", "@types/react-dom", "react-dom"] }, "sha512-5u1eQ46QjuXjNfEnLwzrnou1Bm5dquO3xjVYkkMYCudtkicD2AQHtx+fvXzPATtPJx8TW6DR1x1TDRqsfHyZBw=="],
 

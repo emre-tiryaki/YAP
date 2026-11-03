@@ -1,0 +1,15 @@
+{
+  "app.name": "YAP",
+  "sidebar.home": "Ana Sayfa",
+  "sidebar.projects": "Projeler",
+  "sidebar.tasks": "Görevlerim",
+  "sidebar.teams": "Takımlar",
+  "sidebar.settings": "Ayarlar",
+  "workspace.welcome": "Hoşgeldiniz",
+  "workspace.projects.title": "Projeler",
+  "workspace.projects.empty": "Bu Çalışma Alanında Henüz Hiç Proje Yok.",
+  "workspace.projects.taskCount": "Görevler",
+  "workspace.tasks.title": "Yaklaşan Görevler",
+  "workspace.tasks.empty": "Yaklaşan Göreviniz Yok.",
+  "workspace.tasks.dueDate": "Son Tarih"
+}
