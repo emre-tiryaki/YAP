@@ -55,7 +55,7 @@ func toTaskResponse(t model.Task) taskResponse {
 func (h *TaskHandler) upcoming(w http.ResponseWriter, r *http.Request) {
 	tasks, err := h.svc.Upcoming(r.Context(), h.session)
 	if err != nil {
-		writeError(w, err)
+		writeError(w, r, err)
 		return
 	}
 	res := make([]taskResponse, 0, len(tasks))
@@ -68,7 +68,7 @@ func (h *TaskHandler) upcoming(w http.ResponseWriter, r *http.Request) {
 func (h *TaskHandler) create(w http.ResponseWriter, r *http.Request) {
 	var req createTaskRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeError(w, err)
+		writeError(w, r, err)
 		return
 	}
 
@@ -76,7 +76,7 @@ func (h *TaskHandler) create(w http.ResponseWriter, r *http.Request) {
 	if req.DueDate != nil && *req.DueDate != "" {
 		parsed, err := time.Parse(time.RFC3339, *req.DueDate)
 		if err != nil {
-			writeError(w, err)
+			writeError(w, r, err)
 			return
 		}
 		due = &parsed
@@ -88,7 +88,7 @@ func (h *TaskHandler) create(w http.ResponseWriter, r *http.Request) {
 		DueDate:     due,
 	})
 	if err != nil {
-		writeError(w, err)
+		writeError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, toTaskResponse(task))

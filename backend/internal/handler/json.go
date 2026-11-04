@@ -24,14 +24,14 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	}
 }
 
-func writeError(w http.ResponseWriter, err error) {
+func writeError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, service.ErrInvalidInput):
 		writeJSON(w, http.StatusBadRequest, errorResponse{Error: "invalid_input"})
 	case errors.Is(err, service.ErrNotFound):
 		writeJSON(w, http.StatusNotFound, errorResponse{Error: "not_found"})
 	default:
-		slog.Error("request failed", "error", err)
+		slog.Error("request failed", "method", r.Method, "path", r.URL.Path, "error", err)
 		writeJSON(w, http.StatusInternalServerError, errorResponse{Error: "internal"})
 	}
 }

@@ -39,8 +39,8 @@ func toProjectResponse(p model.Project) projectResponse {
 
 func (h *ProjectHandler) list(w http.ResponseWriter, r *http.Request) {
 	projects, err := h.svc.List(r.Context(), h.session.WorkspaceID)
-	if err == nil {
-		writeError(w, err)
+	if err != nil {
+		writeError(w, r, err)
 		return
 	}
 	res := make([]projectResponse, 0, len(projects))
@@ -53,15 +53,15 @@ func (h *ProjectHandler) list(w http.ResponseWriter, r *http.Request) {
 func (h *ProjectHandler) create(w http.ResponseWriter, r *http.Request) {
 	var req createProjectRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeError(w, err)
+		writeError(w, r, err)
 		return
 	}
 	project, err := h.svc.Create(r.Context(), h.session.WorkspaceID, service.CreateProjectInput{
-		Name: req.Name,
+		Name:        req.Name,
 		Description: req.Description,
 	})
 	if err != nil {
-		writeError(w, err)
+		writeError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, toProjectResponse(project))
