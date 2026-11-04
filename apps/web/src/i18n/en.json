@@ -11,5 +11,16 @@
   "workspace.projects.taskCount": "tasks",
   "workspace.tasks.title": "Upcoming Tasks",
   "workspace.tasks.empty": "You have no upcoming tasks.",
-  "workspace.tasks.dueDate": "Due"
+  "workspace.tasks.dueDate": "Due",
+  "common.loading": "Loading...",
+  "common.error": "Something went wrong.",
+  "workspace.projects.create.title": "New Project",
+  "workspace.projects.create.name": "Name",
+  "workspace.projects.create.description": "Description",
+  "workspace.projects.create.submit": "Create Project",
+  "workspace.tasks.create.title": "New Task",
+  "workspace.tasks.create.name": "Title",
+  "workspace.tasks.create.project": "Project",
+  "workspace.tasks.create.dueDate": "Due date",
+  "workspace.tasks.create.submit": "Create Task"
 }

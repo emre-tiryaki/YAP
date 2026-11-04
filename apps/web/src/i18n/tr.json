@@ -11,5 +11,16 @@
   "workspace.projects.taskCount": "Görevler",
   "workspace.tasks.title": "Yaklaşan Görevler",
   "workspace.tasks.empty": "Yaklaşan Göreviniz Yok.",
-  "workspace.tasks.dueDate": "Son Tarih"
+  "workspace.tasks.dueDate": "Son Tarih",
+  "common.loading": "Yükleniyor...",
+  "common.error": "Bir şeyler ters gitti.",
+  "workspace.projects.create.title": "Yeni Proje",
+  "workspace.projects.create.name": "Ad",
+  "workspace.projects.create.description": "Açıklama",
+  "workspace.projects.create.submit": "Proje Oluştur",
+  "workspace.tasks.create.title": "Yeni Görev",
+  "workspace.tasks.create.name": "Başlık",
+  "workspace.tasks.create.project": "Proje",
+  "workspace.tasks.create.dueDate": "Bitiş tarihi",
+  "workspace.tasks.create.submit": "Görev Oluştur"
 }

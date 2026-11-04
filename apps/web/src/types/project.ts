@@ -4,3 +4,8 @@ export type Project = {
   description: string;
   taskCount: number;
 };
+
+export type CreateProjectInput = {
+  name: string
+  description: string
+}
