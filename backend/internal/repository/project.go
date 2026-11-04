@@ -17,9 +17,11 @@ func NewProjectRepository() *ProjectRepository {
 
 func (*ProjectRepository) List(ctx context.Context, q database.DBTX, workspaceID string) ([]model.Project, error) {
 	rows, err := q.QueryContext(ctx,
-		`SELECT p.id, p.name, p.description
+		`SELECT p.id, p.name, p.description,
 			(SELECT COUNT(*) FROM tasks t
-				WHERE t.project_id = p.id AND t.workspace_id = p.workspace_id AND t.deleted_at IS NULL)
+				WHERE t.project_id = p.id
+				AND t.workspace_id = p.workspace_id
+				AND t.deleted_at IS NULL)
 		 FROM projects p
 		 WHERE p.workspace_id = ? AND p.deleted_at IS NULL AND p.archived_at IS NULL
 		 ORDER BY p.created_at DESC, p.id DESC`,
@@ -74,6 +76,7 @@ func (*ProjectRepository) Exists(ctx context.Context, q database.DBTX, workspace
 	var n int
 	err := q.QueryRowContext(ctx,
 		`SELECT COUNT(*) FROM projects WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`,
+		projectID, workspaceID,
 	).Scan(&n)
 	if err != nil {
 		return false, fmt.Errorf("project exists: %w", err)
