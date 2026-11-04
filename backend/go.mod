@@ -5,7 +5,6 @@ go 1.27.3
 require (
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
-	golang.org/x/tools v0.52.0
 	modernc.org/sqlite v1.61.0
 )
 
