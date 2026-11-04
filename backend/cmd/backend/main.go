@@ -46,7 +46,7 @@ func main() {
 	mux.HandleFunc("/hello-world", handler.HelloWorld)
 	handler.NewWorkspaceHandler(session).Register(mux)
 	handler.NewProjectHandler(session, projectSvc).Register(mux)
-	handler.NewTaskHandler(session, taskSvc)
+	handler.NewTaskHandler(session, taskSvc).Register(mux)
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,

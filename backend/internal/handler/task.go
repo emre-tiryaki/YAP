@@ -17,6 +17,11 @@ func NewTaskHandler(session model.Session, svc *service.TaskService) *TaskHandle
 	return &TaskHandler{session: session, svc: svc}
 }
 
+func (h *TaskHandler) Register(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/tasks/upcoming", h.upcoming)
+	mux.HandleFunc("POST /api/projects/{id}/tasks", h.create)
+}
+
 type taskResponse struct {
 	ID             string  `json:"id"`
 	Title          string  `json:"title"`
