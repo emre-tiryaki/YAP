@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -76,7 +77,7 @@ func (h *TaskHandler) create(w http.ResponseWriter, r *http.Request) {
 	if req.DueDate != nil && *req.DueDate != "" {
 		parsed, err := time.Parse(time.RFC3339, *req.DueDate)
 		if err != nil {
-			writeError(w, r, err)
+			writeError(w, r, fmt.Errorf("%w: due_date", service.ErrInvalidInput))
 			return
 		}
 		due = &parsed

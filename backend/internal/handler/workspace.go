@@ -26,7 +26,7 @@ type workspaceResponse struct {
 
 func (h *WorkspaceHandler) get(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, workspaceResponse{
-		ID:       h.session.UserID,
+		ID:       h.session.WorkspaceID,
 		Name:     h.session.WorkspaceName,
 		UserName: h.session.DisplayName,
 	})
