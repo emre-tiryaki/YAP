@@ -1,5 +1,174 @@
 # Database Design
 
+## Database Graph
+
+```mermaid
+erDiagram
+    direction LR
+    accounts {
+        TEXT id PK
+        TEXT user_id UK
+        TEXT email UK
+        TEXT password_hash
+        DATETIME created_at
+    }                
+
+    users {
+        TEXT id PK, FK
+        TEXT display_name
+        DATETIME created_at
+        DATETIME updated_at
+    }
+
+    workspaces {
+        TEXT id PK
+        TEXT kind
+        TEXT name
+        DATETIME created_at
+        DATETIME updated_at
+        DATETIME deleted_at
+    }
+
+    memberships {
+        TEXT id PK
+        TEXT user_id FK
+        TEXT workspace_id FK
+        TEXT role
+        DATETIME joined_at
+        DATETIME left_at
+        DATETIME updated_at
+    }
+
+    teams {
+        TEXT id PK
+        TEXT workspace_id FK
+        TEXT name
+        TEXT color
+        DATETIME created_at
+        DATETIME updated_at
+        DATETIME deleted_at
+    }
+
+    team_members {
+        TEXT workspace_id FK
+        TEXT membership_id PK, FK
+        TEXT team_id PK, FK
+        TEXT role
+        DATETIME added_at
+        DATETIME updated_at
+        DATETIME removed_at
+    }
+
+    invitations {
+        TEXT id PK
+        TEXT workspace_id FK
+        TEXT invited_by FK
+        TEXT email
+        TEXT role
+        TEXT token_hash UK
+        DATETIME expires_at
+        DATETIME accepted_at
+        DATETIME revoked_at
+        DATETIME created_at
+    }
+
+    projects {
+        TEXT id PK
+        TEXT workspace_id FK
+        TEXT name
+        TEXT description
+        DATETIME created_at
+        DATETIME updated_at
+        DATETIME archived_at
+        DATETIME deleted_at
+    }
+
+    project_teams {
+        TEXT workspace_id FK
+        TEXT project_id PK, FK
+        TEXT team_id PK, FK
+        DATETIME added_at
+        DATETIME updated_at
+        DATETIME removed_at
+    }
+
+    statuses {
+        TEXT id PK
+        TEXT workspace_id FK
+        TEXT plan_id FK
+        TEXT title
+        TEXT description
+        TEXT color
+        TEXT position
+        DATETIME updated_at
+        DATETIME deleted_at
+    }
+
+    tasks {
+        TEXT id PK
+        TEXT created_by FK
+        TEXT project_id FK
+        TEXT plan_id FK
+        TEXT status_id FK
+        TEXT parent_id FK
+        TEXT title
+        TEXT description
+        TEXT position
+        DATETIME created_at
+        DATETIME updated_at
+        DATETIME deleted_at
+    }
+
+    task_assignees {
+        TEXT workspace_id FK
+        TEXT task_id PK, FK
+        TEXT membership_id PK, FK
+        DATETIME assigned_at
+        DATETIME updated_at
+        DATETIME removed_at
+    }
+
+    plans {
+        TEXT id FK
+        TEXT workspace_id FK
+        TEXT project_id FK
+        TEXT team_id FK
+        TEXT name
+        TEXT description
+        DATETIME created_at
+        DATETIME updated_at
+        DATETIME archived_at
+        DATETIME deleted_at
+    }
+
+    accounts ||--|| users : "has profile"
+    users ||--o{ memberships : "joins"
+    workspaces ||--o{ memberships : "contains"
+    workspaces ||--o{ teams : "contains"
+    workspaces ||--o{ projects : "contains"
+    workspaces ||--o{ invitations : "has"
+    workspaces ||--o{ project_teams : "contains"
+
+    memberships ||--o{ invitations : "creates"
+    memberships ||--o{ team_members : "belongs to teams"
+    teams ||--o{ team_members : "has members"
+    
+    projects ||--o{ project_teams : "assigned teams"
+    projects ||--o{ tasks : "contains"
+    teams ||--o{ project_teams : "works on"
+
+    project_teams ||--o{ plans : "has"
+    projects ||--o{ plans : "has"
+    plans ||--o{ tasks : "contains"
+    plans ||--o{ statuses : "contains"
+    statuses ||--o{ tasks : "categorizes"
+
+    memberships ||--o{ task_assignees : "assigned tasks"
+    tasks ||--o{ task_assignees : "has assignees"
+
+    tasks o|--o{ tasks : "parent-child"
+```
+
 ## 1. General Structure
 
 The same logical schema exists in two physical databases.

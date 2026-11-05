@@ -28,7 +28,7 @@ func Load() (Config, error) {
 	}
 	return Config{
 		DBPath: resolve(baseDir, getenv("DB_PATH", "./app.db")),
-		Port:   getenv("PORT", "8080"),
+		Port:   getenv("BACKEND_PORT", "8080"),
 		DisplayName: getenv("DISPLAY_NAME", defaultDisplayName()),
 	}, nil
 }
