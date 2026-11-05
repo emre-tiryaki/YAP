@@ -25,5 +25,11 @@
     "workspace.tasks.create.submit": "Create Task",
     "common.new": "New",
     "common.close": "Close",
-    "topbar.search": "Search..."
+    "topbar.search": "Search...",
+    "error.notFound.title": "Page not found",
+    "error.notFound.message": "The page you are looking for does not exist or has been moved.",
+    "error.unexpected.title": "Something went wrong",
+    "error.unexpected.message": "An unexpected error occurred. Try again or return to the home page.",
+    "error.goHome": "Go to home",
+    "error.retry": "Try again"
 }

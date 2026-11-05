@@ -25,5 +25,11 @@
     "workspace.tasks.create.submit": "Görev Oluştur",
     "common.new": "Yeni",
     "common.close": "Kapat",
-    "topbar.search": "Ara..."
+    "topbar.search": "Ara...",
+    "error.notFound.title": "Sayfa bulunamadı",
+    "error.notFound.message": "Aradığınız sayfa mevcut değil veya taşınmış olabilir.",
+    "error.unexpected.title": "Bir şeyler ters gitti",
+    "error.unexpected.message": "Beklenmeyen bir hata oluştu. Tekrar deneyin veya ana sayfaya dönün.",
+    "error.goHome": "Ana sayfaya git",
+    "error.retry": "Tekrar dene"
 }
