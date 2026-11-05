@@ -1,21 +1,29 @@
 import { useTranslate } from "../hooks/useTranslate";
 import type { Task } from "../types/task";
+import { SectionHeader } from "./SectionHeader";
 import { TaskCard } from "./TaskCard";
 
 type TaskListProps = {
     tasks: Task[];
     isLoading: boolean;
     isError: boolean;
+    onCreate: () => void;
 };
 
-export function TaskList({ tasks, isError, isLoading }: TaskListProps) {
+export function TaskList({
+    tasks,
+    isError,
+    isLoading,
+    onCreate,
+}: TaskListProps) {
     const t = useTranslate();
 
     return (
         <section>
-            <h2 className="mb-4 text-lg font-semibold">
-                {t("workspace.tasks.title")}
-            </h2>
+            <SectionHeader
+                title={t("workspace.tasks.title")}
+                onCreate={onCreate}
+            />
             {isLoading && (
                 <p className="text-sm text-gray-500">{t("common.loading")}</p>
             )}

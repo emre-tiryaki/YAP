@@ -8,9 +8,10 @@ import { SubmitButton } from "./SubmitButton";
 
 type CreateTaskFormProps = {
     projects: Project[];
+    onDone: () => void;
 };
 
-export function CreateTaskForm({ projects }: CreateTaskFormProps) {
+export function CreateTaskForm({ projects, onDone }: CreateTaskFormProps) {
     const t = useTranslate();
     const createTask = useCreateTask();
     const [title, setTitle] = useState("");
@@ -29,26 +30,18 @@ export function CreateTaskForm({ projects }: CreateTaskFormProps) {
                     dueDate: dueDate ? new Date(`${dueDate}T00:00:00`) : null,
                 },
             },
-            {
-                onSuccess: () => {
-                    setTitle("");
-                    setDueDate("");
-                },
-            },
+            { onSuccess: onDone },
         );
     }
 
     return (
-        <form
-            onSubmit={handleSubmit}
-            className="flex flex-col gap-3 rounded-lg border border-gray-200 p-4"
-        >
-            <h3>{t("workspace.tasks.create.title")}</h3>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
             <TextInput
                 label={t("workspace.tasks.create.name")}
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
                 required
+                autoFocus
             />
             <SelectInput
                 label={t("workspace.tasks.create.project")}
@@ -65,10 +58,14 @@ export function CreateTaskForm({ projects }: CreateTaskFormProps) {
                 value={dueDate}
                 onChange={(event) => setDueDate(event.target.value)}
             />
-            {createTask.isError && <p className="text-sm text-red-600">{t('common.error')}</p>}
+            {createTask.isError && (
+                <p className="text-sm text-red-600">{t("common.error")}</p>
+            )}
             <div>
-                <SubmitButton disabled={createTask.isPending || selectedProjectId === ''}>
-                    {t('workspace.tasks.create.submit')}
+                <SubmitButton
+                    disabled={createTask.isPending || selectedProjectId === ""}
+                >
+                    {t("workspace.tasks.create.submit")}
                 </SubmitButton>
             </div>
         </form>

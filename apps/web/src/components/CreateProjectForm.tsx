@@ -4,7 +4,11 @@ import { useTranslate } from "../hooks/useTranslate";
 import { TextInput } from "./TextInput";
 import { SubmitButton } from "./SubmitButton";
 
-export function CreateProjectForm() {
+type CreateProjectFormProps = {
+    onDone: () => void;
+};
+
+export function CreateProjectForm({ onDone }: CreateProjectFormProps) {
     const t = useTranslate();
     const createProject = useCreateProjects();
     const [name, setName] = useState("");
@@ -12,30 +16,17 @@ export function CreateProjectForm() {
 
     function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
-        createProject.mutate(
-            { name, description },
-            {
-                onSuccess: () => {
-                    setName("");
-                    setDescription("");
-                },
-            },
-        );
+        createProject.mutate({ name, description }, { onSuccess: onDone });
     }
 
     return (
-        <form
-            onSubmit={handleSubmit}
-            className="flex flex-col gap-3 rounded-lg border border-gray-200 p-4"
-        >
-            <h3 className="font-semibold">
-                {t("workspace.projects.create.title")}
-            </h3>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
             <TextInput
                 label={t("workspace.projects.create.name")}
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 required
+                autoFocus
             />
             <TextInput
                 label={t("workspace.projects.create.description")}

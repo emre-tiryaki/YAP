@@ -1,27 +1,31 @@
 import { useTranslate } from "../hooks/useTranslate";
 import type { Project } from "../types/project";
 import { ProjectCard } from "./ProjectCard";
+import { SectionHeader } from "./SectionHeader";
 
 type ProjectListProps = {
     projects: Project[];
     isLoading: boolean;
     isError: boolean;
+    onCreate: () => void;
 };
 
 export function ProjectList({
     projects,
     isError,
     isLoading,
+    onCreate,
 }: ProjectListProps) {
     const t = useTranslate();
 
     return (
         <section>
-            <h2 className="mb-4 text-lg font-semibold">
-                {t("workspace.projects.title")}
-            </h2>
+            <SectionHeader
+                title={t("workspace.projects.title")}
+                onCreate={onCreate}
+            />
             {isLoading && (
-                <p className="text-sm text-gray-500">{t("common.error")}</p>
+                <p className="text-sm text-gray-500">{t("common.loading")}</p>
             )}
             {isError && (
                 <p className="text-sm text-red-600">{t("common.error")}</p>
