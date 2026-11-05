@@ -58,6 +58,9 @@ func TestTaskCreatePersistsAndAssignsCreator(t *testing.T) {
 	if task.StatusCategory != model.StatusToDo || task.CreatedBy != env.session.MembershipID {
 		t.Errorf("task = %+v", task)
 	}
+	if task.ProjectName != "Backend" {
+		t.Errorf("ProjectName = %q, want Backend", task.ProjectName)
+	}
 
 	var statusCategory, title, dueDate string
 	err = env.db.QueryRowContext(ctx,

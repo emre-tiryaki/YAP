@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"testing"
 	"time"
 
@@ -174,7 +176,7 @@ func TestProjectInsertStatus(t *testing.T) {
 	}
 }
 
-func TestProjectExists(t *testing.T) {
+func TestProjectName(t *testing.T) {
 	ctx := context.Background()
 	db := newTestDB(t)
 	repo := NewProjectRepository()
@@ -189,21 +191,28 @@ func TestProjectExists(t *testing.T) {
 		name        string
 		workspaceID string
 		projectID   string
-		want        bool
+		want        string
+		wantNoRows  bool
 	}{
-		{"existing", a.WorkspaceID, live.ID, true},
-		{"soft deleted", a.WorkspaceID, deleted.ID, false},
-		{"other workspace", b.WorkspaceID, live.ID, false},
-		{"unknown id", a.WorkspaceID, "missing", false},
+		{"existing", a.WorkspaceID, live.ID, "live", false},
+		{"soft deleted", a.WorkspaceID, deleted.ID, "", true},
+		{"other workspace", b.WorkspaceID, live.ID, "", true},
+		{"unknown id", a.WorkspaceID, "missing", "", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := repo.Exists(ctx, db, tt.workspaceID, tt.projectID)
+			got, err := repo.Name(ctx, db, tt.workspaceID, tt.projectID)
+			if tt.wantNoRows {
+				if !errors.Is(err, sql.ErrNoRows) {
+					t.Fatalf("Name() error = %v, want sql.ErrNoRows", err)
+				}
+				return
+			}
 			if err != nil {
-				t.Fatalf("Exists() error = %v", err)
+				t.Fatalf("Name() error = %v", err)
 			}
 			if got != tt.want {
-				t.Errorf("Exists() = %v, want %v", got, tt.want)
+				t.Errorf("Name() = %q, want %q", got, tt.want)
 			}
 		})
 	}

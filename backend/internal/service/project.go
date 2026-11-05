@@ -15,7 +15,7 @@ type ProjectRepository interface {
 	List(ctx context.Context, q database.DBTX, workspaceID string) ([]model.Project, error)
 	Insert(ctx context.Context, q database.DBTX, p model.Project, now string) error
 	InsertStatus(ctx context.Context, q database.DBTX, s model.Status, projectID string) error
-	Exists(ctx context.Context, q database.DBTX, workspaceID, projectID string) (bool, error)
+	Name(ctx context.Context, q database.DBTX, workspaceID, projectID string) (string, error)
 }
 
 var defaultStatuses = []struct {

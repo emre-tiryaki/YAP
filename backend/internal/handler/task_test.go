@@ -47,6 +47,9 @@ func TestTaskCreate(t *testing.T) {
 			if got.ID == "" || got.Title != "Write tests" || got.ProjectID != project.ID {
 				t.Errorf("task = %+v", got)
 			}
+			if got.ProjectName != "Backend" {
+				t.Errorf("ProjectName = %q, want Backend", got.ProjectName)
+			}
 			if got.StatusCategory != "todo" {
 				t.Errorf("StatusCategory = %q, want todo", got.StatusCategory)
 			}

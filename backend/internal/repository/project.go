@@ -72,14 +72,14 @@ func (*ProjectRepository) InsertStatus(ctx context.Context, q database.DBTX, s m
 	return nil
 }
 
-func (*ProjectRepository) Exists(ctx context.Context, q database.DBTX, workspaceID, projectID string) (bool, error) {
-	var n int
+func (*ProjectRepository) Name(ctx context.Context, q database.DBTX, workspaceID, projectID string) (string, error) {
+	var name string
 	err := q.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM projects WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`,
+		`SELECT name FROM projects WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`,
 		projectID, workspaceID,
-	).Scan(&n)
+	).Scan(&name)
 	if err != nil {
-		return false, fmt.Errorf("project exists: %w", err)
+		return "", fmt.Errorf("project name: %w", err)
 	}
-	return n > 0, nil
+	return name, nil
 }

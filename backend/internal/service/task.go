@@ -59,13 +59,13 @@ func (s *TaskService) Create(ctx context.Context, session model.Session, project
 		DueDate: in.DueDate,
 	}
 	
-	err := database.WithTx(ctx, s.db, func(tx *sql.Tx) error {
-		exists, err := s.projects.Exists(ctx, tx, session.WorkspaceID, projectID)
+		err := database.WithTx(ctx, s.db, func(tx *sql.Tx) error {
+		projectName, err := s.projects.Name(ctx, tx, session.WorkspaceID, projectID)
 		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("%w: project", ErrNotFound)
+			}
 			return err
-		}
-		if !exists {
-			return fmt.Errorf("%w: project", ErrNotFound)
 		}
 
 		statusID, err := s.tasks.FirstStatusID(ctx, tx, session.WorkspaceID, projectID, model.StatusToDo)
@@ -80,6 +80,7 @@ func (s *TaskService) Create(ctx context.Context, session model.Session, project
 			return err
 		}
 
+		task.ProjectName = projectName
 		task.StatusID = statusID
 		task.StatusCategory = model.StatusToDo
 		task.Position = position.After(last)
