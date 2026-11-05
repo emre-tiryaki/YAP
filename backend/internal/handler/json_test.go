@@ -67,6 +67,7 @@ func TestDecodeJSON(t *testing.T) {
 		{"valid", `{"name":"x"}`, "x", false},
 		{"malformed", `{"name":`, "", true},
 		{"unknown field", `{"name":"x","extra":1}`, "", true},
+		{"unknown field first", `{"extra":1,"name":"x"}`, "", true},
 		{"wrong type", `{"name":5}`, "", true},
 		{"empty body", ``, "", true},
 		{"too large", `{"name":"` + strings.Repeat("a", maxBodyBytes+10) + `"}`, "", true},
@@ -81,8 +82,11 @@ func TestDecodeJSON(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("decodeJSON() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if tt.wantErr && !errors.Is(err, service.ErrInvalidInput) {
-				t.Errorf("error = %v, want ErrInvalidInput", err)
+			if tt.wantErr {
+				if !errors.Is(err, service.ErrInvalidInput) {
+					t.Errorf("error = %v, want ErrInvalidInput", err)
+				}
+				return
 			}
 			if p.Name != tt.want {
 				t.Errorf("Name = %q, want %q", p.Name, tt.want)
