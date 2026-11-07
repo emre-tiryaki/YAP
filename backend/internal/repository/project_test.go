@@ -90,11 +90,14 @@ func TestProjectListTaskCount(t *testing.T) {
 
 	p := seedProject(t, db, s.WorkspaceID, "p", baseNow)
 	empty := seedProject(t, db, s.WorkspaceID, "empty", "2025-12-31T00:00:00Z")
-	statuses := seedStatuses(t, db, s.WorkspaceID, p.ID)
+	main := seedPlan(t, db, s.WorkspaceID, p.ID, "Main")
+	second := seedPlan(t, db, s.WorkspaceID, p.ID, "Second")
+	mainStatuses := seedStatuses(t, db, s.WorkspaceID, main.ID)
+	secondStatuses := seedStatuses(t, db, s.WorkspaceID, second.ID)
 
-	seedTask(t, db, s, p.ID, statuses[model.StatusToDo], "one", "a0", nil)
-	seedTask(t, db, s, p.ID, statuses[model.StatusToDo], "two", "a1", nil)
-	gone := seedTask(t, db, s, p.ID, statuses[model.StatusToDo], "gone", "a2", nil)
+	seedTask(t, db, s, main, mainStatuses[model.StatusToDo], "one", "a0", nil)
+	seedTask(t, db, s, second, secondStatuses[model.StatusToDo], "two", "a1", nil)
+	gone := seedTask(t, db, s, main, mainStatuses[model.StatusToDo], "gone", "a2", nil)
 	mustExec(t, db, `UPDATE tasks SET deleted_at = ? WHERE id = ?`, baseNow, gone.ID)
 
 	got, err := repo.List(ctx, db, s.WorkspaceID)
@@ -106,7 +109,7 @@ func TestProjectListTaskCount(t *testing.T) {
 		counts[pr.ID] = pr.TaskCount
 	}
 	if counts[p.ID] != 2 {
-		t.Errorf("TaskCount = %d, want 2", counts[p.ID])
+		t.Errorf("TaskCount = %d, want 2 across plans", counts[p.ID])
 	}
 	if counts[empty.ID] != 0 {
 		t.Errorf("empty TaskCount = %d, want 0", counts[empty.ID])
@@ -132,29 +135,119 @@ func TestProjectInsertErrors(t *testing.T) {
 	}
 }
 
+func TestProjectInsertPlan(t *testing.T) {
+	ctx := context.Background()
+	db := newTestDB(t)
+	repo := NewProjectRepository()
+	s := seedWorkspace(t, db, "owner")
+	p := seedProject(t, db, s.WorkspaceID, "p", baseNow)
+	teamID := seedTeam(t, db, s.WorkspaceID, "Backend")
+	seedProjectTeam(t, db, s.WorkspaceID, p.ID, teamID)
+
+	tests := []struct {
+		name     string
+		plan     model.Plan
+		wantTeam sql.NullString
+		wantDesc sql.NullString
+	}{
+		{"whole project", model.Plan{Name: "Main"}, sql.NullString{}, sql.NullString{}},
+		{
+			"team plan",
+			model.Plan{Name: "API", TeamID: teamID, Description: "endpoints"},
+			sql.NullString{String: teamID, Valid: true},
+			sql.NullString{String: "endpoints", Valid: true},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			plan := tt.plan
+			plan.ID = model.NewID()
+			plan.WorkspaceID = s.WorkspaceID
+			plan.ProjectID = p.ID
+			if err := repo.InsertPlan(ctx, db, plan, baseNow); err != nil {
+				t.Fatalf("InsertPlan() error = %v", err)
+			}
+
+			var name, createdAt, updatedAt string
+			var team, desc sql.NullString
+			err := db.QueryRowContext(ctx,
+				`SELECT name, team_id, description, created_at, updated_at FROM plans WHERE id = ?`, plan.ID,
+			).Scan(&name, &team, &desc, &createdAt, &updatedAt)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if name != tt.plan.Name || team != tt.wantTeam || desc != tt.wantDesc {
+				t.Errorf("stored = %q %v %v", name, team, desc)
+			}
+			if createdAt != baseNow || updatedAt != baseNow {
+				t.Errorf("timestamps = %q %q, want %q", createdAt, updatedAt, baseNow)
+			}
+		})
+	}
+}
+
+func TestProjectInsertPlanErrors(t *testing.T) {
+	ctx := context.Background()
+	db := newTestDB(t)
+	repo := NewProjectRepository()
+	s := seedWorkspace(t, db, "owner")
+	p := seedProject(t, db, s.WorkspaceID, "p", baseNow)
+	unlinkedTeam := seedTeam(t, db, s.WorkspaceID, "Unlinked")
+
+	valid := model.Plan{ID: model.NewID(), WorkspaceID: s.WorkspaceID, ProjectID: p.ID, Name: "Main"}
+	if err := repo.InsertPlan(ctx, db, valid, baseNow); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name   string
+		mutate func(p *model.Plan)
+	}{
+		{"duplicate id", func(p *model.Plan) { p.ID = valid.ID }},
+		{"duplicate name in scope", func(p *model.Plan) { p.ID = model.NewID() }},
+		{"unknown project", func(p *model.Plan) { p.ID = model.NewID(); p.ProjectID = model.NewID() }},
+		{"unknown workspace", func(p *model.Plan) { p.ID = model.NewID(); p.WorkspaceID = model.NewID() }},
+		{"team not linked to project", func(p *model.Plan) {
+			p.ID = model.NewID()
+			p.Name = "Other"
+			p.TeamID = unlinkedTeam
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bad := valid
+			tt.mutate(&bad)
+			if err := repo.InsertPlan(ctx, db, bad, baseNow); err == nil {
+				t.Error("InsertPlan() expected an error")
+			}
+		})
+	}
+}
+
 func TestProjectInsertStatus(t *testing.T) {
 	ctx := context.Background()
 	db := newTestDB(t)
 	repo := NewProjectRepository()
 	s := seedWorkspace(t, db, "owner")
 	p := seedProject(t, db, s.WorkspaceID, "p", baseNow)
+	plan := seedPlan(t, db, s.WorkspaceID, p.ID, "Main")
 
 	valid := model.Status{
-		ID: model.NewID(), WorkspaceID: s.WorkspaceID, ProjectID: p.ID,
+		ID: model.NewID(), WorkspaceID: s.WorkspaceID, PlanID: plan.ID,
 		Title: "To Do", Color: "#fff", Category: model.StatusToDo, Position: "a0",
 	}
 	if err := repo.InsertStatus(ctx, db, valid, baseNow); err != nil {
 		t.Fatalf("InsertStatus() error = %v", err)
 	}
 
-	var title, category, position string
-	err := db.QueryRowContext(ctx, `SELECT title, category, position FROM statuses WHERE id = ?`, valid.ID).
-		Scan(&title, &category, &position)
+	var title, category, position, planID string
+	err := db.QueryRowContext(ctx, `SELECT title, category, position, plan_id FROM statuses WHERE id = ?`, valid.ID).
+		Scan(&title, &category, &position, &planID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if title != "To Do" || category != "todo" || position != "a0" {
-		t.Errorf("stored status = %q %q %q", title, category, position)
+	if title != "To Do" || category != "todo" || position != "a0" || planID != plan.ID {
+		t.Errorf("stored status = %q %q %q %q", title, category, position, planID)
 	}
 
 	tests := []struct {
@@ -163,7 +256,7 @@ func TestProjectInsertStatus(t *testing.T) {
 	}{
 		{"duplicate id", func(s *model.Status) { s.ID = valid.ID }},
 		{"invalid category", func(s *model.Status) { s.ID = model.NewID(); s.Category = "blocked" }},
-		{"unknown project", func(s *model.Status) { s.ID = model.NewID(); s.ProjectID = model.NewID() }},
+		{"unknown plan", func(s *model.Status) { s.ID = model.NewID(); s.PlanID = model.NewID() }},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -213,6 +306,109 @@ func TestProjectName(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("Name() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestProjectDefaultPlanID(t *testing.T) {
+	ctx := context.Background()
+	db := newTestDB(t)
+	repo := NewProjectRepository()
+	a := seedWorkspace(t, db, "a")
+	b := seedWorkspace(t, db, "b")
+	p := seedProject(t, db, a.WorkspaceID, "p", baseNow)
+
+	teamID := seedTeam(t, db, a.WorkspaceID, "Backend")
+	seedProjectTeam(t, db, a.WorkspaceID, p.ID, teamID)
+	teamPlan := model.Plan{ID: model.NewID(), WorkspaceID: a.WorkspaceID, ProjectID: p.ID, TeamID: teamID, Name: "Team"}
+	if err := repo.InsertPlan(ctx, db, teamPlan, "2025-12-31T00:00:00Z"); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := repo.DefaultPlanID(ctx, db, a.WorkspaceID, p.ID); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("DefaultPlanID() with only a team plan error = %v, want sql.ErrNoRows", err)
+	}
+
+	earliest := model.Plan{ID: model.NewID(), WorkspaceID: a.WorkspaceID, ProjectID: p.ID, Name: "Earliest"}
+	later := model.Plan{ID: model.NewID(), WorkspaceID: a.WorkspaceID, ProjectID: p.ID, Name: "Later"}
+	if err := repo.InsertPlan(ctx, db, later, "2026-01-02T00:00:00Z"); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.InsertPlan(ctx, db, earliest, "2026-01-01T00:00:00Z"); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := repo.DefaultPlanID(ctx, db, a.WorkspaceID, p.ID)
+	if err != nil {
+		t.Fatalf("DefaultPlanID() error = %v", err)
+	}
+	if got != earliest.ID {
+		t.Errorf("DefaultPlanID() = %q, want earliest whole-project plan %q", got, earliest.ID)
+	}
+
+	mustExec(t, db, `UPDATE plans SET archived_at = ? WHERE id = ?`, baseNow, earliest.ID)
+	got, err = repo.DefaultPlanID(ctx, db, a.WorkspaceID, p.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != later.ID {
+		t.Errorf("DefaultPlanID() = %q, want archived plan to be skipped", got)
+	}
+
+	mustExec(t, db, `UPDATE plans SET deleted_at = ? WHERE id = ?`, baseNow, later.ID)
+	if _, err := repo.DefaultPlanID(ctx, db, a.WorkspaceID, p.ID); !errors.Is(err, sql.ErrNoRows) {
+		t.Errorf("DefaultPlanID() after deleting all error = %v, want sql.ErrNoRows", err)
+	}
+
+	if _, err := repo.DefaultPlanID(ctx, db, b.WorkspaceID, p.ID); !errors.Is(err, sql.ErrNoRows) {
+		t.Errorf("DefaultPlanID() other workspace error = %v, want sql.ErrNoRows", err)
+	}
+}
+
+func TestProjectPlanID(t *testing.T) {
+	ctx := context.Background()
+	db := newTestDB(t)
+	repo := NewProjectRepository()
+	a := seedWorkspace(t, db, "a")
+	b := seedWorkspace(t, db, "b")
+
+	p := seedProject(t, db, a.WorkspaceID, "p", baseNow)
+	other := seedProject(t, db, a.WorkspaceID, "other", baseNow)
+	live := seedPlan(t, db, a.WorkspaceID, p.ID, "live")
+	deleted := seedPlan(t, db, a.WorkspaceID, p.ID, "deleted")
+	archived := seedPlan(t, db, a.WorkspaceID, p.ID, "archived")
+	mustExec(t, db, `UPDATE plans SET deleted_at = ? WHERE id = ?`, baseNow, deleted.ID)
+	mustExec(t, db, `UPDATE plans SET archived_at = ? WHERE id = ?`, baseNow, archived.ID)
+
+	tests := []struct {
+		name        string
+		workspaceID string
+		projectID   string
+		planID      string
+		wantNoRows  bool
+	}{
+		{"existing", a.WorkspaceID, p.ID, live.ID, false},
+		{"soft deleted", a.WorkspaceID, p.ID, deleted.ID, true},
+		{"archived", a.WorkspaceID, p.ID, archived.ID, true},
+		{"other project", a.WorkspaceID, other.ID, live.ID, true},
+		{"other workspace", b.WorkspaceID, p.ID, live.ID, true},
+		{"unknown id", a.WorkspaceID, p.ID, "missing", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := repo.PlanID(ctx, db, tt.workspaceID, tt.projectID, tt.planID)
+			if tt.wantNoRows {
+				if !errors.Is(err, sql.ErrNoRows) {
+					t.Fatalf("PlanID() error = %v, want sql.ErrNoRows", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("PlanID() error = %v", err)
+			}
+			if got != tt.planID {
+				t.Errorf("PlanID() = %q, want %q", got, tt.planID)
 			}
 		})
 	}

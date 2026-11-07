@@ -16,9 +16,10 @@ func TestTaskFirstStatusID(t *testing.T) {
 	repo := NewTaskRepository()
 	s := seedWorkspace(t, db, "owner")
 	p := seedProject(t, db, s.WorkspaceID, "p", baseNow)
-	statuses := seedStatuses(t, db, s.WorkspaceID, p.ID)
+	plan := seedPlan(t, db, s.WorkspaceID, p.ID, "Main")
+	statuses := seedStatuses(t, db, s.WorkspaceID, plan.ID)
 
-	got, err := repo.FirstStatusID(ctx, db, s.WorkspaceID, p.ID, model.StatusInProgress)
+	got, err := repo.FirstStatusID(ctx, db, s.WorkspaceID, plan.ID, model.StatusInProgress)
 	if err != nil {
 		t.Fatalf("FirstStatusID() error = %v", err)
 	}
@@ -27,13 +28,13 @@ func TestTaskFirstStatusID(t *testing.T) {
 	}
 
 	extra := model.Status{
-		ID: model.NewID(), WorkspaceID: s.WorkspaceID, ProjectID: p.ID,
+		ID: model.NewID(), WorkspaceID: s.WorkspaceID, PlanID: plan.ID,
 		Title: "Earlier", Color: "#000", Category: model.StatusToDo, Position: "a0",
 	}
 	if err := NewProjectRepository().InsertStatus(ctx, db, extra, baseNow); err != nil {
 		t.Fatal(err)
 	}
-	got, err = repo.FirstStatusID(ctx, db, s.WorkspaceID, p.ID, model.StatusToDo)
+	got, err = repo.FirstStatusID(ctx, db, s.WorkspaceID, plan.ID, model.StatusToDo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +43,7 @@ func TestTaskFirstStatusID(t *testing.T) {
 	}
 
 	mustExec(t, db, `UPDATE statuses SET deleted_at = ? WHERE id = ?`, baseNow, extra.ID)
-	got, err = repo.FirstStatusID(ctx, db, s.WorkspaceID, p.ID, model.StatusToDo)
+	got, err = repo.FirstStatusID(ctx, db, s.WorkspaceID, plan.ID, model.StatusToDo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,19 +59,22 @@ func TestTaskFirstStatusIDNotFound(t *testing.T) {
 	s := seedWorkspace(t, db, "owner")
 	other := seedWorkspace(t, db, "other")
 	p := seedProject(t, db, s.WorkspaceID, "p", baseNow)
-	seedStatuses(t, db, s.WorkspaceID, p.ID)
+	plan := seedPlan(t, db, s.WorkspaceID, p.ID, "Main")
+	emptyPlan := seedPlan(t, db, s.WorkspaceID, p.ID, "Empty")
+	seedStatuses(t, db, s.WorkspaceID, plan.ID)
 
 	tests := []struct {
 		name        string
 		workspaceID string
-		projectID   string
+		planID      string
 	}{
-		{"unknown project", s.WorkspaceID, "missing"},
-		{"other workspace", other.WorkspaceID, p.ID},
+		{"unknown plan", s.WorkspaceID, "missing"},
+		{"other workspace", other.WorkspaceID, plan.ID},
+		{"plan without statuses", s.WorkspaceID, emptyPlan.ID},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := repo.FirstStatusID(ctx, db, tt.workspaceID, tt.projectID, model.StatusToDo)
+			_, err := repo.FirstStatusID(ctx, db, tt.workspaceID, tt.planID, model.StatusToDo)
 			if !errors.Is(err, sql.ErrNoRows) {
 				t.Errorf("FirstStatusID() error = %v, want sql.ErrNoRows", err)
 			}
@@ -84,10 +88,11 @@ func TestTaskLastPosition(t *testing.T) {
 	repo := NewTaskRepository()
 	s := seedWorkspace(t, db, "owner")
 	p := seedProject(t, db, s.WorkspaceID, "p", baseNow)
-	statuses := seedStatuses(t, db, s.WorkspaceID, p.ID)
+	plan := seedPlan(t, db, s.WorkspaceID, p.ID, "Main")
+	statuses := seedStatuses(t, db, s.WorkspaceID, plan.ID)
 	todo := statuses[model.StatusToDo]
 
-	got, err := repo.LastPosition(ctx, db, s.WorkspaceID, p.ID, todo)
+	got, err := repo.LastPosition(ctx, db, s.WorkspaceID, plan.ID, todo)
 	if err != nil {
 		t.Fatalf("LastPosition() error = %v", err)
 	}
@@ -95,16 +100,26 @@ func TestTaskLastPosition(t *testing.T) {
 		t.Errorf("LastPosition() on empty column = %q, want empty", got)
 	}
 
-	seedTask(t, db, s, p.ID, todo, "a", "a1", nil)
-	seedTask(t, db, s, p.ID, todo, "b", "a5", nil)
-	seedTask(t, db, s, p.ID, statuses[model.StatusDone], "other column", "zz", nil)
+	seedTask(t, db, s, plan, todo, "a", "a1", nil)
+	seedTask(t, db, s, plan, todo, "b", "a5", nil)
+	seedTask(t, db, s, plan, statuses[model.StatusDone], "other column", "zz", nil)
 
-	got, err = repo.LastPosition(ctx, db, s.WorkspaceID, p.ID, todo)
+	got, err = repo.LastPosition(ctx, db, s.WorkspaceID, plan.ID, todo)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got != "a5" {
 		t.Errorf("LastPosition() = %q, want a5", got)
+	}
+
+	second := seedPlan(t, db, s.WorkspaceID, p.ID, "Second")
+	secondStatuses := seedStatuses(t, db, s.WorkspaceID, second.ID)
+	got, err = repo.LastPosition(ctx, db, s.WorkspaceID, second.ID, secondStatuses[model.StatusToDo])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "" {
+		t.Errorf("LastPosition() in another plan = %q, want empty", got)
 	}
 }
 
@@ -114,7 +129,8 @@ func TestTaskInsert(t *testing.T) {
 	repo := NewTaskRepository()
 	s := seedWorkspace(t, db, "owner")
 	p := seedProject(t, db, s.WorkspaceID, "p", baseNow)
-	statuses := seedStatuses(t, db, s.WorkspaceID, p.ID)
+	plan := seedPlan(t, db, s.WorkspaceID, p.ID, "Main")
+	statuses := seedStatuses(t, db, s.WorkspaceID, plan.ID)
 
 	due := time.Date(2026, 12, 1, 15, 4, 5, 0, time.FixedZone("TRT", 3*3600))
 	tests := []struct {
@@ -130,7 +146,7 @@ func TestTaskInsert(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			task := model.Task{
-				ID: model.NewID(), WorkspaceID: s.WorkspaceID, ProjectID: p.ID,
+				ID: model.NewID(), WorkspaceID: s.WorkspaceID, ProjectID: p.ID, PlanID: plan.ID,
 				StatusID: statuses[model.StatusToDo], CreatedBy: s.MembershipID,
 				Title: tt.name, Description: tt.description, Position: "a0", DueDate: tt.due,
 			}
@@ -138,17 +154,17 @@ func TestTaskInsert(t *testing.T) {
 				t.Fatalf("Insert() error = %v", err)
 			}
 
-			var title string
+			var title, planID string
 			var desc, dueDate sql.NullString
 			var createdAt, updatedAt string
 			err := db.QueryRowContext(ctx,
-				`SELECT title, description, due_date, created_at, updated_at FROM tasks WHERE id = ?`, task.ID,
-			).Scan(&title, &desc, &dueDate, &createdAt, &updatedAt)
+				`SELECT title, plan_id, description, due_date, created_at, updated_at FROM tasks WHERE id = ?`, task.ID,
+			).Scan(&title, &planID, &desc, &dueDate, &createdAt, &updatedAt)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if title != tt.name || desc != tt.wantDesc || dueDate != tt.wantDue {
-				t.Errorf("stored = %q %v %v", title, desc, dueDate)
+			if title != tt.name || planID != plan.ID || desc != tt.wantDesc || dueDate != tt.wantDue {
+				t.Errorf("stored = %q %q %v %v", title, planID, desc, dueDate)
 			}
 			if createdAt != baseNow || updatedAt != baseNow {
 				t.Errorf("timestamps = %q %q, want %q", createdAt, updatedAt, baseNow)
@@ -163,10 +179,16 @@ func TestTaskInsertErrors(t *testing.T) {
 	repo := NewTaskRepository()
 	s := seedWorkspace(t, db, "owner")
 	p := seedProject(t, db, s.WorkspaceID, "p", baseNow)
-	statuses := seedStatuses(t, db, s.WorkspaceID, p.ID)
+	plan := seedPlan(t, db, s.WorkspaceID, p.ID, "Main")
+	statuses := seedStatuses(t, db, s.WorkspaceID, plan.ID)
+
+	secondPlan := seedPlan(t, db, s.WorkspaceID, p.ID, "Second")
+	secondStatuses := seedStatuses(t, db, s.WorkspaceID, secondPlan.ID)
+	otherProject := seedProject(t, db, s.WorkspaceID, "other", baseNow)
+	otherPlan := seedPlan(t, db, s.WorkspaceID, otherProject.ID, "Main")
 
 	valid := model.Task{
-		ID: model.NewID(), WorkspaceID: s.WorkspaceID, ProjectID: p.ID,
+		ID: model.NewID(), WorkspaceID: s.WorkspaceID, ProjectID: p.ID, PlanID: plan.ID,
 		StatusID: statuses[model.StatusToDo], CreatedBy: s.MembershipID, Title: "t", Position: "a0",
 	}
 	if err := repo.Insert(ctx, db, valid, baseNow); err != nil {
@@ -179,8 +201,17 @@ func TestTaskInsertErrors(t *testing.T) {
 	}{
 		{"duplicate id", func(task *model.Task) { task.ID = valid.ID }},
 		{"unknown status", func(task *model.Task) { task.ID = model.NewID(); task.StatusID = model.NewID() }},
+		{"unknown plan", func(task *model.Task) { task.ID = model.NewID(); task.PlanID = model.NewID() }},
 		{"unknown project", func(task *model.Task) { task.ID = model.NewID(); task.ProjectID = model.NewID() }},
 		{"unknown creator", func(task *model.Task) { task.ID = model.NewID(); task.CreatedBy = model.NewID() }},
+		{"status of another plan", func(task *model.Task) {
+			task.ID = model.NewID()
+			task.StatusID = secondStatuses[model.StatusToDo]
+		}},
+		{"plan of another project", func(task *model.Task) {
+			task.ID = model.NewID()
+			task.PlanID = otherPlan.ID
+		}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -199,8 +230,9 @@ func TestTaskInsertAssignee(t *testing.T) {
 	repo := NewTaskRepository()
 	s := seedWorkspace(t, db, "owner")
 	p := seedProject(t, db, s.WorkspaceID, "p", baseNow)
-	statuses := seedStatuses(t, db, s.WorkspaceID, p.ID)
-	task := seedTask(t, db, s, p.ID, statuses[model.StatusToDo], "t", "a0", nil)
+	plan := seedPlan(t, db, s.WorkspaceID, p.ID, "Main")
+	statuses := seedStatuses(t, db, s.WorkspaceID, plan.ID)
+	task := seedTask(t, db, s, plan, statuses[model.StatusToDo], "t", "a0", nil)
 
 	if err := repo.InsertAssignee(ctx, db, s.WorkspaceID, task.ID, s.MembershipID, baseNow); err != nil {
 		t.Fatalf("InsertAssignee() error = %v", err)
@@ -235,25 +267,30 @@ func TestTaskListUpcoming(t *testing.T) {
 	foreign := seedWorkspace(t, db, "foreign")
 
 	p := seedProject(t, db, s.WorkspaceID, "Alpha", baseNow)
-	statuses := seedStatuses(t, db, s.WorkspaceID, p.ID)
+	plan := seedPlan(t, db, s.WorkspaceID, p.ID, "Main")
+	statuses := seedStatuses(t, db, s.WorkspaceID, plan.ID)
 	todo, doing, done := statuses[model.StatusToDo], statuses[model.StatusInProgress], statuses[model.StatusDone]
+
+	secondPlan := seedPlan(t, db, s.WorkspaceID, p.ID, "Second")
+	secondStatuses := seedStatuses(t, db, s.WorkspaceID, secondPlan.ID)
 
 	d1 := time.Date(2026, 12, 1, 9, 0, 0, 0, time.UTC)
 	d2 := time.Date(2026, 12, 2, 9, 0, 0, 0, time.UTC)
 	d3 := time.Date(2026, 12, 3, 9, 0, 0, 0, time.UTC)
 
-	second := seedTask(t, db, s, p.ID, doing, "second", "a1", &d2)
-	first := seedTask(t, db, s, p.ID, todo, "first", "a2", &d1)
-	third := seedTask(t, db, s, p.ID, todo, "third", "a3", &d3)
-	finished := seedTask(t, db, s, p.ID, done, "finished", "a4", &d1)
-	undated := seedTask(t, db, s, p.ID, todo, "undated", "a5", nil)
-	deletedTask := seedTask(t, db, s, p.ID, todo, "deleted task", "a6", &d1)
-	removedAssignee := seedTask(t, db, s, p.ID, todo, "removed assignee", "a7", &d1)
-	notMine := seedTask(t, db, s, p.ID, todo, "not mine", "a8", &d1)
+	second := seedTask(t, db, s, plan, doing, "second", "a1", &d2)
+	first := seedTask(t, db, s, plan, todo, "first", "a2", &d1)
+	third := seedTask(t, db, s, secondPlan, secondStatuses[model.StatusToDo], "third", "a3", &d3)
+	finished := seedTask(t, db, s, plan, done, "finished", "a4", &d1)
+	undated := seedTask(t, db, s, plan, todo, "undated", "a5", nil)
+	deletedTask := seedTask(t, db, s, plan, todo, "deleted task", "a6", &d1)
+	removedAssignee := seedTask(t, db, s, plan, todo, "removed assignee", "a7", &d1)
+	notMine := seedTask(t, db, s, plan, todo, "not mine", "a8", &d1)
 
 	deletedProject := seedProject(t, db, s.WorkspaceID, "Gone", baseNow)
-	dpStatuses := seedStatuses(t, db, s.WorkspaceID, deletedProject.ID)
-	inDeletedProject := seedTask(t, db, s, deletedProject.ID, dpStatuses[model.StatusToDo], "in deleted project", "a0", &d1)
+	dpPlan := seedPlan(t, db, s.WorkspaceID, deletedProject.ID, "Main")
+	dpStatuses := seedStatuses(t, db, s.WorkspaceID, dpPlan.ID)
+	inDeletedProject := seedTask(t, db, s, dpPlan, dpStatuses[model.StatusToDo], "in deleted project", "a0", &d1)
 
 	for _, task := range []model.Task{second, first, third, finished, undated, deletedTask, removedAssignee, inDeletedProject} {
 		assign(t, db, s.WorkspaceID, task.ID, s.MembershipID)
@@ -261,8 +298,9 @@ func TestTaskListUpcoming(t *testing.T) {
 	assign(t, db, s.WorkspaceID, notMine.ID, colleague)
 
 	fp := seedProject(t, db, foreign.WorkspaceID, "Foreign", baseNow)
-	fs := seedStatuses(t, db, foreign.WorkspaceID, fp.ID)
-	foreignTask := seedTask(t, db, foreign, fp.ID, fs[model.StatusToDo], "foreign task", "a0", &d1)
+	fPlan := seedPlan(t, db, foreign.WorkspaceID, fp.ID, "Main")
+	fs := seedStatuses(t, db, foreign.WorkspaceID, fPlan.ID)
+	foreignTask := seedTask(t, db, foreign, fPlan, fs[model.StatusToDo], "foreign task", "a0", &d1)
 	assign(t, db, foreign.WorkspaceID, foreignTask.ID, foreign.MembershipID)
 
 	mustExec(t, db, `UPDATE tasks SET deleted_at = ? WHERE id = ?`, baseNow, deletedTask.ID)
@@ -286,6 +324,9 @@ func TestTaskListUpcoming(t *testing.T) {
 
 	if got[0].ID != first.ID || got[0].ProjectID != p.ID || got[0].ProjectName != "Alpha" {
 		t.Errorf("got[0] = %+v", got[0])
+	}
+	if got[0].PlanID != plan.ID || got[2].PlanID != secondPlan.ID {
+		t.Errorf("plan ids = %q %q, want %q %q", got[0].PlanID, got[2].PlanID, plan.ID, secondPlan.ID)
 	}
 	if got[0].WorkspaceID != s.WorkspaceID {
 		t.Errorf("WorkspaceID = %q, want %q", got[0].WorkspaceID, s.WorkspaceID)
@@ -331,8 +372,9 @@ func TestTaskListUpcomingInvalidDueDate(t *testing.T) {
 	db := newTestDB(t)
 	s := seedWorkspace(t, db, "owner")
 	p := seedProject(t, db, s.WorkspaceID, "p", baseNow)
-	statuses := seedStatuses(t, db, s.WorkspaceID, p.ID)
-	task := seedTask(t, db, s, p.ID, statuses[model.StatusToDo], "broken", "a0", nil)
+	plan := seedPlan(t, db, s.WorkspaceID, p.ID, "Main")
+	statuses := seedStatuses(t, db, s.WorkspaceID, plan.ID)
+	task := seedTask(t, db, s, plan, statuses[model.StatusToDo], "broken", "a0", nil)
 	assign(t, db, s.WorkspaceID, task.ID, s.MembershipID)
 	mustExec(t, db, `UPDATE tasks SET due_date = 'not-a-date' WHERE id = ?`, task.ID)
 

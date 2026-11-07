@@ -28,7 +28,7 @@ func (*ProjectRepository) List(ctx context.Context, q database.DBTX, workspaceID
 		workspaceID,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("list projectS: %w", err)
+		return nil, fmt.Errorf("list projects: %w", err)
 	}
 	defer rows.Close()
 
@@ -60,11 +60,23 @@ func (*ProjectRepository) Insert(ctx context.Context, q database.DBTX, p model.P
 	return nil
 }
 
+func (*ProjectRepository) InsertPlan(ctx context.Context, q database.DBTX, p model.Plan, now string) error {
+	_, err := q.ExecContext(ctx,
+		`INSERT INTO plans (id, workspace_id, project_id, team_id, name, description, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		p.ID, p.WorkspaceID, p.ProjectID, nullIfEmpty(p.TeamID), p.Name, nullIfEmpty(p.Description), now, now,
+	)
+	if err != nil {
+		return fmt.Errorf("insert plan: %w", err)
+	}
+	return nil
+}
+
 func (*ProjectRepository) InsertStatus(ctx context.Context, q database.DBTX, s model.Status, now string) error {
 	_, err := q.ExecContext(ctx,
-		`INSERT INTO statuses (id, workspace_id, project_id, title, color, category, position, updated_at)
+		`INSERT INTO statuses (id, workspace_id, plan_id, title, color, category, position, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		s.ID, s.WorkspaceID, s.ProjectID, s.Title, s.Color, string(s.Category), s.Position, now,
+		s.ID, s.WorkspaceID, s.PlanID, s.Title, s.Color, string(s.Category), s.Position, now,
 	)
 	if err != nil {
 		return fmt.Errorf("insert status: %w", err)
@@ -82,4 +94,34 @@ func (*ProjectRepository) Name(ctx context.Context, q database.DBTX, workspaceID
 		return "", fmt.Errorf("project name: %w", err)
 	}
 	return name, nil
+}
+
+func (*ProjectRepository) DefaultPlanID(ctx context.Context, q database.DBTX, workspaceID, projectID string) (string, error) {
+	var id string
+	err := q.QueryRowContext(ctx,
+		`SELECT id FROM plans
+		 WHERE workspace_id = ? AND project_id = ? AND team_id IS NULL
+		   AND deleted_at IS NULL AND archived_at IS NULL
+		 ORDER BY created_at, id
+		 LIMIT 1`,
+		workspaceID, projectID,
+	).Scan(&id)
+	if err != nil {
+		return "", fmt.Errorf("default plan: %w", err)
+	}
+	return id, nil
+}
+
+func (*ProjectRepository) PlanID(ctx context.Context, q database.DBTX, workspaceID, projectID, planID string) (string, error) {
+	var id string
+	err := q.QueryRowContext(ctx,
+		`SELECT id FROM plans
+		 WHERE id = ? AND workspace_id = ? AND project_id = ?
+		   AND deleted_at IS NULL AND archived_at IS NULL`,
+		planID, workspaceID, projectID,
+	).Scan(&id)
+	if err != nil {
+		return "", fmt.Errorf("plan: %w", err)
+	}
+	return id, nil
 }

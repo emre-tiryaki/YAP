@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 
 	"github.com/emre-tiryaki/YAP/backend/internal/model"
@@ -61,6 +62,42 @@ func TestProjectCreateWhitespaceNameIsInvalid(t *testing.T) {
 	}
 }
 
+func TestProjectCreateAddsDefaultPlan(t *testing.T) {
+	ctx := context.Background()
+	db, session := newTestDB(t)
+	svc := NewProjectService(db, repository.NewProjectRepository())
+
+	p, err := svc.Create(ctx, session.WorkspaceID, CreateProjectInput{Name: "Board"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rows, err := db.QueryContext(ctx, `SELECT workspace_id, name, team_id FROM plans WHERE project_id = ?`, p.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+
+	n := 0
+	for rows.Next() {
+		var workspaceID, name string
+		var teamID sql.NullString
+		if err := rows.Scan(&workspaceID, &name, &teamID); err != nil {
+			t.Fatal(err)
+		}
+		if workspaceID != session.WorkspaceID || name != defaultPlanName || teamID.Valid {
+			t.Errorf("plan = %q %q %v, want whole-project plan %q", workspaceID, name, teamID, defaultPlanName)
+		}
+		n++
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Errorf("plans = %d, want 1", n)
+	}
+}
+
 func TestProjectCreateDefaultStatusOrderAndCategories(t *testing.T) {
 	ctx := context.Background()
 	db, session := newTestDB(t)
@@ -72,7 +109,9 @@ func TestProjectCreateDefaultStatusOrderAndCategories(t *testing.T) {
 	}
 
 	rows, err := db.QueryContext(ctx,
-		`SELECT title, category, position FROM statuses WHERE project_id = ? ORDER BY position`, p.ID)
+		`SELECT s.title, s.category, s.position
+		 FROM statuses s JOIN plans pl ON pl.id = s.plan_id
+		 WHERE pl.project_id = ? ORDER BY s.position`, p.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,15 +156,16 @@ func TestProjectCreateRollsBackOnFailure(t *testing.T) {
 		t.Fatal("Create() expected an error for an unknown workspace")
 	}
 
-	var projects, statuses int
-	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM projects").Scan(&projects); err != nil {
-		t.Fatal(err)
+	counts := map[string]int{}
+	for _, table := range []string{"projects", "plans", "statuses"} {
+		var n int
+		if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM "+table).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		counts[table] = n
 	}
-	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM statuses").Scan(&statuses); err != nil {
-		t.Fatal(err)
-	}
-	if projects != 0 || statuses != 0 {
-		t.Errorf("projects = %d, statuses = %d, want 0 after rollback", projects, statuses)
+	if counts["projects"] != 0 || counts["plans"] != 0 || counts["statuses"] != 0 {
+		t.Errorf("counts = %v, want 0 after rollback", counts)
 	}
 }
 

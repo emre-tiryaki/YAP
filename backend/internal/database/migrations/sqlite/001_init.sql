@@ -1,3 +1,4 @@
+-- backend/internal/database/migrations/sqlite/001_init.sql
 CREATE TABLE users (
     id           TEXT NOT NULL PRIMARY KEY CHECK (length(id) = 36),
     display_name TEXT NOT NULL,
@@ -59,23 +60,6 @@ CREATE INDEX idx_projects_workspace_id
     ON projects (workspace_id)
     WHERE deleted_at IS NULL;
 
-CREATE TABLE statuses (
-    id           TEXT NOT NULL PRIMARY KEY CHECK (length(id) = 36),
-    workspace_id TEXT NOT NULL REFERENCES workspaces (id),
-    project_id   TEXT NOT NULL,
-    title        TEXT NOT NULL,
-    description  TEXT,
-    color        TEXT NOT NULL,
-    category     TEXT NOT NULL CHECK (category IN ('todo', 'in_progress', 'done')),
-    position     TEXT NOT NULL,
-    updated_at   TEXT NOT NULL,
-    deleted_at   TEXT,
-    UNIQUE (id, project_id),
-    FOREIGN KEY (project_id, workspace_id) REFERENCES projects (id, workspace_id)
-) STRICT;
-
-CREATE INDEX idx_statuses_project_id_position ON statuses (project_id, position);
-
 CREATE TABLE project_teams (
     workspace_id TEXT NOT NULL REFERENCES workspaces (id),
     project_id   TEXT NOT NULL,
@@ -105,12 +89,54 @@ CREATE TABLE team_members (
 
 CREATE INDEX idx_team_members_team_id ON team_members (team_id);
 
+CREATE TABLE plans (
+    id           TEXT NOT NULL PRIMARY KEY CHECK (length(id) = 36),
+    workspace_id TEXT NOT NULL REFERENCES workspaces (id),
+    project_id   TEXT NOT NULL,
+    team_id      TEXT,
+    name         TEXT NOT NULL,
+    description  TEXT,
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL,
+    archived_at  TEXT,
+    deleted_at   TEXT,
+    UNIQUE (id, workspace_id),
+    UNIQUE (id, project_id),
+    FOREIGN KEY (project_id, workspace_id) REFERENCES projects (id, workspace_id),
+    FOREIGN KEY (project_id, team_id) REFERENCES project_teams (project_id, team_id)
+) STRICT;
+
+CREATE INDEX idx_plans_project_id_team_id
+    ON plans (project_id, team_id)
+    WHERE deleted_at IS NULL;
+
+CREATE UNIQUE INDEX idx_plans_project_id_team_id_name
+    ON plans (project_id, COALESCE(team_id, ''), name)
+    WHERE deleted_at IS NULL;
+
+CREATE TABLE statuses (
+    id           TEXT NOT NULL PRIMARY KEY CHECK (length(id) = 36),
+    workspace_id TEXT NOT NULL REFERENCES workspaces (id),
+    plan_id      TEXT NOT NULL,
+    title        TEXT NOT NULL,
+    description  TEXT,
+    color        TEXT NOT NULL,
+    category     TEXT NOT NULL CHECK (category IN ('todo', 'in_progress', 'done')),
+    position     TEXT NOT NULL,
+    updated_at   TEXT NOT NULL,
+    deleted_at   TEXT,
+    UNIQUE (id, plan_id),
+    FOREIGN KEY (plan_id, workspace_id) REFERENCES plans (id, workspace_id)
+) STRICT;
+
+CREATE INDEX idx_statuses_plan_id_position ON statuses (plan_id, position);
+
 CREATE TABLE tasks (
     id           TEXT NOT NULL PRIMARY KEY CHECK (length(id) = 36),
     workspace_id TEXT NOT NULL REFERENCES workspaces (id),
     project_id   TEXT NOT NULL,
+    plan_id      TEXT NOT NULL,
     status_id    TEXT NOT NULL,
-    team_id      TEXT,
     parent_id    TEXT,
     created_by   TEXT NOT NULL,
     title        TEXT NOT NULL,
@@ -123,15 +149,15 @@ CREATE TABLE tasks (
     UNIQUE (id, workspace_id),
     UNIQUE (id, project_id),
     FOREIGN KEY (project_id, workspace_id) REFERENCES projects (id, workspace_id),
-    FOREIGN KEY (status_id, project_id) REFERENCES statuses (id, project_id),
+    FOREIGN KEY (plan_id, project_id) REFERENCES plans (id, project_id),
+    FOREIGN KEY (status_id, plan_id) REFERENCES statuses (id, plan_id),
     FOREIGN KEY (parent_id, project_id) REFERENCES tasks (id, project_id),
-    FOREIGN KEY (created_by, workspace_id) REFERENCES memberships (id, workspace_id),
-    FOREIGN KEY (project_id, team_id) REFERENCES project_teams (project_id, team_id)
+    FOREIGN KEY (created_by, workspace_id) REFERENCES memberships (id, workspace_id)
 ) STRICT;
 
 CREATE INDEX idx_tasks_parent_id ON tasks (parent_id);
-CREATE INDEX idx_tasks_project_id_team_id ON tasks (project_id, team_id);
-CREATE INDEX idx_tasks_project_id_status_id_position ON tasks (project_id, status_id, position);
+CREATE INDEX idx_tasks_project_id ON tasks (project_id) WHERE deleted_at IS NULL;
+CREATE INDEX idx_tasks_plan_id_status_id_position ON tasks (plan_id, status_id, position);
 CREATE INDEX idx_tasks_workspace_id_updated_at ON tasks (workspace_id, updated_at);
 
 CREATE TABLE task_assignees (

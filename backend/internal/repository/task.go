@@ -15,14 +15,14 @@ func NewTaskRepository() *TaskRepository {
 	return &TaskRepository{}
 }
 
-func (*TaskRepository) FirstStatusID(ctx context.Context, q database.DBTX, workspaceID, projectID string, category model.StatusCategory) (string, error) {
+func (*TaskRepository) FirstStatusID(ctx context.Context, q database.DBTX, workspaceID, planID string, category model.StatusCategory) (string, error) {
 	var id string
 	err := q.QueryRowContext(ctx,
 		`SELECT id FROM statuses
-		 WHERE workspace_id =? AND project_id = ? AND category = ? AND deleted_at IS NULL
+		 WHERE workspace_id = ? AND plan_id = ? AND category = ? AND deleted_at IS NULL
 		 ORDER BY position
 		 LIMIT 1`,
-		 workspaceID, projectID, string(category),
+		workspaceID, planID, string(category),
 	).Scan(&id)
 	if err != nil {
 		return "", fmt.Errorf("first status: %w", err)
@@ -30,12 +30,12 @@ func (*TaskRepository) FirstStatusID(ctx context.Context, q database.DBTX, works
 	return id, nil
 }
 
-func (*TaskRepository) LastPosition(ctx context.Context, q database.DBTX, workspaceID, projectID, statusID string) (string, error) {
+func (*TaskRepository) LastPosition(ctx context.Context, q database.DBTX, workspaceID, planID, statusID string) (string, error) {
 	var pos string
 	err := q.QueryRowContext(ctx,
 		`SELECT COALESCE(MAX(position), '') FROM tasks
-		 WHERE workspace_id = ? AND project_id = ? AND status_id = ?`,
-		 workspaceID, projectID, statusID,
+		 WHERE workspace_id = ? AND plan_id = ? AND status_id = ?`,
+		workspaceID, planID, statusID,
 	).Scan(&pos)
 	if err != nil {
 		return "", fmt.Errorf("last position: %w", err)
@@ -51,9 +51,9 @@ func (*TaskRepository) Insert(ctx context.Context, q database.DBTX, t model.Task
 
 	_, err := q.ExecContext(ctx,
 		`INSERT INTO tasks
-			(id, workspace_id, project_id, status_id, created_by, title, description, position, due_date, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		t.ID, t.WorkspaceID, t.ProjectID, t.StatusID, t.CreatedBy, t.Title,
+			(id, workspace_id, project_id, plan_id, status_id, created_by, title, description, position, due_date, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		t.ID, t.WorkspaceID, t.ProjectID, t.PlanID, t.StatusID, t.CreatedBy, t.Title,
 		nullIfEmpty(t.Description), t.Position, dueDate, now, now,
 	)
 	if err != nil {
@@ -66,7 +66,7 @@ func (*TaskRepository) InsertAssignee(ctx context.Context, q database.DBTX, work
 	_, err := q.ExecContext(ctx,
 		`INSERT INTO task_assignees (workspace_id, task_id, membership_id, assigned_at, updated_at)
 		VALUES (?, ?, ?, ?, ?)`,
-		workspaceID, taskID, membershipID, now, now,	
+		workspaceID, taskID, membershipID, now, now,
 	)
 	if err != nil {
 		return fmt.Errorf("insert task assignee: %w", err)
@@ -76,11 +76,11 @@ func (*TaskRepository) InsertAssignee(ctx context.Context, q database.DBTX, work
 
 func (*TaskRepository) ListUpcoming(ctx context.Context, q database.DBTX, workspaceID, membershipID string, limit int) ([]model.Task, error) {
 	rows, err := q.QueryContext(ctx,
-		`SELECT t.id, t.title, t.project_id, p.name, t.due_date, s.category
+		`SELECT t.id, t.title, t.project_id, t.plan_id, p.name, t.due_date, s.category
 		 FROM task_assignees ta
 		 JOIN tasks t ON t.id = ta.task_id AND t.workspace_id = ta.workspace_id
 		 JOIN projects p ON p.id = t.project_id AND p.workspace_id = t.workspace_id
-		 JOIN statuses s ON s.id = t.status_id AND s.project_id = t.project_id
+		 JOIN statuses s ON s.id = t.status_id AND s.plan_id = t.plan_id
 		 WHERE ta.workspace_id = ? AND ta.membership_id = ? AND ta.removed_at IS NULL
 		   AND t.deleted_at IS NULL AND p.deleted_at IS NULL
 		   AND t.due_date IS NOT NULL AND s.category <> ?
@@ -92,12 +92,12 @@ func (*TaskRepository) ListUpcoming(ctx context.Context, q database.DBTX, worksp
 		return nil, fmt.Errorf("list upcoming tasks: %w", err)
 	}
 	defer rows.Close()
-	
+
 	tasks := []model.Task{}
 	for rows.Next() {
 		t := model.Task{WorkspaceID: workspaceID}
 		var dueDate, category string
-		if err := rows.Scan(&t.ID, &t.Title, &t.ProjectID, &t.ProjectName, &dueDate, &category); err != nil {
+		if err := rows.Scan(&t.ID, &t.Title, &t.ProjectID, &t.PlanID, &t.ProjectName, &dueDate, &category); err != nil {
 			return nil, fmt.Errorf("scan task: %w", err)
 		}
 		parsed, err := time.Parse(time.RFC3339, dueDate)

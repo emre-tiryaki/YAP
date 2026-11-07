@@ -15,10 +15,9 @@ const (
 	RoleOwner    = "owner"
 )
 
-
 type User struct {
-	ID        string
-	DisplayName   string
+	ID          string
+	DisplayName string
 }
 
 type Session struct {
@@ -37,10 +36,19 @@ type Project struct {
 	TaskCount   int
 }
 
-type Status struct {
+type Plan struct {
 	ID          string
 	WorkspaceID string
 	ProjectID   string
+	TeamID      string
+	Name        string
+	Description string
+}
+
+type Status struct {
+	ID          string
+	WorkspaceID string
+	PlanID      string
 	Title       string
 	Color       string
 	Category    StatusCategory
@@ -51,6 +59,7 @@ type Task struct {
 	ID             string
 	WorkspaceID    string
 	ProjectID      string
+	PlanID         string
 	ProjectName    string
 	StatusID       string
 	CreatedBy      string
@@ -60,5 +69,3 @@ type Task struct {
 	StatusCategory StatusCategory
 	DueDate        *time.Time
 }
-
-

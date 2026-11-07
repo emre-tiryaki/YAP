@@ -12,9 +12,9 @@ func TestProjectCreate(t *testing.T) {
 	db, session := newTestDB(t)
 	svc := NewProjectService(db, repository.NewProjectRepository())
 
-	tests := []struct{
-		name string
-		input CreateProjectInput
+	tests := []struct {
+		name    string
+		input   CreateProjectInput
 		wantErr error
 	}{
 		{"valid", CreateProjectInput{Name: "Backend"}, nil},
@@ -42,7 +42,10 @@ func TestProjectCreateAddsDefaultStatuses(t *testing.T) {
 	}
 
 	var count int
-	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM statuses WHERE project_id = ?", project.ID).Scan(&count); err != nil {
+	err = db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM statuses s JOIN plans p ON p.id = s.plan_id WHERE p.project_id = ?`, project.ID,
+	).Scan(&count)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if count != len(defaultStatuses) {
@@ -54,6 +57,6 @@ func TestProjectCreateAddsDefaultStatuses(t *testing.T) {
 		t.Fatalf("List() error = %v", err)
 	}
 	if len(projects) != 1 || projects[0].ID != project.ID {
-		t.Fatalf("List() = %+v, want onşy %s", projects, project.ID)
+		t.Fatalf("List() = %+v, want only %s", projects, project.ID)
 	}
 }

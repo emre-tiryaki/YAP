@@ -89,7 +89,32 @@ func seedProject(t *testing.T, db *sql.DB, workspaceID, name, now string) model.
 	return p
 }
 
-func seedStatuses(t *testing.T, db *sql.DB, workspaceID, projectID string) map[model.StatusCategory]string {
+func seedPlan(t *testing.T, db *sql.DB, workspaceID, projectID, name string) model.Plan {
+	t.Helper()
+	p := model.Plan{ID: model.NewID(), WorkspaceID: workspaceID, ProjectID: projectID, Name: name}
+	if err := NewProjectRepository().InsertPlan(context.Background(), db, p, baseNow); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+func seedTeam(t *testing.T, db *sql.DB, workspaceID, name string) string {
+	t.Helper()
+	id := model.NewID()
+	mustExec(t, db,
+		`INSERT INTO teams (id, workspace_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+		id, workspaceID, name, baseNow, baseNow)
+	return id
+}
+
+func seedProjectTeam(t *testing.T, db *sql.DB, workspaceID, projectID, teamID string) {
+	t.Helper()
+	mustExec(t, db,
+		`INSERT INTO project_teams (workspace_id, project_id, team_id, added_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+		workspaceID, projectID, teamID, baseNow, baseNow)
+}
+
+func seedStatuses(t *testing.T, db *sql.DB, workspaceID, planID string) map[model.StatusCategory]string {
 	t.Helper()
 	repo := NewProjectRepository()
 	ids := map[model.StatusCategory]string{}
@@ -105,7 +130,7 @@ func seedStatuses(t *testing.T, db *sql.DB, workspaceID, projectID string) map[m
 		s := model.Status{
 			ID:          model.NewID(),
 			WorkspaceID: workspaceID,
-			ProjectID:   projectID,
+			PlanID:      planID,
 			Title:       string(d.category),
 			Color:       "#000000",
 			Category:    d.category,
@@ -119,12 +144,13 @@ func seedStatuses(t *testing.T, db *sql.DB, workspaceID, projectID string) map[m
 	return ids
 }
 
-func seedTask(t *testing.T, db *sql.DB, s workspaceSeed, projectID, statusID, title, pos string, due *time.Time) model.Task {
+func seedTask(t *testing.T, db *sql.DB, s workspaceSeed, plan model.Plan, statusID, title, pos string, due *time.Time) model.Task {
 	t.Helper()
 	task := model.Task{
 		ID:          model.NewID(),
 		WorkspaceID: s.WorkspaceID,
-		ProjectID:   projectID,
+		ProjectID:   plan.ProjectID,
+		PlanID:      plan.ID,
 		StatusID:    statusID,
 		CreatedBy:   s.MembershipID,
 		Title:       title,
