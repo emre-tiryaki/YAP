@@ -148,7 +148,7 @@ func TestTaskCreateInExplicitPlan(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
-	if task.PlanID != plan.ID || task.Position != "a1" {
+	if task.PlanID != plan.ID || task.Position != "a0" {
 		t.Errorf("task = %+v, want plan %q and first position in that plan", task, plan.ID)
 	}
 
