@@ -413,3 +413,128 @@ func TestProjectPlanID(t *testing.T) {
 		})
 	}
 }
+
+func TestProjectGet(t *testing.T) {
+	ctx := context.Background()
+	db := newTestDB(t)
+	repo := NewProjectRepository()
+	a := seedWorkspace(t, db, "a")
+	b := seedWorkspace(t, db, "b")
+
+	withDesc := model.Project{ID: model.NewID(), WorkspaceID: a.WorkspaceID, Name: "With", Description: "desc"}
+	if err := repo.Insert(ctx, db, withDesc, baseNow); err != nil {
+		t.Fatal(err)
+	}
+	noDesc := seedProject(t, db, a.WorkspaceID, "Without", baseNow)
+	deleted := seedProject(t, db, a.WorkspaceID, "deleted", baseNow)
+	mustExec(t, db, `UPDATE projects SET deleted_at = ? WHERE id = ?`, baseNow, deleted.ID)
+
+	plan := seedPlan(t, db, a.WorkspaceID, withDesc.ID, "Main")
+	statuses := seedStatuses(t, db, a.WorkspaceID, plan.ID)
+	seedTask(t, db, a, plan, statuses[model.StatusToDo], "one", "a0", nil)
+	seedTask(t, db, a, plan, statuses[model.StatusDone], "two", "a1", nil)
+	gone := seedTask(t, db, a, plan, statuses[model.StatusToDo], "gone", "a2", nil)
+	mustExec(t, db, `UPDATE tasks SET deleted_at = ? WHERE id = ?`, baseNow, gone.ID)
+
+	tests := []struct {
+		name        string
+		workspaceID string
+		projectID   string
+		wantName    string
+		wantDesc    string
+		wantCount   int
+		wantNoRows  bool
+	}{
+		{"with description and tasks", a.WorkspaceID, withDesc.ID, "With", "desc", 2, false},
+		{"without description", a.WorkspaceID, noDesc.ID, "Without", "", 0, false},
+		{"soft deleted", a.WorkspaceID, deleted.ID, "", "", 0, true},
+		{"other workspace", b.WorkspaceID, withDesc.ID, "", "", 0, true},
+		{"unknown id", a.WorkspaceID, "missing", "", "", 0, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := repo.Get(ctx, db, tt.workspaceID, tt.projectID)
+			if tt.wantNoRows {
+				if !errors.Is(err, sql.ErrNoRows) {
+					t.Fatalf("Get() error = %v, want sql.ErrNoRows", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Get() error = %v", err)
+			}
+			if got.ID != tt.projectID || got.WorkspaceID != tt.workspaceID {
+				t.Errorf("Get() ids = %q %q", got.ID, got.WorkspaceID)
+			}
+			if got.Name != tt.wantName || got.Description != tt.wantDesc || got.TaskCount != tt.wantCount {
+				t.Errorf("Get() = %+v", got)
+			}
+		})
+	}
+}
+
+func TestProjectListPlans(t *testing.T) {
+	ctx := context.Background()
+	db := newTestDB(t)
+	repo := NewProjectRepository()
+	a := seedWorkspace(t, db, "a")
+	b := seedWorkspace(t, db, "b")
+
+	p := seedProject(t, db, a.WorkspaceID, "p", baseNow)
+	other := seedProject(t, db, a.WorkspaceID, "other", baseNow)
+	teamID := seedTeam(t, db, a.WorkspaceID, "Backend")
+	seedProjectTeam(t, db, a.WorkspaceID, p.ID, teamID)
+
+	insert := func(projectID, team, name, desc, createdAt string) model.Plan {
+		t.Helper()
+		plan := model.Plan{
+			ID: model.NewID(), WorkspaceID: a.WorkspaceID, ProjectID: projectID,
+			TeamID: team, Name: name, Description: desc,
+		}
+		if err := repo.InsertPlan(ctx, db, plan, createdAt); err != nil {
+			t.Fatal(err)
+		}
+		return plan
+	}
+
+	later := insert(p.ID, teamID, "API", "endpoints", "2026-01-02T00:00:00Z")
+	first := insert(p.ID, "", "Main", "", "2026-01-01T00:00:00Z")
+	deleted := insert(p.ID, "", "Deleted", "", "2026-01-03T00:00:00Z")
+	archived := insert(p.ID, "", "Archived", "", "2026-01-04T00:00:00Z")
+	insert(other.ID, "", "Foreign project plan", "", "2026-01-05T00:00:00Z")
+	mustExec(t, db, `UPDATE plans SET deleted_at = ? WHERE id = ?`, baseNow, deleted.ID)
+	mustExec(t, db, `UPDATE plans SET archived_at = ? WHERE id = ?`, baseNow, archived.ID)
+
+	statuses := seedStatuses(t, db, a.WorkspaceID, first.ID)
+	seedTask(t, db, a, first, statuses[model.StatusToDo], "one", "a0", nil)
+	seedTask(t, db, a, first, statuses[model.StatusDone], "two", "a1", nil)
+	gone := seedTask(t, db, a, first, statuses[model.StatusToDo], "gone", "a2", nil)
+	mustExec(t, db, `UPDATE tasks SET deleted_at = ? WHERE id = ?`, baseNow, gone.ID)
+
+	got, err := repo.ListPlans(ctx, db, a.WorkspaceID, p.ID)
+	if err != nil {
+		t.Fatalf("ListPlans() error = %v", err)
+	}
+	if len(got) != 2 || got[0].ID != first.ID || got[1].ID != later.ID {
+		t.Fatalf("ListPlans() = %+v, want [Main, API] ordered by creation", got)
+	}
+	if got[0].TeamID != "" || got[0].TeamName != "" || got[0].Description != "" || got[0].TaskCount != 2 {
+		t.Errorf("got[0] = %+v, want whole-project plan with 2 tasks", got[0])
+	}
+	if got[1].TeamID != teamID || got[1].TeamName != "Backend" || got[1].Description != "endpoints" || got[1].TaskCount != 0 {
+		t.Errorf("got[1] = %+v, want Backend team plan with 0 tasks", got[1])
+	}
+	for _, pl := range got {
+		if pl.WorkspaceID != a.WorkspaceID || pl.ProjectID != p.ID {
+			t.Errorf("plan scope = %q %q", pl.WorkspaceID, pl.ProjectID)
+		}
+	}
+
+	foreign, err := repo.ListPlans(ctx, db, b.WorkspaceID, p.ID)
+	if err != nil {
+		t.Fatalf("ListPlans() other workspace error = %v", err)
+	}
+	if foreign == nil || len(foreign) != 0 {
+		t.Errorf("ListPlans() other workspace = %#v, want empty non-nil slice", foreign)
+	}
+}

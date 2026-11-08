@@ -126,8 +126,8 @@ func (*ProjectRepository) PlanID(ctx context.Context, q database.DBTX, workspace
 	return id, nil
 }
 
-func (*ProjectRepository) Get(ctx context.Context, q database.DBTX, workspace_id, project_id string) (model.Project, error) {
-	p := model.Project{ID: project_id, WorkspaceID: workspace_id}
+func (*ProjectRepository) Get(ctx context.Context, q database.DBTX, workspaceID, projectID string) (model.Project, error) {
+	p := model.Project{ID: projectID, WorkspaceID: workspaceID}
 	var description sql.NullString
 	err := q.QueryRowContext(ctx,
 		`SELECT p.name, p.description,
@@ -135,9 +135,9 @@ func (*ProjectRepository) Get(ctx context.Context, q database.DBTX, workspace_id
 				WHERE t.project_id = p.id
 				AND t.workspace_id = p.workspace_id
 				AND t.deleted_at IS NULL)
-			 FROM projects p
-			 WHERE p.id = ? AND p.workspace = ? AND p.deletet_at IS NULL`,
-		project_id, workspace_id,
+		 FROM projects p
+		 WHERE p.id = ? AND p.workspace_id = ? AND p.deleted_at IS NULL`,
+		projectID, workspaceID,
 	).Scan(&p.Name, &description, &p.TaskCount)
 	if err != nil {
 		return model.Project{}, fmt.Errorf("get project: %w", err)
