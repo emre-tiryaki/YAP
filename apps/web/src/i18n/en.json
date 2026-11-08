@@ -31,5 +31,11 @@
     "error.unexpected.title": "Something went wrong",
     "error.unexpected.message": "An unexpected error occurred. Try again or return to the home page.",
     "error.goHome": "Go to home",
-    "error.retry": "Try again"
+    "error.retry": "Try again",
+    "project.noDescription": "No description.",
+    "project.plans.title": "Plans",
+    "project.plans.empty": "This project has no plans yet.",
+    "project.plans.wholeProject": "Whole project",
+    "project.plans.taskCount": "tasks",
+    "project.plans.count": "plans"
 }

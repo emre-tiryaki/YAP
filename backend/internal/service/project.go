@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"errors"
 
 	"github.com/emre-tiryaki/YAP/backend/internal/database"
 	"github.com/emre-tiryaki/YAP/backend/internal/model"
@@ -21,6 +22,8 @@ type ProjectRepository interface {
 	Name(ctx context.Context, q database.DBTX, workspaceID, projectID string) (string, error)
 	DefaultPlanID(ctx context.Context, q database.DBTX, workspaceID, projectID string) (string, error)
 	PlanID(ctx context.Context, q database.DBTX, workspaceID, projectID, planID string) (string, error)
+	Get(ctx context.Context, q database.DBTX, workspaceID, projectID string) (model.Project, error)
+	ListPlans(ctx context.Context, q database.DBTX, workspaceID, projectID string) ([]model.Plan, error)
 }
 
 var defaultStatuses = []struct {
@@ -102,4 +105,25 @@ func (s *ProjectService) Create(ctx context.Context, workspaceID string, in Crea
 		return model.Project{}, err
 	}
 	return project, nil
+}
+
+func (s *ProjectService) Get(ctx context.Context, workspaceID, projectID string) (model.Project, error) {
+	project, err := s.repo.Get(ctx, s.db, workspaceID, projectID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows){
+			return model.Project{}, fmt.Errorf("%w: project", ErrNotFound)
+		}
+		return model.Project{}, err
+	}
+	return project, nil
+}
+
+func (s *ProjectService) Plans(ctx context.Context, workspaceID, projectID string) ([]model.Plan, error) {
+	if _, err := s.repo.Name(ctx, s.db, workspaceID, projectID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("%w: project", ErrNotFound)
+		}
+		return nil, err
+	}
+	return s.repo.ListPlans(ctx, s.db, workspaceID, projectID)
 }

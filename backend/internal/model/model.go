@@ -41,8 +41,10 @@ type Plan struct {
 	WorkspaceID string
 	ProjectID   string
 	TeamID      string
+	TeamName    string
 	Name        string
 	Description string
+	TaskCount   int
 }
 
 type Status struct {

@@ -3,6 +3,7 @@ import { useCreateProjects } from "../hooks/useProjects";
 import { useTranslate } from "../hooks/useTranslate";
 import { TextInput } from "./TextInput";
 import { SubmitButton } from "./SubmitButton";
+import { useNavigate } from "react-router";
 
 type CreateProjectFormProps = {
     onDone: () => void;
@@ -11,12 +12,21 @@ type CreateProjectFormProps = {
 export function CreateProjectForm({ onDone }: CreateProjectFormProps) {
     const t = useTranslate();
     const createProject = useCreateProjects();
+    const navigate = useNavigate();
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
 
     function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
-        createProject.mutate({ name, description }, { onSuccess: onDone });
+        createProject.mutate(
+            { name, description },
+            {
+                onSuccess: (project) => {
+                    onDone();
+                    navigate(`/projects/${project.id}`);
+                },
+            },
+        );
     }
 
     return (

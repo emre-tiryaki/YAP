@@ -1,51 +1,68 @@
-import type { CreateProjectInput, Project } from "../types/project"
-import type { CreateTaskInput, StatusCategory, Task } from "../types/task"
-import type { Workspace } from "../types/workspace"
+import type { Plan } from "../types/plan";
+import type { CreateProjectInput, Project } from "../types/project";
+import type { CreateTaskInput, StatusCategory, Task } from "../types/task";
+import type { Workspace } from "../types/workspace";
 
 type WorkspaceDto = {
-    id: string
-    name: string
-    user_name: string
-}
+    id: string;
+    name: string;
+    user_name: string;
+};
 
 type ProjectDto = {
-    id: string
-    name: string
-    description: string
-    task_count: number
-}
+    id: string;
+    name: string;
+    description: string;
+    task_count: number;
+};
 
 type TaskDto = {
-    id: string
-    title: string
-    project_id: string
-    project_name: string
-    due_date: string | null
-    status_category: StatusCategory
-}
+    id: string;
+    title: string;
+    project_id: string;
+    project_name: string;
+    due_date: string | null;
+    status_category: StatusCategory;
+};
+
+type PlanDto = {
+    id: string;
+    project_id: string;
+    team_id: string | null;
+    team_name: string | null;
+    name: string;
+    description: string;
+    task_count: number;
+};
 
 export class ApiError extends Error {
-    status: number
+    status: number;
 
     constructor(status: number, message: string) {
-        super(message)
-        this.status = status
+        super(message);
+        this.status = status;
     }
 }
 
-async function request<T>(path:string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const response = await fetch(path, {
         ...init,
-        headers: { 'Content-Type': 'application/json' },
-    })
+        headers: { "Content-Type": "application/json" },
+    });
 
     if (!response.ok) {
-        const body: unknown = await response.json().catch(() => null)
-        const code = typeof body === 'object' && body !== null && 'error' in body && typeof body.error === 'string' ? body.error : 'unknown'
-        throw new ApiError(response.status, code)
+        const body: unknown = await response.json().catch(() => null);
+        const code =
+            typeof body === "object" &&
+            body !== null &&
+            "error" in body &&
+            typeof body.error === "string"
+                ? body.error
+                : "unknown";
+        throw new ApiError(response.status, code);
     }
 
-    return (await response.json()) as T
+    return (await response.json()) as T;
 }
 
 function toProject(dto: ProjectDto): Project {
@@ -53,8 +70,8 @@ function toProject(dto: ProjectDto): Project {
         id: dto.id,
         name: dto.name,
         description: dto.description,
-        taskCount: dto.task_count
-    }
+        taskCount: dto.task_count,
+    };
 }
 
 function toTask(dto: TaskDto): Task {
@@ -67,36 +84,61 @@ function toTask(dto: TaskDto): Task {
     };
 }
 
+function toPlan(dto: PlanDto): Plan {
+    return {
+        id: dto.id,
+        name: dto.name,
+        description: dto.description,
+        teamName: dto.team_name,
+        taskCount: dto.task_count
+    }
+}
+
 export async function getWorkspace(): Promise<Workspace> {
-    const dto = await request<WorkspaceDto>("/api/workspace")
-    return {id: dto.id, name: dto.name, username: dto.user_name}
+    const dto = await request<WorkspaceDto>("/api/workspace");
+    return { id: dto.id, name: dto.name, username: dto.user_name };
 }
 
 export async function listProjects(): Promise<Project[]> {
-    const dtos = await request<ProjectDto[]>("/api/projects")
-    return dtos.map(toProject)
+    const dtos = await request<ProjectDto[]>("/api/projects");
+    return dtos.map(toProject);
 }
 
-export async function createProject(input: CreateProjectInput): Promise<Project> {
-    const dto = await request<ProjectDto>("/api/projects",{
-        method: 'POST',
+export async function createProject(
+    input: CreateProjectInput,
+): Promise<Project> {
+    const dto = await request<ProjectDto>("/api/projects", {
+        method: "POST",
         body: JSON.stringify(input),
-    })
+    });
+    return toProject(dto);
+}
+
+export async function getProject(projectId: string): Promise<Project> {
+    const dto = await request<ProjectDto>(`/api/projects/${projectId}`)
     return toProject(dto)
 }
 
-export async function listUpcomingTasks(): Promise<Task[]> {
-    const dtos = await request<TaskDto[]>(`/api/tasks/upcoming`)
-    return dtos.map(toTask)
+export async function listPlans(projectId: string): Promise<Plan[]> {
+    const dtos = await request<PlanDto[]>(`api/projects/${projectId}/plans`)
+    return dtos.map(toPlan)
 }
 
-export async function createTask(projectId: string, input: CreateTaskInput): Promise<Task> {
+export async function listUpcomingTasks(): Promise<Task[]> {
+    const dtos = await request<TaskDto[]>(`/api/tasks/upcoming`);
+    return dtos.map(toTask);
+}
+
+export async function createTask(
+    projectId: string,
+    input: CreateTaskInput,
+): Promise<Task> {
     const dto = await request<TaskDto>(`/api/projects/${projectId}/tasks`, {
         method: "POST",
         body: JSON.stringify({
             title: input.title,
             due_date: input.dueDate ? input.dueDate.toISOString : null,
         }),
-    })
-    return toTask(dto)
+    });
+    return toTask(dto);
 }

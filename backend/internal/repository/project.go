@@ -125,3 +125,60 @@ func (*ProjectRepository) PlanID(ctx context.Context, q database.DBTX, workspace
 	}
 	return id, nil
 }
+
+func (*ProjectRepository) Get(ctx context.Context, q database.DBTX, workspace_id, project_id string) (model.Project, error) {
+	p := model.Project{ID: project_id, WorkspaceID: workspace_id}
+	var description sql.NullString
+	err := q.QueryRowContext(ctx,
+		`SELECT p.name, p.description,
+			(SELECT COUNT(*) FROM tasks t
+				WHERE t.project_id = p.id
+				AND t.workspace_id = p.workspace_id
+				AND t.deleted_at IS NULL)
+			 FROM projects p
+			 WHERE p.id = ? AND p.workspace = ? AND p.deletet_at IS NULL`,
+		project_id, workspace_id,
+	).Scan(&p.Name, &description, &p.TaskCount)
+	if err != nil {
+		return model.Project{}, fmt.Errorf("get project: %w", err)
+	}
+	p.Description = description.String
+	return p, nil
+}
+
+func (*ProjectRepository) ListPlans(ctx context.Context, q database.DBTX, workspace_id, project_id string) ([]model.Plan, error) {
+	rows, err := q.QueryContext(ctx,
+		`SELECT pl.id, pl.team_id, tm.name, pl.name, pl.description,
+			(SELECT COUNT(*) FROM tasks t
+				WHERE t.plan_id = pl.id
+				AND t.workspace_id = pl.workspace_id
+				AND t.deleted_at IS NULL)
+			 FROM plans pl
+			 LEFT JOIN teams tm ON tm.id = pl.team_id AND tm.workspace_id = pl.workspace_id
+			 WHERE pl.workspace_id = ? AND pl.project_id = ?
+				AND pl.deleted_at IS NULL AND pl.archived_at IS NULL
+			 ORDER BY pl.created_at, pl.id`,
+		workspace_id, project_id,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list plans: %w", err)
+	}
+	defer rows.Close()
+
+	plans := []model.Plan{}
+	for rows.Next() {
+		pl := model.Plan{WorkspaceID: workspace_id, ProjectID: project_id}
+		var teamID, teamName, description sql.NullString
+		if err := rows.Scan(&pl.ID, &teamID, &teamName, &pl.Name, &description, &pl.TaskCount); err != nil {
+			return nil, fmt.Errorf("scan plan: %w", err)
+		}
+		pl.TeamID = teamID.String
+		pl.TeamName = teamName.String
+		pl.Description = description.String
+		plans = append(plans, pl)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list plans: %w", err)
+	}
+	return plans, nil
+}
