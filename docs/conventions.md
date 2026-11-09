@@ -114,15 +114,29 @@ The following are enforced in the service layer and each has a unit test **(DB)*
 
 ### 3.3 Structure
 
-- Feature-based layout. Code that belongs to one feature lives under `src/features/<feature>/` (components, hooks, api, types). Code used by two or more features moves to `src/shared/`.
+- Type-based layout under `src/`:
+
+| Directory | Contents |
+| --------- | -------- |
+| `api/` | `client.ts`: the only module that calls `fetch` |
+| `components/` | Reusable UI components (`TaskCard.tsx`, `Modal.tsx`, ...) |
+| `hooks/` | TanStack Query hooks per resource (`useProjects.ts`, `useTasks.ts`, ...) and `useTranslate.ts` |
+| `pages/` | Route-level pages, registered in `App.tsx` |
+| `types/` | Domain types per resource (`project.ts`, `task.ts`, ...) |
+| `i18n/` | Translation files (`en.json`, `tr.json`) |
+| `util/` | Build-time helpers (`env.ts`, read by `vite.config.ts`) |
+
 - One component per file; the file name equals the component name (`TaskCard.tsx`).
 - Files that export components export only components (required by `eslint-plugin-react-refresh`). Hooks, constants and helpers go in separate files.
-- Named exports for everything except route-level pages.
+- Named exports for everything except route-level pages and `App`, which use `export default`.
 
 ### 3.4 Components and state
 
 - Function components and hooks only.
-- Components render; they do not call `fetch` directly. All HTTP calls go through a typed API client in `src/shared/api/`.
+- Components render; they do not call `fetch` directly. All HTTP calls go through the typed API client in `src/api/client.ts`.
+- Server state lives in TanStack Query. Components and pages use the hooks in `src/hooks/`, not the API client directly; mutations invalidate the affected query keys in `onSuccess`.
+- Query keys are arrays that start with the resource name and nest by ID: `["projects"]`, `["projects", id]`, `["projects", id, "plans"]`.
+- Hooks that take a route parameter disable the query while it is empty (`enabled: projectId !== ""`).
 - Keep state at the lowest level that needs it. Derive values during render instead of mirroring them in state.
 - `useEffect` is for synchronizing with external systems only. Fetching, derived data and event reactions do not belong in effects.
 - The `react-hooks` lint rules are errors, not suggestions. Do not disable them inline without a comment explaining the case.
@@ -137,9 +151,17 @@ The following are enforced in the service layer and each has a unit test **(DB)*
 | Ordering | Sort by `position` with plain string comparison (`a < b`). Never use `localeCompare`; fractional indexes depend on byte order. |
 | Soft deletes | Entities with `deleted_at` or `removed_at` set are never rendered. The client does not need to know how deletion is implemented. |
 | Validation | The client validates for UX only. The backend is the authority. |
-| Errors | API errors are mapped to typed error objects in the API client; components receive typed errors, not raw responses. |
+| DTOs | The API client declares `snake_case` `*Dto` types matching the backend JSON and maps them to `camelCase` domain types from `src/types/` with `toX()` functions. DTO types never leave `client.ts`. |
+| Paths | API paths are absolute (`/api/...`). Vite proxies `/api` to the backend on `BACKEND_PORT` from the root `.env`. |
+| Errors | Non-2xx responses throw `ApiError` with the HTTP `status` and the backend's `error` code (`"unknown"` if none). Components check `error instanceof ApiError` and its `status` (for example, 404 renders `NotFoundPage`). |
 
-### 3.6 Styling
+### 3.6 Text and translations
+
+- User-facing strings are never hard-coded. Use `const t = useTranslate()` and `t("section.key")`.
+- Keys are dot-separated by area (`sidebar.projects`, `common.close`) and defined in `src/i18n/en.json`; `TranslationKey` is derived from that file, so a missing key is a type error.
+- Add every new key to `tr.json` as well.
+
+### 3.7 Styling
 
 - Tailwind CSS utility classes. No inline `style` unless the value is dynamic and cannot be expressed as a class.
 - Repeated class combinations become a component, not a CSS file.
