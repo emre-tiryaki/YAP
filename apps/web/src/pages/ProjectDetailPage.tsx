@@ -6,6 +6,7 @@ import { ApiError } from "../api/client";
 import NotFoundPage from "./NotFoundPage";
 import { Sidebar } from "../components/SideBar";
 import { TopBar } from "../components/TopBar";
+import type { BreadcrumbItem } from "../types/breadcrumb";
 import {
     ProjectHeader,
     ProjectHeaderSkeleton,
@@ -25,9 +26,10 @@ export default function ProjectDetailPage() {
     if (project.error instanceof ApiError && project.error.status === 404)
         return <NotFoundPage />;
 
-    const path = [t("sidebar.projects"), project.data?.name ?? ""].filter(
-        Boolean,
-    );
+    const path: BreadcrumbItem[] = [
+        { label: t("sidebar.projects"), href: "/home" },
+        { label: project.data?.name ?? "", href: `/projects/${projectId}` },
+    ].filter((item) => item.label);
 
     return (
         <div className="flex min-h-screen">

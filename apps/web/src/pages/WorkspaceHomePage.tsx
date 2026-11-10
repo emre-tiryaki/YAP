@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Sidebar } from "../components/SideBar";
 import { TopBar } from "../components/TopBar";
+import type { BreadcrumbItem } from "../types/breadcrumb";
 import { Modal } from "../components/Modal";
 import { useTranslate } from "../hooks/useTranslate";
 import { useWorkspace } from "../hooks/useWorkspace";
@@ -20,9 +21,10 @@ export default function WorkspaceHomePage() {
     const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
 
     const projectItems = projects.data ?? [];
-    const path = [t("sidebar.home"), workspace.data?.name ?? ""].filter(
-        Boolean,
-    );
+    const path: BreadcrumbItem[] = [
+        { label: t("sidebar.home"), href: "/home" },
+        { label: workspace.data?.name ?? "", href: "/home" },
+    ].filter((item) => item.label);
 
     return (
         <div className="flex min-h-screen">

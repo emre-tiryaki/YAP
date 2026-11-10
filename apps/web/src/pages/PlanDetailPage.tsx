@@ -10,6 +10,7 @@ import { PlanBoard } from "../components/PlanBoard";
 import { PlanHeader, PlanHeaderSkeleton } from "../components/PlanHeader";
 import { Sidebar } from "../components/SideBar";
 import { TopBar } from "../components/TopBar";
+import type { BreadcrumbItem } from "../types/breadcrumb";
 import { ViewToggle, type BoardView } from "../components/ViewToggle";
 import { usePlan, usePlanStatuses } from "../hooks/usePlans";
 import { useProject } from "../hooks/useProjects";
@@ -41,11 +42,14 @@ export default function PlanDetailPage() {
     if (plan.error instanceof ApiError && plan.error.status === 404)
         return <NotFoundPage />;
 
-    const path = [
-        t("sidebar.projects"),
-        project.data?.name ?? "",
-        plan.data?.name ?? "",
-    ].filter(Boolean);
+    const path: BreadcrumbItem[] = [
+        { label: t("sidebar.projects"), href: "/home" },
+        { label: project.data?.name ?? "", href: `/projects/${projectId}` },
+        {
+            label: plan.data?.name ?? "",
+            href: `/projects/${projectId}/plans/${planId}`,
+        },
+    ].filter((item) => item.label);
 
     const boardLoading = statuses.isLoading || tasks.isLoading;
     const boardError = statuses.isError || tasks.isError;
