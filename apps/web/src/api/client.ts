@@ -1,6 +1,13 @@
 import type { CreatePlanInput, Plan } from "../types/plan";
 import type { CreateProjectInput, Project } from "../types/project";
-import type { CreateTaskInput, StatusCategory, Task } from "../types/task";
+import type { CreateStatusInput, Status } from "../types/status";
+import type {
+    CreateTaskInput,
+    MoveTaskInput,
+    PlanTask,
+    StatusCategory,
+    Task,
+} from "../types/task";
 import type { Workspace } from "../types/workspace";
 
 type WorkspaceDto = {
@@ -33,6 +40,26 @@ type PlanDto = {
     name: string;
     description: string;
     task_count: number;
+    done_task_count: number;
+};
+
+type StatusDto = {
+    id: string;
+    plan_id: string;
+    title: string;
+    color: string;
+    category: StatusCategory;
+    position: string;
+};
+
+type PlanTaskDto = {
+    id: string;
+    title: string;
+    description: string;
+    status_id: string;
+    status_category: StatusCategory;
+    position: string;
+    due_date: string | null;
 };
 
 export class ApiError extends Error {
@@ -62,6 +89,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
         throw new ApiError(response.status, code);
     }
 
+    if (response.status === 204) return undefined as T;
     return (await response.json()) as T;
 }
 
@@ -87,11 +115,35 @@ function toTask(dto: TaskDto): Task {
 function toPlan(dto: PlanDto): Plan {
     return {
         id: dto.id,
+        projectId: dto.project_id,
         name: dto.name,
         description: dto.description,
         teamName: dto.team_name,
-        taskCount: dto.task_count
-    }
+        taskCount: dto.task_count,
+        doneTaskCount: dto.done_task_count,
+    };
+}
+
+function toStatus(dto: StatusDto): Status {
+    return {
+        id: dto.id,
+        title: dto.title,
+        color: dto.color,
+        category: dto.category,
+        position: dto.position,
+    };
+}
+
+function toPlanTask(dto: PlanTaskDto): PlanTask {
+    return {
+        id: dto.id,
+        title: dto.title,
+        description: dto.description,
+        statusId: dto.status_id,
+        statusCategory: dto.status_category,
+        position: dto.position,
+        dueDate: dto.due_date ? new Date(dto.due_date) : null,
+    };
 }
 
 export async function getWorkspace(): Promise<Workspace> {
@@ -148,8 +200,66 @@ export async function createTask(
         method: "POST",
         body: JSON.stringify({
             title: input.title,
+            description: input.description ?? "",
             due_date: input.dueDate ? input.dueDate.toISOString() : null,
+            plan_id: input.planId ?? "",
+            status_id: input.statusId ?? "",
         }),
     });
     return toTask(dto);
+}
+
+function planPath(projectId: string, planId: string): string {
+    return `/api/projects/${projectId}/plans/${planId}`;
+}
+
+export async function getPlan(projectId: string, planId: string): Promise<Plan> {
+    const dto = await request<PlanDto>(planPath(projectId, planId));
+    return toPlan(dto);
+}
+
+export async function listStatuses(
+    projectId: string,
+    planId: string,
+): Promise<Status[]> {
+    const dtos = await request<StatusDto[]>(
+        `${planPath(projectId, planId)}/statuses`,
+    );
+    return dtos.map(toStatus);
+}
+
+export async function createStatus(
+    projectId: string,
+    planId: string,
+    input: CreateStatusInput,
+): Promise<Status> {
+    const dto = await request<StatusDto>(
+        `${planPath(projectId, planId)}/statuses`,
+        { method: "POST", body: JSON.stringify(input) },
+    );
+    return toStatus(dto);
+}
+
+export async function listPlanTasks(
+    projectId: string,
+    planId: string,
+): Promise<PlanTask[]> {
+    const dtos = await request<PlanTaskDto[]>(
+        `${planPath(projectId, planId)}/tasks`,
+    );
+    return dtos.map(toPlanTask);
+}
+
+export async function moveTask(
+    taskId: string,
+    input: MoveTaskInput,
+): Promise<void> {
+    await request<void>(`/api/tasks/${taskId}/move`, {
+        method: "POST",
+        body: JSON.stringify({ status_id: input.statusId, index: input.index }),
+    });
+}
+
+export async function deleteTask(taskId: string): Promise<void> {
+    await request<void>(`/api/tasks/${taskId}`, { method: "DELETE" });
 }

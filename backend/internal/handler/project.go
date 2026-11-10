@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/emre-tiryaki/YAP/backend/internal/model"
@@ -22,6 +23,9 @@ func (h *ProjectHandler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/projects/{id}", h.get)
 	mux.HandleFunc("GET /api/projects/{id}/plans", h.plans)
 	mux.HandleFunc("POST /api/projects/{id}/plans", h.createPlan)
+	mux.HandleFunc("GET /api/projects/{id}/plans/{planId}", h.getPlan)
+	mux.HandleFunc("GET /api/projects/{id}/plans/{planId}/statuses", h.statuses)
+	mux.HandleFunc("POST /api/projects/{id}/plans/{planId}/statuses", h.createStatus)
 }
 
 type projectResponse struct {
@@ -83,6 +87,7 @@ type planResponse struct {
 	Name        string  `json:"name"`
 	Description string  `json:"description"`
 	TaskCount   int     `json:"task_count"`
+	DoneCount   int     `json:"done_task_count"`
 }
 
 func toPlanResponse(p model.Plan) planResponse {
@@ -92,6 +97,7 @@ func toPlanResponse(p model.Plan) planResponse {
 		Name:        p.Name,
 		Description: p.Description,
 		TaskCount:   p.TaskCount,
+		DoneCount:   p.DoneCount,
 	}
 	if p.TeamID != "" {
 		res.TeamID = &p.TeamID
@@ -137,4 +143,83 @@ func (h *ProjectHandler) createPlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, toPlanResponse(plan))
+}
+
+type statusResponse struct {
+	ID       string `json:"id"`
+	PlanID   string `json:"plan_id"`
+	Title    string `json:"title"`
+	Color    string `json:"color"`
+	Category string `json:"category"`
+	Position string `json:"position"`
+}
+
+type createStatusRequest struct {
+	Title    string `json:"title"`
+	Color    string `json:"color"`
+	Category string `json:"category"`
+}
+
+func toStatusResponse(s model.Status) statusResponse {
+	return statusResponse{
+		ID:       s.ID,
+		PlanID:   s.PlanID,
+		Title:    s.Title,
+		Color:    s.Color,
+		Category: string(s.Category),
+		Position: s.Position,
+	}
+}
+
+func (h *ProjectHandler) getPlan(w http.ResponseWriter, r *http.Request) {
+	plan, err := h.svc.GetPlan(r.Context(), h.session.WorkspaceID, r.PathValue("id"), r.PathValue("planId"))
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, toPlanResponse(plan))
+}
+
+func (h *ProjectHandler) statuses(w http.ResponseWriter, r *http.Request) {
+	statuses, err := h.svc.Statuses(r.Context(), h.session.WorkspaceID, r.PathValue("id"), r.PathValue("planId"))
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	res := make([]statusResponse, 0, len(statuses))
+	for _, s := range statuses {
+		res = append(res, toStatusResponse(s))
+	}
+	writeJSON(w, http.StatusOK, res)
+}
+
+func (h *ProjectHandler) createStatus(w http.ResponseWriter, r *http.Request) {
+	var req createStatusRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	category, err := parseStatusCategory(req.Category)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	status, err := h.svc.CreateStatus(r.Context(), h.session.WorkspaceID, r.PathValue("id"), r.PathValue("planId"), service.CreateStatusInput{
+		Title:    req.Title,
+		Color:    req.Color,
+		Category: category,
+	})
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, toStatusResponse(status))
+}
+
+func parseStatusCategory(v string) (model.StatusCategory, error) {
+	switch c := model.StatusCategory(v); c {
+	case model.StatusToDo, model.StatusInProgress, model.StatusDone:
+		return c, nil
+	}
+	return "", fmt.Errorf("%w: category", service.ErrInvalidInput)
 }

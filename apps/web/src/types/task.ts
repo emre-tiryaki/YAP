@@ -8,7 +8,26 @@ export type Task = {
   statusCategory: StatusCategory;
 };
 
+export type PlanTask = {
+  id: string;
+  title: string;
+  description: string;
+  statusId: string;
+  statusCategory: StatusCategory;
+  position: string;
+  dueDate: Date | null;
+};
+
 export type CreateTaskInput = {
   title: string
   dueDate: Date | null
+  description?: string
+  planId?: string
+  statusId?: string
+}
+
+export type MoveTaskInput = {
+  statusId: string
+  // Position among the other tasks of the target status.
+  index: number
 }

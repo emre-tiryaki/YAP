@@ -152,7 +152,13 @@ func (*ProjectRepository) ListPlans(ctx context.Context, q database.DBTX, worksp
 			(SELECT COUNT(*) FROM tasks t
 				WHERE t.plan_id = pl.id
 				AND t.workspace_id = pl.workspace_id
-				AND t.deleted_at IS NULL)
+				AND t.deleted_at IS NULL),
+			(SELECT COUNT(*) FROM tasks t
+				JOIN statuses s ON s.id = t.status_id AND s.plan_id = t.plan_id
+				WHERE t.plan_id = pl.id
+				AND t.workspace_id = pl.workspace_id
+				AND t.deleted_at IS NULL
+				AND s.category = 'done')
 			 FROM plans pl
 			 LEFT JOIN teams tm ON tm.id = pl.team_id AND tm.workspace_id = pl.workspace_id
 			 WHERE pl.workspace_id = ? AND pl.project_id = ?
@@ -169,7 +175,7 @@ func (*ProjectRepository) ListPlans(ctx context.Context, q database.DBTX, worksp
 	for rows.Next() {
 		pl := model.Plan{WorkspaceID: workspace_id, ProjectID: project_id}
 		var teamID, teamName, description sql.NullString
-		if err := rows.Scan(&pl.ID, &teamID, &teamName, &pl.Name, &description, &pl.TaskCount); err != nil {
+		if err := rows.Scan(&pl.ID, &teamID, &teamName, &pl.Name, &description, &pl.TaskCount, &pl.DoneCount); err != nil {
 			return nil, fmt.Errorf("scan plan: %w", err)
 		}
 		pl.TeamID = teamID.String
@@ -199,4 +205,78 @@ func (*ProjectRepository) PlanNameExists(ctx context.Context, q database.DBTX, w
 		return false, fmt.Errorf("plan name exists: %w", err)
 	}
 	return exists, nil
+}
+
+// GetPlan returns a non-deleted, non-archived plan of the project together
+// with its task and done-task counts.
+func (*ProjectRepository) GetPlan(ctx context.Context, q database.DBTX, workspaceID, projectID, planID string) (model.Plan, error) {
+	pl := model.Plan{ID: planID, WorkspaceID: workspaceID, ProjectID: projectID}
+	var teamID, teamName, description sql.NullString
+	err := q.QueryRowContext(ctx,
+		`SELECT pl.team_id, tm.name, pl.name, pl.description,
+			(SELECT COUNT(*) FROM tasks t
+				WHERE t.plan_id = pl.id
+				AND t.workspace_id = pl.workspace_id
+				AND t.deleted_at IS NULL),
+			(SELECT COUNT(*) FROM tasks t
+				JOIN statuses s ON s.id = t.status_id AND s.plan_id = t.plan_id
+				WHERE t.plan_id = pl.id
+				AND t.workspace_id = pl.workspace_id
+				AND t.deleted_at IS NULL
+				AND s.category = 'done')
+		 FROM plans pl
+		 LEFT JOIN teams tm ON tm.id = pl.team_id AND tm.workspace_id = pl.workspace_id
+		 WHERE pl.id = ? AND pl.workspace_id = ? AND pl.project_id = ?
+		   AND pl.deleted_at IS NULL AND pl.archived_at IS NULL`,
+		planID, workspaceID, projectID,
+	).Scan(&teamID, &teamName, &pl.Name, &description, &pl.TaskCount, &pl.DoneCount)
+	if err != nil {
+		return model.Plan{}, fmt.Errorf("get plan: %w", err)
+	}
+	pl.TeamID = teamID.String
+	pl.TeamName = teamName.String
+	pl.Description = description.String
+	return pl, nil
+}
+
+func (*ProjectRepository) ListStatuses(ctx context.Context, q database.DBTX, workspaceID, planID string) ([]model.Status, error) {
+	rows, err := q.QueryContext(ctx,
+		`SELECT id, title, color, category, position FROM statuses
+		 WHERE workspace_id = ? AND plan_id = ? AND deleted_at IS NULL
+		 ORDER BY position, id`,
+		workspaceID, planID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list statuses: %w", err)
+	}
+	defer rows.Close()
+
+	statuses := []model.Status{}
+	for rows.Next() {
+		s := model.Status{WorkspaceID: workspaceID, PlanID: planID}
+		var category string
+		if err := rows.Scan(&s.ID, &s.Title, &s.Color, &category, &s.Position); err != nil {
+			return nil, fmt.Errorf("scan status: %w", err)
+		}
+		s.Category = model.StatusCategory(category)
+		statuses = append(statuses, s)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list statuses: %w", err)
+	}
+	return statuses, nil
+}
+
+// LastStatusPosition includes deleted statuses so a new position never
+// collides with a soft-deleted row.
+func (*ProjectRepository) LastStatusPosition(ctx context.Context, q database.DBTX, workspaceID, planID string) (string, error) {
+	var pos string
+	err := q.QueryRowContext(ctx,
+		`SELECT COALESCE(MAX(position), '') FROM statuses WHERE workspace_id = ? AND plan_id = ?`,
+		workspaceID, planID,
+	).Scan(&pos)
+	if err != nil {
+		return "", fmt.Errorf("last status position: %w", err)
+	}
+	return pos, nil
 }

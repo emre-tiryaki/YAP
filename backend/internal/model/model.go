@@ -45,6 +45,7 @@ type Plan struct {
 	Name        string
 	Description string
 	TaskCount   int
+	DoneCount   int
 }
 
 type Status struct {

@@ -60,8 +60,8 @@ React 19 + TypeScript (strict, `verbatimModuleSyntax`, `erasableSyntaxOnly` → 
 
 - Vite proxies `/api` to `http://localhost:$BACKEND_PORT`, so the frontend calls relative `/api/...` paths.
 - `src/api/client.ts` is the single HTTP boundary: it defines snake_case `*Dto` types, maps them to camelCase domain types in `src/types/`, parses dates, and throws typed `ApiError(status, code)` from the backend's `{"error": "..."}` body. Components never call `fetch`.
-- Data fetching is done through TanStack Query hooks in `src/hooks/` (`useProjects`, `useTasks`, `useWorkspace`).
-- Routes (`App.tsx`): `/home` (workspace home), `/projects/:projectId` (project detail with plans).
+- Data fetching is done through TanStack Query hooks in `src/hooks/` (`useProjects`, `usePlans`, `useTasks`, `useWorkspace`).
+- Routes (`App.tsx`): `/home` (workspace home), `/projects/:projectId` (project detail with plans), `/projects/:projectId/plans/:planId` (plan board: list/kanban views, drag-and-drop via `@dnd-kit`).
 - UI strings go through `useTranslate()` keyed by `src/i18n/en.json` (`tr.json` also exists).
 - Folders are organized by type: `api/`, `components/`, `hooks/`, `pages/`, `types/`, `i18n/`, `util/` (see `docs/conventions.md` §3.3).
 - Component files export only components (react-refresh lint rule); named exports except route pages.

@@ -265,6 +265,9 @@ All of these rules are protected by unit tests.
 | When a plan is deleted. | Its `statuses` and `tasks` rows are individually marked with `deleted_at` within the same transaction. |
 | When a project is deleted. | Its `plans`, `statuses`, `tasks`, and `project_teams` rows are individually marked with `deleted_at` / `removed_at` within the same transaction. The system does not rely on the parent being hidden, because each row needs its own deletion record for synchronization. |
 | Moving a task to another plan. | The status is mapped to a status of the target plan, because status IDs belong to a single plan. |
+| Every plan has at least one `done`-category status. | Plan creation always inserts the default `Done` status. A task counts as finished exactly while its status has `category = 'done'`; there is no separate flag. Any future status deletion or category change must reject removing the plan's last `done` status. |
+| Reordering or moving a task within its plan. | Only the moved row is written: its `position` becomes the midpoint (`position.Between`) of its new neighbours in the target status. The target status must belong to the task's plan. |
+| When a task is deleted. | The task and all of its subtasks are marked with `deleted_at`, and their open `task_assignees` rows get `removed_at`, within the same transaction. |
 
 ## 5. Table Reference
 

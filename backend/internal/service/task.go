@@ -21,6 +21,12 @@ type TaskRepository interface {
 	Insert(ctx context.Context, q database.DBTX, t model.Task, now string) error
 	InsertAssignee(ctx context.Context, q database.DBTX, workspaceID, taskID, membershipID, now string) error
 	ListUpcoming(ctx context.Context, q database.DBTX, workspaceID, membershipID string, limit int) ([]model.Task, error)
+	ListByPlan(ctx context.Context, q database.DBTX, workspaceID, planID string) ([]model.Task, error)
+	Placement(ctx context.Context, q database.DBTX, workspaceID, taskID string) (planID, statusID string, err error)
+	StatusCategory(ctx context.Context, q database.DBTX, workspaceID, planID, statusID string) (model.StatusCategory, error)
+	PositionsInStatus(ctx context.Context, q database.DBTX, workspaceID, planID, statusID, excludeTaskID string) ([]string, error)
+	UpdatePlacement(ctx context.Context, q database.DBTX, workspaceID, taskID, statusID, pos, now string) error
+	SoftDeleteTree(ctx context.Context, q database.DBTX, workspaceID, taskID, now string) error
 }
 
 type CreateTaskInput struct {
@@ -28,6 +34,15 @@ type CreateTaskInput struct {
 	Description string
 	DueDate     *time.Time
 	PlanID      string
+	// StatusID is optional; empty means the plan's first todo status.
+	StatusID string
+}
+
+type MoveTaskInput struct {
+	StatusID string
+	// Index is the task's position among the other tasks of the target
+	// status; out-of-range values are clamped.
+	Index int
 }
 
 type TaskService struct {
@@ -74,11 +89,8 @@ func (s *TaskService) Create(ctx context.Context, session model.Session, project
 			return err
 		}
 
-		statusID, err := s.tasks.FirstStatusID(ctx, tx, session.WorkspaceID, planID, model.StatusToDo)
+		statusID, category, err := s.resolveStatus(ctx, tx, session.WorkspaceID, planID, strings.TrimSpace(in.StatusID))
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return fmt.Errorf("%w: plan has no todo status", ErrNotFound)
-			}
 			return err
 		}
 		last, err := s.tasks.LastPosition(ctx, tx, session.WorkspaceID, planID, statusID)
@@ -89,7 +101,7 @@ func (s *TaskService) Create(ctx context.Context, session model.Session, project
 		task.ProjectName = projectName
 		task.PlanID = planID
 		task.StatusID = statusID
-		task.StatusCategory = model.StatusToDo
+		task.StatusCategory = category
 		task.Position = position.After(last)
 
 		now := nowUTC()
@@ -119,4 +131,84 @@ func (s *TaskService) resolvePlanID(ctx context.Context, q database.DBTX, worksp
 		return "", err
 	}
 	return id, nil
+}
+func (s *TaskService) resolveStatus(ctx context.Context, q database.DBTX, workspaceID, planID, statusID string) (string, model.StatusCategory, error) {
+	if statusID == "" {
+		id, err := s.tasks.FirstStatusID(ctx, q, workspaceID, planID, model.StatusToDo)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return "", "", fmt.Errorf("%w: plan has no todo status", ErrNotFound)
+			}
+			return "", "", err
+		}
+		return id, model.StatusToDo, nil
+	}
+	category, err := s.tasks.StatusCategory(ctx, q, workspaceID, planID, statusID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", "", fmt.Errorf("%w: status is not in the plan", ErrInvalidInput)
+		}
+		return "", "", err
+	}
+	return statusID, category, nil
+}
+
+func (s *TaskService) ListByPlan(ctx context.Context, session model.Session, projectID, planID string) ([]model.Task, error) {
+	if _, err := s.resolvePlanID(ctx, s.db, session.WorkspaceID, projectID, planID); err != nil {
+		return nil, err
+	}
+	return s.tasks.ListByPlan(ctx, s.db, session.WorkspaceID, planID)
+}
+
+// Move places a task at in.Index inside in.StatusID of its own plan. Only the
+// moved row is written; its position is the midpoint of its new neighbours.
+func (s *TaskService) Move(ctx context.Context, session model.Session, taskID string, in MoveTaskInput) error {
+	statusID := strings.TrimSpace(in.StatusID)
+	if statusID == "" {
+		return fmt.Errorf("%w: status_id is required", ErrInvalidInput)
+	}
+	return database.WithTx(ctx, s.db, func(tx *sql.Tx) error {
+		planID, _, err := s.tasks.Placement(ctx, tx, session.WorkspaceID, taskID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("%w: task", ErrNotFound)
+			}
+			return err
+		}
+		if _, _, err := s.resolveStatus(ctx, tx, session.WorkspaceID, planID, statusID); err != nil {
+			return err
+		}
+
+		positions, err := s.tasks.PositionsInStatus(ctx, tx, session.WorkspaceID, planID, statusID, taskID)
+		if err != nil {
+			return err
+		}
+		index := min(max(in.Index, 0), len(positions))
+		var lo, hi string
+		if index > 0 {
+			lo = positions[index-1]
+		}
+		if index < len(positions) {
+			hi = positions[index]
+		}
+		pos, err := position.Between(lo, hi)
+		if err != nil {
+			return fmt.Errorf("%w: cannot place task between %q and %q", ErrConflict, lo, hi)
+		}
+		return s.tasks.UpdatePlacement(ctx, tx, session.WorkspaceID, taskID, statusID, pos, nowUTC())
+	})
+}
+
+// Delete soft-deletes a task together with its subtasks and closes their
+// assignments, so every affected row carries its own deletion record.
+func (s *TaskService) Delete(ctx context.Context, session model.Session, taskID string) error {
+	return database.WithTx(ctx, s.db, func(tx *sql.Tx) error {
+		if _, _, err := s.tasks.Placement(ctx, tx, session.WorkspaceID, taskID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("%w: task", ErrNotFound)
+			}
+			return err
+		}
+		return s.tasks.SoftDeleteTree(ctx, tx, session.WorkspaceID, taskID, nowUTC())
+	})
 }

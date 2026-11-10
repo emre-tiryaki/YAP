@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/emre-tiryaki/YAP/backend/internal/database"
@@ -25,7 +26,12 @@ type ProjectRepository interface {
 	Get(ctx context.Context, q database.DBTX, workspaceID, projectID string) (model.Project, error)
 	ListPlans(ctx context.Context, q database.DBTX, workspaceID, projectID string) ([]model.Plan, error)
 	PlanNameExists(ctx context.Context, q database.DBTX, workspaceID, projectID, name string) (bool, error)
+	GetPlan(ctx context.Context, q database.DBTX, workspaceID, projectID, planID string) (model.Plan, error)
+	ListStatuses(ctx context.Context, q database.DBTX, workspaceID, planID string) ([]model.Status, error)
+	LastStatusPosition(ctx context.Context, q database.DBTX, workspaceID, planID string) (string, error)
 }
+
+var colorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 
 var defaultStatuses = []struct {
 	title    string
@@ -45,6 +51,12 @@ type CreateProjectInput struct {
 type CreatePlanInput struct {
 	Name        string
 	Description string
+}
+
+type CreateStatusInput struct {
+	Title    string
+	Color    string
+	Category model.StatusCategory
 }
 
 type ProjectService struct {
@@ -179,4 +191,79 @@ func (s *ProjectService) insertDefaultStatuses(ctx context.Context, tx *sql.Tx, 
 		}
 	}
 	return nil
+}
+
+func (s *ProjectService) GetPlan(ctx context.Context, workspaceID, projectID, planID string) (model.Plan, error) {
+	plan, err := s.repo.GetPlan(ctx, s.db, workspaceID, projectID, planID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return model.Plan{}, fmt.Errorf("%w: plan", ErrNotFound)
+		}
+		return model.Plan{}, err
+	}
+	return plan, nil
+}
+
+func (s *ProjectService) Statuses(ctx context.Context, workspaceID, projectID, planID string) ([]model.Status, error) {
+	if err := s.requirePlan(ctx, s.db, workspaceID, projectID, planID); err != nil {
+		return nil, err
+	}
+	return s.repo.ListStatuses(ctx, s.db, workspaceID, planID)
+}
+
+// CreateStatus appends a status after the plan's last column. Any category is
+// allowed; a task counts as finished while it sits in a done-category status.
+func (s *ProjectService) CreateStatus(ctx context.Context, workspaceID, projectID, planID string, in CreateStatusInput) (model.Status, error) {
+	title := strings.TrimSpace(in.Title)
+	if title == "" {
+		return model.Status{}, fmt.Errorf("%w: title is required", ErrInvalidInput)
+	}
+	if !colorPattern.MatchString(in.Color) {
+		return model.Status{}, fmt.Errorf("%w: color must be #rrggbb", ErrInvalidInput)
+	}
+	if !validCategory(in.Category) {
+		return model.Status{}, fmt.Errorf("%w: category", ErrInvalidInput)
+	}
+
+	status := model.Status{
+		ID:          model.NewID(),
+		WorkspaceID: workspaceID,
+		PlanID:      planID,
+		Title:       title,
+		Color:       strings.ToLower(in.Color),
+		Category:    in.Category,
+	}
+	err := database.WithTx(ctx, s.db, func(tx *sql.Tx) error {
+		if err := s.requirePlan(ctx, tx, workspaceID, projectID, planID); err != nil {
+			return err
+		}
+		last, err := s.repo.LastStatusPosition(ctx, tx, workspaceID, planID)
+		if err != nil {
+			return err
+		}
+		status.Position = position.After(last)
+		return s.repo.InsertStatus(ctx, tx, status, nowUTC())
+	})
+	if err != nil {
+		return model.Status{}, err
+	}
+	return status, nil
+}
+
+func (s *ProjectService) requirePlan(ctx context.Context, q database.DBTX, workspaceID, projectID, planID string) error {
+	if _, err := s.repo.PlanID(ctx, q, workspaceID, projectID, planID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("%w: plan", ErrNotFound)
+		}
+		return err
+	}
+	return nil
+}
+
+func validCategory(c model.StatusCategory) bool {
+	switch c {
+	case model.StatusToDo, model.StatusInProgress, model.StatusDone:
+		return true
+	}
+	return false
 }

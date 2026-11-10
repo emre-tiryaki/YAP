@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -112,4 +113,141 @@ func (*TaskRepository) ListUpcoming(ctx context.Context, q database.DBTX, worksp
 		return nil, fmt.Errorf("list upcoming tasks: %w", err)
 	}
 	return tasks, nil
+}
+func (*TaskRepository) ListByPlan(ctx context.Context, q database.DBTX, workspaceID, planID string) ([]model.Task, error) {
+	rows, err := q.QueryContext(ctx,
+		`SELECT t.id, t.project_id, t.status_id, t.created_by, t.title, t.description,
+			t.position, t.due_date, s.category
+		 FROM tasks t
+		 JOIN statuses s ON s.id = t.status_id AND s.plan_id = t.plan_id
+		 WHERE t.workspace_id = ? AND t.plan_id = ?
+		   AND t.deleted_at IS NULL AND s.deleted_at IS NULL
+		 ORDER BY s.position, s.id, t.position, t.id`,
+		workspaceID, planID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list plan tasks: %w", err)
+	}
+	defer rows.Close()
+
+	tasks := []model.Task{}
+	for rows.Next() {
+		t := model.Task{WorkspaceID: workspaceID, PlanID: planID}
+		var description, dueDate sql.NullString
+		var category string
+		if err := rows.Scan(&t.ID, &t.ProjectID, &t.StatusID, &t.CreatedBy, &t.Title, &description,
+			&t.Position, &dueDate, &category); err != nil {
+			return nil, fmt.Errorf("scan task: %w", err)
+		}
+		t.Description = description.String
+		t.StatusCategory = model.StatusCategory(category)
+		if dueDate.Valid {
+			parsed, err := time.Parse(time.RFC3339, dueDate.String)
+			if err != nil {
+				return nil, fmt.Errorf("parse due date: %w", err)
+			}
+			t.DueDate = &parsed
+		}
+		tasks = append(tasks, t)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list plan tasks: %w", err)
+	}
+	return tasks, nil
+}
+
+// Placement returns the plan and status of a non-deleted task.
+func (*TaskRepository) Placement(ctx context.Context, q database.DBTX, workspaceID, taskID string) (planID, statusID string, err error) {
+	err = q.QueryRowContext(ctx,
+		`SELECT plan_id, status_id FROM tasks
+		 WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`,
+		taskID, workspaceID,
+	).Scan(&planID, &statusID)
+	if err != nil {
+		return "", "", fmt.Errorf("task placement: %w", err)
+	}
+	return planID, statusID, nil
+}
+
+// StatusCategory returns the category of a non-deleted status of the plan.
+func (*TaskRepository) StatusCategory(ctx context.Context, q database.DBTX, workspaceID, planID, statusID string) (model.StatusCategory, error) {
+	var category string
+	err := q.QueryRowContext(ctx,
+		`SELECT category FROM statuses
+		 WHERE id = ? AND workspace_id = ? AND plan_id = ? AND deleted_at IS NULL`,
+		statusID, workspaceID, planID,
+	).Scan(&category)
+	if err != nil {
+		return "", fmt.Errorf("status category: %w", err)
+	}
+	return model.StatusCategory(category), nil
+}
+
+// PositionsInStatus lists the ordered positions of the non-deleted tasks in a
+// status, leaving out excludeTaskID (the task being moved).
+func (*TaskRepository) PositionsInStatus(ctx context.Context, q database.DBTX, workspaceID, planID, statusID, excludeTaskID string) ([]string, error) {
+	rows, err := q.QueryContext(ctx,
+		`SELECT position FROM tasks
+		 WHERE workspace_id = ? AND plan_id = ? AND status_id = ?
+		   AND deleted_at IS NULL AND id <> ?
+		 ORDER BY position, id`,
+		workspaceID, planID, statusID, excludeTaskID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("positions in status: %w", err)
+	}
+	defer rows.Close()
+
+	positions := []string{}
+	for rows.Next() {
+		var pos string
+		if err := rows.Scan(&pos); err != nil {
+			return nil, fmt.Errorf("scan position: %w", err)
+		}
+		positions = append(positions, pos)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("positions in status: %w", err)
+	}
+	return positions, nil
+}
+
+func (*TaskRepository) UpdatePlacement(ctx context.Context, q database.DBTX, workspaceID, taskID, statusID, pos, now string) error {
+	_, err := q.ExecContext(ctx,
+		`UPDATE tasks SET status_id = ?, position = ?, updated_at = ?
+		 WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`,
+		statusID, pos, now, taskID, workspaceID,
+	)
+	if err != nil {
+		return fmt.Errorf("update task placement: %w", err)
+	}
+	return nil
+}
+
+// SoftDeleteTree marks the task and all of its non-deleted descendants as
+// deleted and closes their open assignments.
+func (*TaskRepository) SoftDeleteTree(ctx context.Context, q database.DBTX, workspaceID, taskID, now string) error {
+	const tree = `WITH RECURSIVE tree(id) AS (
+			SELECT id FROM tasks WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL
+			UNION
+			SELECT t.id FROM tasks t JOIN tree ON t.parent_id = tree.id
+			 WHERE t.workspace_id = ? AND t.deleted_at IS NULL
+		)`
+	_, err := q.ExecContext(ctx,
+		tree+` UPDATE task_assignees SET removed_at = ?, updated_at = ?
+		 WHERE workspace_id = ? AND removed_at IS NULL AND task_id IN (SELECT id FROM tree)`,
+		taskID, workspaceID, workspaceID, now, now, workspaceID,
+	)
+	if err != nil {
+		return fmt.Errorf("close task assignees: %w", err)
+	}
+	_, err = q.ExecContext(ctx,
+		tree+` UPDATE tasks SET deleted_at = ?, updated_at = ?
+		 WHERE workspace_id = ? AND id IN (SELECT id FROM tree)`,
+		taskID, workspaceID, workspaceID, now, now, workspaceID,
+	)
+	if err != nil {
+		return fmt.Errorf("delete task tree: %w", err)
+	}
+	return nil
 }

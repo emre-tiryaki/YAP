@@ -1,15 +1,19 @@
-import { useTranslate } from "../hooks/useTranslate"
-import type { Plan } from "../types/plan"
+import { Link } from "react-router";
+import { useTranslate } from "../hooks/useTranslate";
+import type { Plan } from "../types/plan";
 
 type PlanCardProps = {
-    plan: Plan
-}
+    plan: Plan;
+};
 
 export function PlanCard({ plan }: PlanCardProps) {
-    const t = useTranslate()
+    const t = useTranslate();
 
     return (
-        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        <Link
+            to={`/projects/${plan.projectId}/plans/${plan.id}`}
+            className="block rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition hover:border-gray-400 hover:shadow-md"
+        >
             <div className="flex items-center justify-between gap-2">
                 <h3 className="font-semibold">{plan.name}</h3>
                 <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700">
@@ -22,6 +26,6 @@ export function PlanCard({ plan }: PlanCardProps) {
             <p className="mt-3 text-xs text-gray-500">
                 {plan.taskCount} {t("project.plans.taskCount")}
             </p>
-        </div>
-    )
+        </Link>
+    );
 }
