@@ -37,5 +37,16 @@
     "project.plans.empty": "Bu projede henüz plan yok.",
     "project.plans.wholeProject": "Tüm proje",
     "project.plans.taskCount": "görev",
-    "project.plans.count": "plan"
+    "project.plans.count": "plan",
+    "common.retry": "Tekrar dene",
+    "project.loadError": "Proje yüklenemedi.",
+    "project.plans.loadError": "Planlar yüklenemedi.",
+    "project.plans.emptyHint": "Bu projenin görevlerini düzenlemeye başlamak için bir plan oluştur.",
+    "project.plans.create.title": "Yeni Plan",
+    "project.plans.create.name": "Ad",
+    "project.plans.create.description": "Açıklama",
+    "project.plans.create.submit": "Plan Oluştur",
+    "project.plans.create.duplicate": "Bu projede aynı adda bir plan zaten var.",
+    "project.plans.create.notFound": "Bu proje artık mevcut değil.",
+    "project.plans.create.invalid": "Plan adı zorunludur."
 }

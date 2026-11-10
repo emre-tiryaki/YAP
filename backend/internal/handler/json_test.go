@@ -37,6 +37,8 @@ func TestWriteError(t *testing.T) {
 		{"wrapped invalid input", fmt.Errorf("%w: name is required", service.ErrInvalidInput), http.StatusBadRequest, "invalid_input"},
 		{"not found", service.ErrNotFound, http.StatusNotFound, "not_found"},
 		{"wrapped not found", fmt.Errorf("%w: project", service.ErrNotFound), http.StatusNotFound, "not_found"},
+		{"conflict", service.ErrConflict, http.StatusConflict, "conflict"},
+		{"wrapped conflict", fmt.Errorf("%w: plan name", service.ErrConflict), http.StatusConflict, "conflict"},
 		{"unknown error", errors.New("db exploded"), http.StatusInternalServerError, "internal"},
 	}
 	for _, tt := range tests {

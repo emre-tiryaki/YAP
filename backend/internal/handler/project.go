@@ -21,6 +21,7 @@ func (h *ProjectHandler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/projects", h.create)
 	mux.HandleFunc("GET /api/projects/{id}", h.get)
 	mux.HandleFunc("GET /api/projects/{id}/plans", h.plans)
+	mux.HandleFunc("POST /api/projects/{id}/plans", h.createPlan)
 }
 
 type projectResponse struct {
@@ -69,6 +70,11 @@ func (h *ProjectHandler) create(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, toProjectResponse(project))
 }
 
+type createPlanRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
 type planResponse struct {
 	ID          string  `json:"id"`
 	ProjectID   string  `json:"project_id"`
@@ -94,16 +100,16 @@ func toPlanResponse(p model.Plan) planResponse {
 	return res
 }
 
-func(h *ProjectHandler) get(w http.ResponseWriter, r *http.Request) {
+func (h *ProjectHandler) get(w http.ResponseWriter, r *http.Request) {
 	project, err := h.svc.Get(r.Context(), h.session.WorkspaceID, r.PathValue("id"))
 	if err != nil {
 		writeError(w, r, err)
-		return	
+		return
 	}
 	writeJSON(w, http.StatusOK, toProjectResponse(project))
 }
 
-func(h *ProjectHandler) plans(w http.ResponseWriter, r *http.Request) {
+func (h *ProjectHandler) plans(w http.ResponseWriter, r *http.Request) {
 	plans, err := h.svc.Plans(r.Context(), h.session.WorkspaceID, r.PathValue("id"))
 	if err != nil {
 		writeError(w, r, err)
@@ -113,5 +119,22 @@ func(h *ProjectHandler) plans(w http.ResponseWriter, r *http.Request) {
 	for _, p := range plans {
 		res = append(res, toPlanResponse(p))
 	}
-	writeJSON(w, http. StatusOK, res)
+	writeJSON(w, http.StatusOK, res)
+}
+
+func (h *ProjectHandler) createPlan(w http.ResponseWriter, r *http.Request) {
+	var req createPlanRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	plan, err := h.svc.CreatePlan(r.Context(), h.session.WorkspaceID, r.PathValue("id"), service.CreatePlanInput{
+		Name:        req.Name,
+		Description: req.Description,
+	})
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, toPlanResponse(plan))
 }

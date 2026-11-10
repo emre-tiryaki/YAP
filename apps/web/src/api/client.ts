@@ -1,4 +1,4 @@
-import type { Plan } from "../types/plan";
+import type { CreatePlanInput, Plan } from "../types/plan";
 import type { CreateProjectInput, Project } from "../types/project";
 import type { CreateTaskInput, StatusCategory, Task } from "../types/task";
 import type { Workspace } from "../types/workspace";
@@ -120,8 +120,19 @@ export async function getProject(projectId: string): Promise<Project> {
 }
 
 export async function listPlans(projectId: string): Promise<Plan[]> {
-    const dtos = await request<PlanDto[]>(`api/projects/${projectId}/plans`)
+    const dtos = await request<PlanDto[]>(`/api/projects/${projectId}/plans`)
     return dtos.map(toPlan)
+}
+
+export async function createPlan(
+    projectId: string,
+    input: CreatePlanInput,
+): Promise<Plan> {
+    const dto = await request<PlanDto>(`/api/projects/${projectId}/plans`, {
+        method: "POST",
+        body: JSON.stringify(input),
+    });
+    return toPlan(dto);
 }
 
 export async function listUpcomingTasks(): Promise<Task[]> {
@@ -137,7 +148,7 @@ export async function createTask(
         method: "POST",
         body: JSON.stringify({
             title: input.title,
-            due_date: input.dueDate ? input.dueDate.toISOString : null,
+            due_date: input.dueDate ? input.dueDate.toISOString() : null,
         }),
     });
     return toTask(dto);

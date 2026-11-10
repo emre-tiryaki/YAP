@@ -75,7 +75,62 @@ func TestProjectDetailMethodNotAllowed(t *testing.T) {
 	for _, method := range []string{http.MethodPost, http.MethodPut, http.MethodDelete} {
 		t.Run(method, func(t *testing.T) {
 			wantStatus(t, env.do(t, method, "/api/projects/"+project.ID, ""), http.StatusMethodNotAllowed)
+		})
+	}
+	for _, method := range []string{http.MethodPut, http.MethodDelete, http.MethodPatch} {
+		t.Run("plans "+method, func(t *testing.T) {
 			wantStatus(t, env.do(t, method, "/api/projects/"+project.ID+"/plans", ""), http.StatusMethodNotAllowed)
+		})
+	}
+}
+
+func TestProjectCreatePlan(t *testing.T) {
+	env := newTestEnv(t)
+	project := createProject(t, env, "Alpha")
+
+	rec := env.do(t, http.MethodPost, "/api/projects/"+project.ID+"/plans", `{"name":"  Sprint 1 ","description":" first sprint "}`)
+	wantStatus(t, rec, http.StatusCreated)
+	created := decode[planResponse](t, rec)
+	if created.ID == "" || created.ProjectID != project.ID || created.Name != "Sprint 1" ||
+		created.Description != "first sprint" || created.TaskCount != 0 || created.TeamID != nil || created.TeamName != nil {
+		t.Errorf("created = %+v", created)
+	}
+
+	list := decode[[]planResponse](t, env.do(t, http.MethodGet, "/api/projects/"+project.ID+"/plans", ""))
+	if len(list) != 2 || list[1].ID != created.ID {
+		t.Errorf("plans = %+v, want [Main, Sprint 1]", list)
+	}
+}
+
+func TestProjectCreatePlanErrors(t *testing.T) {
+	tests := []struct {
+		name      string
+		projectID string
+		body      string
+		status    int
+		code      string
+	}{
+		{"blank name", "", `{"name":"  "}`, http.StatusBadRequest, "invalid_input"},
+		{"missing name", "", `{"description":"x"}`, http.StatusBadRequest, "invalid_input"},
+		{"malformed json", "", `{"name":`, http.StatusBadRequest, "invalid_input"},
+		{"unknown field", "", `{"name":"x","team_id":"t"}`, http.StatusBadRequest, "invalid_input"},
+		{"duplicate name", "", `{"name":"Main"}`, http.StatusConflict, "conflict"},
+		{"unknown project", "missing", `{"name":"x"}`, http.StatusNotFound, "not_found"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			env := newTestEnv(t)
+			project := createProject(t, env, "Alpha")
+			id := tt.projectID
+			if id == "" {
+				id = project.ID
+			}
+			wantErrorCode(t, env.do(t, http.MethodPost, "/api/projects/"+id+"/plans", tt.body), tt.status, tt.code)
+
+			list := decode[[]planResponse](t, env.do(t, http.MethodGet, "/api/projects/"+project.ID+"/plans", ""))
+			if len(list) != 1 {
+				t.Errorf("plans = %+v, want only the default plan after a failed create", list)
+			}
 		})
 	}
 }

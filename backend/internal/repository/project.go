@@ -182,3 +182,21 @@ func (*ProjectRepository) ListPlans(ctx context.Context, q database.DBTX, worksp
 	}
 	return plans, nil
 }
+
+// PlanNameExists reports whether a non-deleted whole-project plan with the
+// given name exists. It mirrors idx_plans_project_id_team_id_name, so archived
+// plans still count.
+func (*ProjectRepository) PlanNameExists(ctx context.Context, q database.DBTX, workspaceID, projectID, name string) (bool, error) {
+	var exists bool
+	err := q.QueryRowContext(ctx,
+		`SELECT EXISTS (
+			SELECT 1 FROM plans
+			 WHERE workspace_id = ? AND project_id = ? AND team_id IS NULL
+			   AND name = ? AND deleted_at IS NULL)`,
+		workspaceID, projectID, name,
+	).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("plan name exists: %w", err)
+	}
+	return exists, nil
+}

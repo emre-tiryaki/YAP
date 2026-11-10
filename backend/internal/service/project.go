@@ -3,9 +3,9 @@ package service
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
-	"errors"
 
 	"github.com/emre-tiryaki/YAP/backend/internal/database"
 	"github.com/emre-tiryaki/YAP/backend/internal/model"
@@ -24,6 +24,7 @@ type ProjectRepository interface {
 	PlanID(ctx context.Context, q database.DBTX, workspaceID, projectID, planID string) (string, error)
 	Get(ctx context.Context, q database.DBTX, workspaceID, projectID string) (model.Project, error)
 	ListPlans(ctx context.Context, q database.DBTX, workspaceID, projectID string) ([]model.Plan, error)
+	PlanNameExists(ctx context.Context, q database.DBTX, workspaceID, projectID, name string) (bool, error)
 }
 
 var defaultStatuses = []struct {
@@ -37,6 +38,11 @@ var defaultStatuses = []struct {
 }
 
 type CreateProjectInput struct {
+	Name        string
+	Description string
+}
+
+type CreatePlanInput struct {
 	Name        string
 	Description string
 }
@@ -83,23 +89,7 @@ func (s *ProjectService) Create(ctx context.Context, workspaceID string, in Crea
 			return err
 		}
 
-		pos := ""
-		for _, d := range defaultStatuses {
-			pos = position.After(pos)
-			status := model.Status{
-				ID:          model.NewID(),
-				WorkspaceID: workspaceID,
-				PlanID:      plan.ID,
-				Title:       d.title,
-				Color:       d.color,
-				Category:    d.category,
-				Position:    pos,
-			}
-			if err := s.repo.InsertStatus(ctx, tx, status, now); err != nil {
-				return err
-			}
-		}
-		return nil
+		return s.insertDefaultStatuses(ctx, tx, plan, now)
 	})
 	if err != nil {
 		return model.Project{}, err
@@ -110,7 +100,7 @@ func (s *ProjectService) Create(ctx context.Context, workspaceID string, in Crea
 func (s *ProjectService) Get(ctx context.Context, workspaceID, projectID string) (model.Project, error) {
 	project, err := s.repo.Get(ctx, s.db, workspaceID, projectID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows){
+		if errors.Is(err, sql.ErrNoRows) {
 			return model.Project{}, fmt.Errorf("%w: project", ErrNotFound)
 		}
 		return model.Project{}, err
@@ -126,4 +116,67 @@ func (s *ProjectService) Plans(ctx context.Context, workspaceID, projectID strin
 		return nil, err
 	}
 	return s.repo.ListPlans(ctx, s.db, workspaceID, projectID)
+}
+
+// CreatePlan adds a whole-project plan with the default statuses. Plan names
+// are unique per project among non-deleted plans.
+func (s *ProjectService) CreatePlan(ctx context.Context, workspaceID, projectID string, in CreatePlanInput) (model.Plan, error) {
+	name := strings.TrimSpace(in.Name)
+	if name == "" {
+		return model.Plan{}, fmt.Errorf("%w: name is required", ErrInvalidInput)
+	}
+
+	plan := model.Plan{
+		ID:          model.NewID(),
+		WorkspaceID: workspaceID,
+		ProjectID:   projectID,
+		Name:        name,
+		Description: strings.TrimSpace(in.Description),
+	}
+
+	err := database.WithTx(ctx, s.db, func(tx *sql.Tx) error {
+		if _, err := s.repo.Name(ctx, tx, workspaceID, projectID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("%w: project", ErrNotFound)
+			}
+			return err
+		}
+		exists, err := s.repo.PlanNameExists(ctx, tx, workspaceID, projectID, name)
+		if err != nil {
+			return err
+		}
+		if exists {
+			return fmt.Errorf("%w: plan name already used", ErrConflict)
+		}
+
+		now := nowUTC()
+		if err := s.repo.InsertPlan(ctx, tx, plan, now); err != nil {
+			return err
+		}
+		return s.insertDefaultStatuses(ctx, tx, plan, now)
+	})
+	if err != nil {
+		return model.Plan{}, err
+	}
+	return plan, nil
+}
+
+func (s *ProjectService) insertDefaultStatuses(ctx context.Context, tx *sql.Tx, plan model.Plan, now string) error {
+	pos := ""
+	for _, d := range defaultStatuses {
+		pos = position.After(pos)
+		status := model.Status{
+			ID:          model.NewID(),
+			WorkspaceID: plan.WorkspaceID,
+			PlanID:      plan.ID,
+			Title:       d.title,
+			Color:       d.color,
+			Category:    d.category,
+			Position:    pos,
+		}
+		if err := s.repo.InsertStatus(ctx, tx, status, now); err != nil {
+			return err
+		}
+	}
+	return nil
 }

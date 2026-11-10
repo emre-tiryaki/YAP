@@ -37,5 +37,16 @@
     "project.plans.empty": "This project has no plans yet.",
     "project.plans.wholeProject": "Whole project",
     "project.plans.taskCount": "tasks",
-    "project.plans.count": "plans"
+    "project.plans.count": "plans",
+    "common.retry": "Try again",
+    "project.loadError": "The project could not be loaded.",
+    "project.plans.loadError": "Plans could not be loaded.",
+    "project.plans.emptyHint": "Create a plan to start organizing this project's tasks.",
+    "project.plans.create.title": "New Plan",
+    "project.plans.create.name": "Name",
+    "project.plans.create.description": "Description",
+    "project.plans.create.submit": "Create Plan",
+    "project.plans.create.duplicate": "A plan with this name already exists in this project.",
+    "project.plans.create.notFound": "This project no longer exists.",
+    "project.plans.create.invalid": "Plan name is required."
 }

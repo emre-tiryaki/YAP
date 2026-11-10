@@ -1,5 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createProject, getProject, listPlans, listProjects } from "../api/client";
+import {
+    createPlan,
+    createProject,
+    getProject,
+    listPlans,
+    listProjects,
+} from "../api/client";
+import type { CreatePlanInput } from "../types/plan";
 
 export function useProjects() {
     return useQuery({ queryKey: ["projects"], queryFn: listProjects });
@@ -28,5 +35,17 @@ export function useProjectPlans(projectId: string) {
         queryKey: ["projects", projectId, "plans"],
         queryFn: () => listPlans(projectId),
         enabled: projectId !== "",
+    });
+}
+
+export function useCreatePlan(projectId: string) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (input: CreatePlanInput) => createPlan(projectId, input),
+        onSuccess: () =>
+            queryClient.invalidateQueries({
+                queryKey: ["projects", projectId, "plans"],
+            }),
     });
 }

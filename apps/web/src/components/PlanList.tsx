@@ -1,34 +1,69 @@
 import { useTranslate } from "../hooks/useTranslate";
 import type { Plan } from "../types/plan";
+import { InlineError } from "./InlineError";
 import { PlanCard } from "./PlanCard";
+import { SectionHeader } from "./SectionHeader";
 
 type PlanListProps = {
     plans: Plan[];
     isLoading: boolean;
     isError: boolean;
+    onRetry: () => void;
+    onCreate: () => void;
 };
 
-export function PlanList({ plans, isError, isLoading }: PlanListProps) {
+const gridClass = "grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3";
+
+export function PlanList({
+    plans,
+    isError,
+    isLoading,
+    onRetry,
+    onCreate,
+}: PlanListProps) {
     const t = useTranslate();
 
     return (
         <section>
-            <h2 className="mb-4 text-lg font-semibold">
-                {t("project.plans.title")}
-            </h2>
+            <SectionHeader
+                title={t("project.plans.title")}
+                onCreate={onCreate}
+            />
             {isLoading && (
-                <p className="text-sm text-gray-500">{t("common.loading")}</p>
+                <div aria-busy="true" className={gridClass}>
+                    {[0, 1, 2].map((i) => (
+                        <div
+                            key={i}
+                            className="h-24 animate-pulse rounded-lg border border-gray-200 bg-gray-100"
+                        />
+                    ))}
+                </div>
             )}
             {isError && (
-                <p className="text-sm text-red-600">{t("common.error")}</p>
+                <InlineError
+                    message={t("project.plans.loadError")}
+                    onRetry={onRetry}
+                />
             )}
             {!isLoading && !isError && plans.length === 0 && (
-                <p className="text-sm text-gray-500">
-                    {t("project.plans.empty")}
-                </p>
+                <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-gray-300 p-8 text-center">
+                    <p className="text-sm font-medium text-gray-700">
+                        {t("project.plans.empty")}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                        {t("project.plans.emptyHint")}
+                    </p>
+                    <button
+                        type="button"
+                        onClick={onCreate}
+                        className="cursor-pointer rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700"
+                    >
+                        + {t("project.plans.create.title")}
+                    </button>
+                </div>
             )}
-            {plans.length > 0 && (
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {!isError && plans.length > 0 && (
+                <div className={gridClass}>
                     {plans.map((plan) => (
                         <PlanCard key={plan.id} plan={plan} />
                     ))}

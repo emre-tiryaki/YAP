@@ -259,6 +259,7 @@ All of these rules are protected by unit tests.
 | A member who has left (`left_at` is set) cannot be assigned to a team or a task. | When a member leaves, the corresponding `team_members` and `task_assignees` rows are closed within the same transaction. |
 | A subtask cannot create a cycle. | |
 | Creating a project creates a default whole-project plan with the default statuses. | Done in one transaction. |
+| Creating a plan creates the default statuses for it. | Done in one transaction; a name already used by a non-deleted plan in the same project and team scope (archived included) is rejected with a conflict before the unique index is hit. |
 | A task created without an explicit plan goes into the project's default plan. | The default plan is the oldest non-deleted, non-archived plan with `team_id IS NULL`. |
 | When a team is removed from a project or deleted. | The plans of that team within the affected project are archived (`archived_at`) within the same transaction. The foreign key cannot see soft removal. |
 | When a plan is deleted. | Its `statuses` and `tasks` rows are individually marked with `deleted_at` within the same transaction. |

@@ -538,3 +538,61 @@ func TestProjectListPlans(t *testing.T) {
 		t.Errorf("ListPlans() other workspace = %#v, want empty non-nil slice", foreign)
 	}
 }
+
+func TestProjectPlanNameExists(t *testing.T) {
+	ctx := context.Background()
+	db := newTestDB(t)
+	repo := NewProjectRepository()
+	a := seedWorkspace(t, db, "a")
+	b := seedWorkspace(t, db, "b")
+
+	p := seedProject(t, db, a.WorkspaceID, "p", baseNow)
+	other := seedProject(t, db, a.WorkspaceID, "other", baseNow)
+	foreign := seedProject(t, db, b.WorkspaceID, "foreign", baseNow)
+	teamID := seedTeam(t, db, a.WorkspaceID, "Backend")
+	seedProjectTeam(t, db, a.WorkspaceID, p.ID, teamID)
+
+	insert := func(ws, projectID, team, name string) model.Plan {
+		t.Helper()
+		plan := model.Plan{ID: model.NewID(), WorkspaceID: ws, ProjectID: projectID, TeamID: team, Name: name}
+		if err := repo.InsertPlan(ctx, db, plan, baseNow); err != nil {
+			t.Fatal(err)
+		}
+		return plan
+	}
+	insert(a.WorkspaceID, p.ID, "", "Main")
+	insert(a.WorkspaceID, p.ID, teamID, "Team plan")
+	insert(a.WorkspaceID, other.ID, "", "Other plan")
+	insert(b.WorkspaceID, foreign.ID, "", "Foreign")
+	archived := insert(a.WorkspaceID, p.ID, "", "Archived")
+	deleted := insert(a.WorkspaceID, p.ID, "", "Deleted")
+	mustExec(t, db, `UPDATE plans SET archived_at = ? WHERE id = ?`, baseNow, archived.ID)
+	mustExec(t, db, `UPDATE plans SET deleted_at = ? WHERE id = ?`, baseNow, deleted.ID)
+
+	tests := []struct {
+		name string
+		ws   string
+		pid  string
+		plan string
+		want bool
+	}{
+		{"existing", a.WorkspaceID, p.ID, "Main", true},
+		{"archived still counts", a.WorkspaceID, p.ID, "Archived", true},
+		{"deleted is free", a.WorkspaceID, p.ID, "Deleted", false},
+		{"team plan is another scope", a.WorkspaceID, p.ID, "Team plan", false},
+		{"other project", a.WorkspaceID, p.ID, "Other plan", false},
+		{"case sensitive", a.WorkspaceID, p.ID, "main", false},
+		{"other workspace", a.WorkspaceID, foreign.ID, "Foreign", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := repo.PlanNameExists(ctx, db, tt.ws, tt.pid, tt.plan)
+			if err != nil {
+				t.Fatalf("PlanNameExists() error = %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("PlanNameExists() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

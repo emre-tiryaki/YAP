@@ -5,3 +5,8 @@ export type Plan = {
     teamName: string | null;
     taskCount: number;
 };
+
+export type CreatePlanInput = {
+    name: string;
+    description: string;
+};
