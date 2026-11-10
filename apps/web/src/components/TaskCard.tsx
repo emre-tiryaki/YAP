@@ -23,7 +23,16 @@ export function TaskCard({ task }: TaskCardProps) {
         </p>
       )}
       <div className="absolute top-3 right-3">
-        <CardMenu onSelect={setAction} />
+        <CardMenu
+          onSelect={setAction}
+          pin={{
+            kind: "task",
+            id: task.id,
+            label: task.title,
+            href: `/projects/${task.projectId}`,
+            projectId: task.projectId,
+          }}
+        />
       </div>
       {/* The upcoming list carries no description, so the edit dialog hides that field. */}
       <TaskDialogs task={task} action={action} onClose={() => setAction(null)} />

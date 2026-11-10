@@ -74,9 +74,9 @@ func (*ProjectRepository) InsertPlan(ctx context.Context, q database.DBTX, p mod
 
 func (*ProjectRepository) InsertStatus(ctx context.Context, q database.DBTX, s model.Status, now string) error {
 	_, err := q.ExecContext(ctx,
-		`INSERT INTO statuses (id, workspace_id, plan_id, title, color, category, position, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		s.ID, s.WorkspaceID, s.PlanID, s.Title, s.Color, string(s.Category), s.Position, now,
+		`INSERT INTO statuses (id, workspace_id, plan_id, title, description, color, category, position, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		s.ID, s.WorkspaceID, s.PlanID, s.Title, nullIfEmpty(s.Description), s.Color, string(s.Category), s.Position, now,
 	)
 	if err != nil {
 		return fmt.Errorf("insert status: %w", err)
@@ -241,7 +241,7 @@ func (*ProjectRepository) GetPlan(ctx context.Context, q database.DBTX, workspac
 
 func (*ProjectRepository) ListStatuses(ctx context.Context, q database.DBTX, workspaceID, planID string) ([]model.Status, error) {
 	rows, err := q.QueryContext(ctx,
-		`SELECT id, title, color, category, position FROM statuses
+		`SELECT id, title, description, color, category, position FROM statuses
 		 WHERE workspace_id = ? AND plan_id = ? AND deleted_at IS NULL
 		 ORDER BY position, id`,
 		workspaceID, planID,
@@ -255,9 +255,11 @@ func (*ProjectRepository) ListStatuses(ctx context.Context, q database.DBTX, wor
 	for rows.Next() {
 		s := model.Status{WorkspaceID: workspaceID, PlanID: planID}
 		var category string
-		if err := rows.Scan(&s.ID, &s.Title, &s.Color, &category, &s.Position); err != nil {
+		var description sql.NullString
+		if err := rows.Scan(&s.ID, &s.Title, &description, &s.Color, &category, &s.Position); err != nil {
 			return nil, fmt.Errorf("scan status: %w", err)
 		}
+		s.Description = description.String
 		s.Category = model.StatusCategory(category)
 		statuses = append(statuses, s)
 	}
@@ -294,12 +296,12 @@ func (*ProjectRepository) UpdateStatusPosition(ctx context.Context, q database.D
 	return nil
 }
 
-// UpdateStatus overwrites the title and color of a non-deleted status.
-func (*ProjectRepository) UpdateStatus(ctx context.Context, q database.DBTX, workspaceID, statusID, title, color, now string) error {
+// UpdateStatus overwrites the title, description and color of a non-deleted status.
+func (*ProjectRepository) UpdateStatus(ctx context.Context, q database.DBTX, workspaceID, statusID, title, description, color, now string) error {
 	_, err := q.ExecContext(ctx,
-		`UPDATE statuses SET title = ?, color = ?, updated_at = ?
+		`UPDATE statuses SET title = ?, description = ?, color = ?, updated_at = ?
 		 WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`,
-		title, color, now, statusID, workspaceID,
+		title, nullIfEmpty(description), color, now, statusID, workspaceID,
 	)
 	if err != nil {
 		return fmt.Errorf("update status: %w", err)
@@ -371,6 +373,38 @@ func (*ProjectRepository) SoftDeletePlan(ctx context.Context, q database.DBTX, w
 		if _, err := q.ExecContext(ctx, step.query, now, now, workspaceID, planID); err != nil {
 			return fmt.Errorf("delete plan %s: %w", step.name, err)
 		}
+	}
+	return nil
+}
+
+// SoftDeleteStatus marks the status as deleted together with the tasks in it,
+// all of their descendants (which may sit in other statuses) and their open
+// assignments, matching what deleting each task one by one would do.
+func (*ProjectRepository) SoftDeleteStatus(ctx context.Context, q database.DBTX, workspaceID, statusID, now string) error {
+	const tree = `WITH RECURSIVE tree(id) AS (
+			SELECT id FROM tasks WHERE status_id = ? AND workspace_id = ? AND deleted_at IS NULL
+			UNION
+			SELECT t.id FROM tasks t JOIN tree ON t.parent_id = tree.id
+			 WHERE t.workspace_id = ? AND t.deleted_at IS NULL
+		)`
+	steps := []struct{ name, query string }{
+		{"task assignees", tree + ` UPDATE task_assignees SET removed_at = ?, updated_at = ?
+			 WHERE workspace_id = ? AND removed_at IS NULL AND task_id IN (SELECT id FROM tree)`},
+		{"tasks", tree + ` UPDATE tasks SET deleted_at = ?, updated_at = ?
+			 WHERE workspace_id = ? AND id IN (SELECT id FROM tree)`},
+	}
+	for _, step := range steps {
+		if _, err := q.ExecContext(ctx, step.query, statusID, workspaceID, workspaceID, now, now, workspaceID); err != nil {
+			return fmt.Errorf("delete status %s: %w", step.name, err)
+		}
+	}
+	_, err := q.ExecContext(ctx,
+		`UPDATE statuses SET deleted_at = ?, updated_at = ?
+		 WHERE workspace_id = ? AND id = ? AND deleted_at IS NULL`,
+		now, now, workspaceID, statusID,
+	)
+	if err != nil {
+		return fmt.Errorf("delete status: %w", err)
 	}
 	return nil
 }

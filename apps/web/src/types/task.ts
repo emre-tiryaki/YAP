@@ -3,6 +3,7 @@ export type StatusCategory = "todo" | "in_progress" | "done";
 export type Task = {
   id: string;
   title: string;
+  projectId: string;
   projectName: string;
   dueDate: Date | null;
   statusCategory: StatusCategory;

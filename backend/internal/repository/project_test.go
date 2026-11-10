@@ -596,3 +596,55 @@ func TestProjectPlanNameExists(t *testing.T) {
 		})
 	}
 }
+
+func TestProjectSoftDeleteStatus(t *testing.T) {
+	ctx := context.Background()
+	db := newTestDB(t)
+	s := seedWorkspace(t, db, "ws")
+	project := seedProject(t, db, s.WorkspaceID, "Alpha", baseNow)
+	plan := seedPlan(t, db, s.WorkspaceID, project.ID, "Main")
+	statuses := seedStatuses(t, db, s.WorkspaceID, plan.ID)
+	todo, done := statuses[model.StatusToDo], statuses[model.StatusDone]
+
+	parent := seedTask(t, db, s, plan, todo, "parent", "a0", nil)
+	// The subtask lives in another status but must go with its parent.
+	child := seedTask(t, db, s, plan, done, "child", "a0", nil)
+	mustExec(t, db, `UPDATE tasks SET parent_id = ? WHERE id = ?`, parent.ID, child.ID)
+	keep := seedTask(t, db, s, plan, done, "keep", "a1", nil)
+	assign(t, db, s.WorkspaceID, parent.ID, s.MembershipID)
+	assign(t, db, s.WorkspaceID, keep.ID, s.MembershipID)
+
+	const now = "2026-02-01T00:00:00Z"
+	if err := NewProjectRepository().SoftDeleteStatus(ctx, db, s.WorkspaceID, todo, now); err != nil {
+		t.Fatalf("SoftDeleteStatus() error = %v", err)
+	}
+
+	deletedAt := func(table, idColumn, column, id string) string {
+		t.Helper()
+		var v sql.NullString
+		if err := db.QueryRowContext(ctx,
+			`SELECT `+column+` FROM `+table+` WHERE `+idColumn+` = ?`, id,
+		).Scan(&v); err != nil {
+			t.Fatal(err)
+		}
+		return v.String
+	}
+	tests := []struct {
+		name, table, idColumn, column, id, want string
+	}{
+		{"status", "statuses", "id", "deleted_at", todo, now},
+		{"task in status", "tasks", "id", "deleted_at", parent.ID, now},
+		{"subtask in other status", "tasks", "id", "deleted_at", child.ID, now},
+		{"unrelated task", "tasks", "id", "deleted_at", keep.ID, ""},
+		{"other status", "statuses", "id", "deleted_at", done, ""},
+		{"assignment of deleted task", "task_assignees", "task_id", "removed_at", parent.ID, now},
+		{"assignment of unrelated task", "task_assignees", "task_id", "removed_at", keep.ID, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := deletedAt(tt.table, tt.idColumn, tt.column, tt.id); got != tt.want {
+				t.Errorf("%s = %q, want %q", tt.column, got, tt.want)
+			}
+		})
+	}
+}

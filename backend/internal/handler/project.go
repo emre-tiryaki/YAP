@@ -31,6 +31,7 @@ func (h *ProjectHandler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/projects/{id}/plans/{planId}/statuses", h.statuses)
 	mux.HandleFunc("POST /api/projects/{id}/plans/{planId}/statuses", h.createStatus)
 	mux.HandleFunc("PATCH /api/projects/{id}/plans/{planId}/statuses/{statusId}", h.updateStatus)
+	mux.HandleFunc("DELETE /api/projects/{id}/plans/{planId}/statuses/{statusId}", h.deleteStatus)
 	mux.HandleFunc("POST /api/projects/{id}/plans/{planId}/statuses/{statusId}/move", h.moveStatus)
 }
 
@@ -152,28 +153,31 @@ func (h *ProjectHandler) createPlan(w http.ResponseWriter, r *http.Request) {
 }
 
 type statusResponse struct {
-	ID       string `json:"id"`
-	PlanID   string `json:"plan_id"`
-	Title    string `json:"title"`
-	Color    string `json:"color"`
-	Category string `json:"category"`
-	Position string `json:"position"`
+	ID          string `json:"id"`
+	PlanID      string `json:"plan_id"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Color       string `json:"color"`
+	Category    string `json:"category"`
+	Position    string `json:"position"`
 }
 
 type createStatusRequest struct {
-	Title    string `json:"title"`
-	Color    string `json:"color"`
-	Category string `json:"category"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Color       string `json:"color"`
+	Category    string `json:"category"`
 }
 
 func toStatusResponse(s model.Status) statusResponse {
 	return statusResponse{
-		ID:       s.ID,
-		PlanID:   s.PlanID,
-		Title:    s.Title,
-		Color:    s.Color,
-		Category: string(s.Category),
-		Position: s.Position,
+		ID:          s.ID,
+		PlanID:      s.PlanID,
+		Title:       s.Title,
+		Description: s.Description,
+		Color:       s.Color,
+		Category:    string(s.Category),
+		Position:    s.Position,
 	}
 }
 
@@ -211,9 +215,10 @@ func (h *ProjectHandler) createStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	status, err := h.svc.CreateStatus(r.Context(), h.session.WorkspaceID, r.PathValue("id"), r.PathValue("planId"), service.CreateStatusInput{
-		Title:    req.Title,
-		Color:    req.Color,
-		Category: category,
+		Title:       req.Title,
+		Description: req.Description,
+		Color:       req.Color,
+		Category:    category,
 	})
 	if err != nil {
 		writeError(w, r, err)
@@ -224,8 +229,9 @@ func (h *ProjectHandler) createStatus(w http.ResponseWriter, r *http.Request) {
 
 // updateStatusRequest is a partial update: omitted (or null) fields are kept.
 type updateStatusRequest struct {
-	Title *string `json:"title"`
-	Color *string `json:"color"`
+	Title       *string `json:"title"`
+	Description *string `json:"description"`
+	Color       *string `json:"color"`
 }
 
 func (h *ProjectHandler) updateStatus(w http.ResponseWriter, r *http.Request) {
@@ -235,14 +241,23 @@ func (h *ProjectHandler) updateStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	status, err := h.svc.UpdateStatus(r.Context(), h.session.WorkspaceID, r.PathValue("id"), r.PathValue("planId"), r.PathValue("statusId"), service.UpdateStatusInput{
-		Title: req.Title,
-		Color: req.Color,
+		Title:       req.Title,
+		Description: req.Description,
+		Color:       req.Color,
 	})
 	if err != nil {
 		writeError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, toStatusResponse(status))
+}
+
+func (h *ProjectHandler) deleteStatus(w http.ResponseWriter, r *http.Request) {
+	if err := h.svc.DeleteStatus(r.Context(), h.session.WorkspaceID, r.PathValue("id"), r.PathValue("planId"), r.PathValue("statusId")); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 type moveStatusRequest struct {

@@ -56,6 +56,7 @@ type StatusDto = {
     id: string;
     plan_id: string;
     title: string;
+    description: string;
     color: string;
     category: StatusCategory;
     position: string;
@@ -114,6 +115,7 @@ function toProject(dto: ProjectDto): Project {
 function toTask(dto: TaskDto): Task {
     return {
         id: dto.id,
+        projectId: dto.project_id,
         projectName: dto.project_name,
         title: dto.title,
         dueDate: dto.due_date ? new Date(dto.due_date) : null,
@@ -137,6 +139,7 @@ function toStatus(dto: StatusDto): Status {
     return {
         id: dto.id,
         title: dto.title,
+        description: dto.description,
         color: dto.color,
         category: dto.category,
         position: dto.position,
@@ -260,6 +263,17 @@ export async function updateStatus(
         { method: "PATCH", body: JSON.stringify(input) },
     );
     return toStatus(dto);
+}
+
+// Deletes the status together with the tasks in it.
+export async function deleteStatus(
+    projectId: string,
+    planId: string,
+    statusId: string,
+): Promise<void> {
+    await request<void>(`${planPath(projectId, planId)}/statuses/${statusId}`, {
+        method: "DELETE",
+    });
 }
 
 // Places the status at `index` among the other statuses of its plan.

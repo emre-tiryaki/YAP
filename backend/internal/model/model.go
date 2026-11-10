@@ -53,6 +53,7 @@ type Status struct {
 	WorkspaceID string
 	PlanID      string
 	Title       string
+	Description string
 	Color       string
 	Category    StatusCategory
 	Position    string

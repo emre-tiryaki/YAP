@@ -37,12 +37,16 @@ export function CreateStatusForm({
     const t = useTranslate();
     const createStatus = useCreateStatus(projectId, planId);
     const [title, setTitle] = useState("");
+    const [description, setDescription] = useState("");
     const [color, setColor] = useState(statusColors[0]);
     const [category, setCategory] = useState<StatusCategory>("in_progress");
 
     function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
-        createStatus.mutate({ title, color, category }, { onSuccess: onDone });
+        createStatus.mutate(
+            { title, description, color, category },
+            { onSuccess: onDone },
+        );
     }
 
     return (
@@ -53,6 +57,11 @@ export function CreateStatusForm({
                 onChange={(event) => setTitle(event.target.value)}
                 required
                 autoFocus
+            />
+            <TextInput
+                label={t("plan.status.create.description")}
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
             />
             <StatusColorPicker value={color} onChange={setColor} />
             <SelectInput

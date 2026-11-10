@@ -109,7 +109,7 @@ func TestProjectCreateDefaultStatusOrderAndCategories(t *testing.T) {
 	}
 
 	rows, err := db.QueryContext(ctx,
-		`SELECT s.title, s.category, s.position
+		`SELECT s.title, COALESCE(s.description, ''), s.category, s.position
 		 FROM statuses s JOIN plans pl ON pl.id = s.plan_id
 		 WHERE pl.project_id = ? ORDER BY s.position`, p.ID)
 	if err != nil {
@@ -117,12 +117,12 @@ func TestProjectCreateDefaultStatusOrderAndCategories(t *testing.T) {
 	}
 	defer rows.Close()
 
-	var gotTitles []string
+	var gotTitles, gotDescriptions []string
 	var gotCategories []model.StatusCategory
 	prev := ""
 	for rows.Next() {
-		var title, category, pos string
-		if err := rows.Scan(&title, &category, &pos); err != nil {
+		var title, description, category, pos string
+		if err := rows.Scan(&title, &description, &category, &pos); err != nil {
 			t.Fatal(err)
 		}
 		if pos <= prev {
@@ -130,6 +130,7 @@ func TestProjectCreateDefaultStatusOrderAndCategories(t *testing.T) {
 		}
 		prev = pos
 		gotTitles = append(gotTitles, title)
+		gotDescriptions = append(gotDescriptions, description)
 		gotCategories = append(gotCategories, model.StatusCategory(category))
 	}
 	if err := rows.Err(); err != nil {
@@ -142,6 +143,9 @@ func TestProjectCreateDefaultStatusOrderAndCategories(t *testing.T) {
 	for i, d := range defaultStatuses {
 		if gotTitles[i] != d.title || gotCategories[i] != d.category {
 			t.Errorf("status[%d] = %q/%q, want %q/%q", i, gotTitles[i], gotCategories[i], d.title, d.category)
+		}
+		if d.description == "" || gotDescriptions[i] != d.description {
+			t.Errorf("status[%d] description = %q, want non-empty %q", i, gotDescriptions[i], d.description)
 		}
 	}
 }

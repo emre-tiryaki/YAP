@@ -12,6 +12,7 @@ import {
 } from "../api/client";
 import type { CreatePlanInput, UpdatePlanInput } from "../types/plan";
 import { planKey } from "./usePlans";
+import { relabelPin, unpinWhere } from "./usePins";
 import type { UpdateProjectInput } from "../types/project";
 
 export function useProjects() {
@@ -94,7 +95,10 @@ export function useUpdateProject() {
     return useMutation({
         mutationFn: ({ projectId, input }: UpdateProjectVariables) =>
             updateProject(projectId, input),
-        onSuccess: () => invalidateProjectViews(queryClient),
+        onSuccess: (project) => {
+            relabelPin("project", project.id, project.name);
+            return invalidateProjectViews(queryClient);
+        },
     });
 }
 
@@ -103,8 +107,16 @@ export function useDeleteProject() {
 
     return useMutation({
         mutationFn: deleteProject,
-        onSuccess: (_data, projectId) =>
-            invalidateProjectViews(queryClient, ["projects", projectId]),
+        onSuccess: (_data, projectId) => {
+            // The project's tasks go with it.
+            unpinWhere(
+                (pin) => pin.id === projectId || pin.projectId === projectId,
+            );
+            return invalidateProjectViews(queryClient, [
+                "projects",
+                projectId,
+            ]);
+        },
     });
 }
 

@@ -30,11 +30,12 @@ type ProjectRepository interface {
 	ListStatuses(ctx context.Context, q database.DBTX, workspaceID, planID string) ([]model.Status, error)
 	LastStatusPosition(ctx context.Context, q database.DBTX, workspaceID, planID string) (string, error)
 	UpdateStatusPosition(ctx context.Context, q database.DBTX, workspaceID, statusID, pos, now string) error
-	UpdateStatus(ctx context.Context, q database.DBTX, workspaceID, statusID, title, color, now string) error
+	UpdateStatus(ctx context.Context, q database.DBTX, workspaceID, statusID, title, description, color, now string) error
 	Update(ctx context.Context, q database.DBTX, workspaceID, projectID, name, description, now string) error
 	SoftDelete(ctx context.Context, q database.DBTX, workspaceID, projectID, now string) error
 	UpdatePlan(ctx context.Context, q database.DBTX, workspaceID, planID, name, description, now string) error
 	SoftDeletePlan(ctx context.Context, q database.DBTX, workspaceID, planID, now string) error
+	SoftDeleteStatus(ctx context.Context, q database.DBTX, workspaceID, statusID, now string) error
 	PlanNameTaken(ctx context.Context, q database.DBTX, workspaceID, projectID, teamID, name, excludePlanID string) (bool, error)
 	CountWholeProjectPlans(ctx context.Context, q database.DBTX, workspaceID, projectID string) (int, error)
 }
@@ -42,13 +43,14 @@ type ProjectRepository interface {
 var colorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 
 var defaultStatuses = []struct {
-	title    string
-	color    string
-	category model.StatusCategory
+	title       string
+	description string
+	color       string
+	category    model.StatusCategory
 }{
-	{"To Do", "#9ca3af", model.StatusToDo},
-	{"In Progress", "#3b82f6", model.StatusInProgress},
-	{"Done", "#22c55e", model.StatusDone},
+	{"To Do", "Tasks that are planned but not started yet.", "#9ca3af", model.StatusToDo},
+	{"In Progress", "Tasks that are currently being worked on.", "#3b82f6", model.StatusInProgress},
+	{"Done", "Finished tasks.", "#22c55e", model.StatusDone},
 }
 
 type CreateProjectInput struct {
@@ -62,9 +64,10 @@ type CreatePlanInput struct {
 }
 
 type CreateStatusInput struct {
-	Title    string
-	Color    string
-	Category model.StatusCategory
+	Title       string
+	Description string
+	Color       string
+	Category    model.StatusCategory
 }
 
 type ProjectService struct {
@@ -190,6 +193,7 @@ func (s *ProjectService) insertDefaultStatuses(ctx context.Context, tx *sql.Tx, 
 			WorkspaceID: plan.WorkspaceID,
 			PlanID:      plan.ID,
 			Title:       d.title,
+			Description: d.description,
 			Color:       d.color,
 			Category:    d.category,
 			Position:    pos,
@@ -238,6 +242,7 @@ func (s *ProjectService) CreateStatus(ctx context.Context, workspaceID, projectI
 		WorkspaceID: workspaceID,
 		PlanID:      planID,
 		Title:       title,
+		Description: strings.TrimSpace(in.Description),
 		Color:       strings.ToLower(in.Color),
 		Category:    in.Category,
 	}
@@ -303,13 +308,14 @@ func (s *ProjectService) MoveStatus(ctx context.Context, workspaceID, projectID,
 // category is not editable here: changing it would have to guard the plan's
 // last done-category status.
 type UpdateStatusInput struct {
-	Title *string
-	Color *string
+	Title       *string
+	Description *string
+	Color       *string
 }
 
-// UpdateStatus renames and/or recolors a status of the plan.
+// UpdateStatus renames, redescribes and/or recolors a status of the plan.
 func (s *ProjectService) UpdateStatus(ctx context.Context, workspaceID, projectID, planID, statusID string, in UpdateStatusInput) (model.Status, error) {
-	if in.Title == nil && in.Color == nil {
+	if in.Title == nil && in.Description == nil && in.Color == nil {
 		return model.Status{}, fmt.Errorf("%w: nothing to update", ErrInvalidInput)
 	}
 	if in.Title != nil && strings.TrimSpace(*in.Title) == "" {
@@ -341,15 +347,50 @@ func (s *ProjectService) UpdateStatus(ctx context.Context, workspaceID, projectI
 		if in.Title != nil {
 			status.Title = strings.TrimSpace(*in.Title)
 		}
+		if in.Description != nil {
+			status.Description = strings.TrimSpace(*in.Description)
+		}
 		if in.Color != nil {
 			status.Color = strings.ToLower(*in.Color)
 		}
-		return s.repo.UpdateStatus(ctx, tx, workspaceID, statusID, status.Title, status.Color, nowUTC())
+		return s.repo.UpdateStatus(ctx, tx, workspaceID, statusID, status.Title, status.Description, status.Color, nowUTC())
 	})
 	if err != nil {
 		return model.Status{}, err
 	}
 	return status, nil
+}
+
+// DeleteStatus soft-deletes a status of the plan together with the tasks in
+// it. The plan's last done-category status cannot be deleted, because a task
+// counts as finished only while it sits in a done-category status.
+func (s *ProjectService) DeleteStatus(ctx context.Context, workspaceID, projectID, planID, statusID string) error {
+	return database.WithTx(ctx, s.db, func(tx *sql.Tx) error {
+		if err := s.requirePlan(ctx, tx, workspaceID, projectID, planID); err != nil {
+			return err
+		}
+		statuses, err := s.repo.ListStatuses(ctx, tx, workspaceID, planID)
+		if err != nil {
+			return err
+		}
+		var target *model.Status
+		doneCount := 0
+		for i, st := range statuses {
+			if st.ID == statusID {
+				target = &statuses[i]
+			}
+			if st.Category == model.StatusDone {
+				doneCount++
+			}
+		}
+		if target == nil {
+			return fmt.Errorf("%w: status", ErrNotFound)
+		}
+		if target.Category == model.StatusDone && doneCount <= 1 {
+			return fmt.Errorf("%w: plan needs at least one done status", ErrConflict)
+		}
+		return s.repo.SoftDeleteStatus(ctx, tx, workspaceID, statusID, nowUTC())
+	})
 }
 
 func (s *ProjectService) requirePlan(ctx context.Context, q database.DBTX, workspaceID, projectID, planID string) error {

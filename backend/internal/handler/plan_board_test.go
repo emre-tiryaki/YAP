@@ -81,12 +81,12 @@ func TestPlanCreateStatus(t *testing.T) {
 	env := newTestEnv(t)
 	b := newPlanBoard(t, env)
 
-	rec := env.do(t, http.MethodPost, b.path("/statuses"), `{"title":"Review","color":"#a855f7","category":"in_progress"}`)
+	rec := env.do(t, http.MethodPost, b.path("/statuses"), `{"title":"Review","description":"Awaiting review","color":"#a855f7","category":"in_progress"}`)
 	wantStatus(t, rec, http.StatusCreated)
 	created := decode[statusResponse](t, rec)
 
 	statuses := decode[[]statusResponse](t, env.do(t, http.MethodGet, b.path("/statuses"), ""))
-	if last := statuses[len(statuses)-1]; last != created || last.Title != "Review" {
+	if last := statuses[len(statuses)-1]; last != created || last.Title != "Review" || last.Description != "Awaiting review" {
 		t.Errorf("last status = %+v, want created %+v", last, created)
 	}
 }
@@ -208,10 +208,10 @@ func TestPlanUpdateStatus(t *testing.T) {
 	b := newPlanBoard(t, env)
 	todo := b.statuses[0]
 
-	rec := env.do(t, http.MethodPatch, b.path("/statuses/"+todo.ID), `{"title":"Backlog","color":"#EF4444"}`)
+	rec := env.do(t, http.MethodPatch, b.path("/statuses/"+todo.ID), `{"title":"Backlog","description":"Ideas","color":"#EF4444"}`)
 	wantStatus(t, rec, http.StatusOK)
 	updated := decode[statusResponse](t, rec)
-	if updated.Title != "Backlog" || updated.Color != "#ef4444" || updated.Category != todo.Category {
+	if updated.Title != "Backlog" || updated.Description != "Ideas" || updated.Color != "#ef4444" || updated.Category != todo.Category {
 		t.Errorf("updated = %+v", updated)
 	}
 
@@ -240,6 +240,45 @@ func TestPlanUpdateStatusErrors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			wantErrorCode(t, env.do(t, http.MethodPatch, tt.path, tt.body), tt.status, tt.code)
+		})
+	}
+}
+
+func TestPlanDeleteStatus(t *testing.T) {
+	env := newTestEnv(t)
+	b := newPlanBoard(t, env)
+	todo := b.statuses[0]
+	b.createTask(t, env, `{"title":"gone","plan_id":"`+b.plan.ID+`","status_id":"`+todo.ID+`"}`)
+
+	wantStatus(t, env.do(t, http.MethodDelete, b.path("/statuses/"+todo.ID), ""), http.StatusNoContent)
+
+	statuses := decode[[]statusResponse](t, env.do(t, http.MethodGet, b.path("/statuses"), ""))
+	if len(statuses) != 2 || statuses[0].ID == todo.ID {
+		t.Errorf("statuses = %+v, want todo removed", statuses)
+	}
+	got := decode[planResponse](t, env.do(t, http.MethodGet, b.path(""), ""))
+	if got.TaskCount != 0 {
+		t.Errorf("task count = %d, want 0", got.TaskCount)
+	}
+}
+
+func TestPlanDeleteStatusErrors(t *testing.T) {
+	env := newTestEnv(t)
+	b := newPlanBoard(t, env)
+	done := b.statuses[2]
+
+	tests := []struct {
+		name, path string
+		status     int
+		code       string
+	}{
+		{"last done status", b.path("/statuses/" + done.ID), http.StatusConflict, "conflict"},
+		{"missing status", b.path("/statuses/missing"), http.StatusNotFound, "not_found"},
+		{"missing plan", "/api/projects/" + b.project.ID + "/plans/missing/statuses/" + done.ID, http.StatusNotFound, "not_found"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			wantErrorCode(t, env.do(t, http.MethodDelete, tt.path, ""), tt.status, tt.code)
 		})
 	}
 }

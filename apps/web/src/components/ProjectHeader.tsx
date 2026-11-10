@@ -23,7 +23,15 @@ export function ProjectHeader({
         <header className="mb-8 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
             <div className="flex items-start justify-between gap-3">
                 <h1 className="text-2xl font-bold">{project.name}</h1>
-                <CardMenu onSelect={setAction} />
+                <CardMenu
+                    onSelect={setAction}
+                    pin={{
+                        kind: "project",
+                        id: project.id,
+                        label: project.name,
+                        href: `/projects/${project.id}`,
+                    }}
+                />
             </div>
             {project.description ? (
                 <p className="mt-2 text-sm text-gray-600">

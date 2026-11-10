@@ -130,16 +130,19 @@ func TestCreateStatusAppendsAfterLastColumn(t *testing.T) {
 	planID := env.planOf(t, project.ID)
 
 	created, err := env.projects.CreateStatus(ctx, env.session.WorkspaceID, project.ID, planID, CreateStatusInput{
-		Title: "  Review  ", Color: "#A855F7", Category: model.StatusInProgress,
+		Title: "  Review  ", Description: "  Waiting for review  ", Color: "#A855F7", Category: model.StatusInProgress,
 	})
 	if err != nil {
 		t.Fatalf("CreateStatus() error = %v", err)
 	}
-	if created.Title != "Review" || created.Color != "#a855f7" {
-		t.Errorf("status = %+v, want trimmed title and lowercase color", created)
+	if created.Title != "Review" || created.Description != "Waiting for review" || created.Color != "#a855f7" {
+		t.Errorf("status = %+v, want trimmed title and description and lowercase color", created)
 	}
 
 	statuses := env.statuses(t, project.ID, planID)
+	if got := statuses[len(statuses)-1].Description; got != "Waiting for review" {
+		t.Errorf("stored description = %q, want %q", got, "Waiting for review")
+	}
 	titles := []string{}
 	for _, s := range statuses {
 		titles = append(titles, s.Title)
@@ -469,15 +472,21 @@ func TestMoveStatusErrors(t *testing.T) {
 func TestUpdateStatus(t *testing.T) {
 	ctx := context.Background()
 	str := func(v string) *string { return &v }
+	todoDesc := defaultStatuses[0].description
 	tests := []struct {
-		name      string
-		in        UpdateStatusInput
-		wantTitle string
-		wantColor string
+		name            string
+		initial         string
+		in              UpdateStatusInput
+		wantTitle       string
+		wantDescription string
+		wantColor       string
 	}{
-		{"title only", UpdateStatusInput{Title: str("  Backlog  ")}, "Backlog", "#9ca3af"},
-		{"color only", UpdateStatusInput{Color: str("#EF4444")}, "To Do", "#ef4444"},
-		{"both", UpdateStatusInput{Title: str("Next"), Color: str("#22c55e")}, "Next", "#22c55e"},
+		{"title only", "", UpdateStatusInput{Title: str("  Backlog  ")}, "Backlog", todoDesc, "#9ca3af"},
+		{"color only", "", UpdateStatusInput{Color: str("#EF4444")}, "To Do", todoDesc, "#ef4444"},
+		{"both", "", UpdateStatusInput{Title: str("Next"), Color: str("#22c55e")}, "Next", todoDesc, "#22c55e"},
+		{"description only", "", UpdateStatusInput{Description: str("  Not started yet  ")}, "To Do", "Not started yet", "#9ca3af"},
+		{"description kept when omitted", "Keep me", UpdateStatusInput{Title: str("Next")}, "Next", "Keep me", "#9ca3af"},
+		{"description cleared", "Old", UpdateStatusInput{Description: str("")}, "To Do", "", "#9ca3af"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -485,6 +494,11 @@ func TestUpdateStatus(t *testing.T) {
 			project := env.project(t, "Alpha")
 			planID := env.planOf(t, project.ID)
 			todo := env.statuses(t, project.ID, planID)[0]
+			if tt.initial != "" {
+				if _, err := env.projects.UpdateStatus(ctx, env.session.WorkspaceID, project.ID, planID, todo.ID, UpdateStatusInput{Description: str(tt.initial)}); err != nil {
+					t.Fatalf("seed description error = %v", err)
+				}
+			}
 
 			got, err := env.projects.UpdateStatus(ctx, env.session.WorkspaceID, project.ID, planID, todo.ID, tt.in)
 			if err != nil {
@@ -492,8 +506,8 @@ func TestUpdateStatus(t *testing.T) {
 			}
 			stored := env.statuses(t, project.ID, planID)[0]
 			for _, s := range []model.Status{got, stored} {
-				if s.Title != tt.wantTitle || s.Color != tt.wantColor {
-					t.Errorf("status = %q %q, want %q %q", s.Title, s.Color, tt.wantTitle, tt.wantColor)
+				if s.Title != tt.wantTitle || s.Description != tt.wantDescription || s.Color != tt.wantColor {
+					t.Errorf("status = %q %q %q, want %q %q %q", s.Title, s.Description, s.Color, tt.wantTitle, tt.wantDescription, tt.wantColor)
 				}
 				if s.Category != todo.Category || s.Position != todo.Position {
 					t.Errorf("status %+v changed category or position of %+v", s, todo)
@@ -541,5 +555,108 @@ func TestUpdateStatusErrors(t *testing.T) {
 	}
 	if got := env.statuses(t, project.ID, second.ID)[0]; got != foreign {
 		t.Errorf("foreign status = %+v, want unchanged %+v", got, foreign)
+	}
+}
+
+func TestDeleteStatusRemovesItsTasks(t *testing.T) {
+	ctx := context.Background()
+	env := newTaskEnv(t)
+	project := env.project(t, "Alpha")
+	planID := env.planOf(t, project.ID)
+	statuses := env.statuses(t, project.ID, planID)
+	todo, inProgress := statuses[0], statuses[1]
+	for _, in := range []CreateTaskInput{
+		{Title: "a", PlanID: planID, StatusID: todo.ID},
+		{Title: "b", PlanID: planID, StatusID: todo.ID},
+		{Title: "keep", PlanID: planID, StatusID: inProgress.ID},
+	} {
+		if _, err := env.tasks.Create(ctx, env.session, project.ID, in); err != nil {
+			t.Fatalf("Create() error = %v", err)
+		}
+	}
+
+	if err := env.projects.DeleteStatus(ctx, env.session.WorkspaceID, project.ID, planID, todo.ID); err != nil {
+		t.Fatalf("DeleteStatus() error = %v", err)
+	}
+
+	titles := []string{}
+	for _, s := range env.statuses(t, project.ID, planID) {
+		titles = append(titles, s.Title)
+	}
+	if want := []string{"In Progress", "Done"}; !equalStrings(titles, want) {
+		t.Errorf("statuses = %v, want %v", titles, want)
+	}
+	if got := env.taskTitles(t, project.ID, planID, todo.ID); len(got) != 0 {
+		t.Errorf("tasks of deleted status = %v, want none", got)
+	}
+	if got := env.taskTitles(t, project.ID, planID, inProgress.ID); !equalStrings(got, []string{"keep"}) {
+		t.Errorf("tasks of other status = %v, want [keep]", got)
+	}
+
+	var deleted int
+	if err := env.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM tasks WHERE status_id = ? AND deleted_at IS NOT NULL`, todo.ID,
+	).Scan(&deleted); err != nil {
+		t.Fatal(err)
+	}
+	if deleted != 2 {
+		t.Errorf("soft-deleted tasks = %d, want 2", deleted)
+	}
+}
+
+func TestDeleteStatusAllowsDoneWhenAnotherDoneRemains(t *testing.T) {
+	ctx := context.Background()
+	env := newTaskEnv(t)
+	project := env.project(t, "Alpha")
+	planID := env.planOf(t, project.ID)
+	done := env.statuses(t, project.ID, planID)[2]
+	if _, err := env.projects.CreateStatus(ctx, env.session.WorkspaceID, project.ID, planID, CreateStatusInput{
+		Title: "Shipped", Color: "#000000", Category: model.StatusDone,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := env.projects.DeleteStatus(ctx, env.session.WorkspaceID, project.ID, planID, done.ID); err != nil {
+		t.Fatalf("DeleteStatus() error = %v", err)
+	}
+}
+
+func TestDeleteStatusErrors(t *testing.T) {
+	ctx := context.Background()
+	env := newTaskEnv(t)
+	project := env.project(t, "Alpha")
+	planID := env.planOf(t, project.ID)
+	second, err := env.projects.CreatePlan(ctx, env.session.WorkspaceID, project.ID, CreatePlanInput{Name: "Second"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	statuses := env.statuses(t, project.ID, planID)
+	foreign := env.statuses(t, project.ID, second.ID)[0]
+
+	tests := []struct {
+		name              string
+		projectID, planID string
+		statusID          string
+		want              error
+	}{
+		{"last done status", project.ID, planID, statuses[2].ID, ErrConflict},
+		{"missing project", "missing", planID, statuses[0].ID, ErrNotFound},
+		{"missing plan", project.ID, "missing", statuses[0].ID, ErrNotFound},
+		{"missing status", project.ID, planID, "missing", ErrNotFound},
+		{"status of another plan", project.ID, planID, foreign.ID, ErrNotFound},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := env.projects.DeleteStatus(ctx, env.session.WorkspaceID, tt.projectID, tt.planID, tt.statusID)
+			if !errors.Is(err, tt.want) {
+				t.Errorf("DeleteStatus() error = %v, want %v", err, tt.want)
+			}
+		})
+	}
+	if got := len(env.statuses(t, project.ID, planID)); got != len(statuses) {
+		t.Errorf("statuses = %d, want %d unchanged", got, len(statuses))
+	}
+	if got := len(env.statuses(t, project.ID, second.ID)); got != len(defaultStatuses) {
+		t.Errorf("foreign plan statuses = %d, want %d unchanged", got, len(defaultStatuses))
 	}
 }

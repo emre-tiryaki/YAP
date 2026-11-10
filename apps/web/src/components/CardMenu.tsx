@@ -1,11 +1,16 @@
 import { useEffect, useRef, useState, type SyntheticEvent } from "react";
 import { createPortal } from "react-dom";
 import { FiEdit2, FiMoreVertical, FiTrash2, FiType } from "react-icons/fi";
+import { TbPin, TbPinnedOff } from "react-icons/tb";
+import { togglePin, usePins } from "../hooks/usePins";
 import { useTranslate } from "../hooks/useTranslate";
 import type { CardAction } from "../types/cardAction";
+import type { Pin } from "../types/pin";
 
 type CardMenuProps = {
     onSelect: (action: CardAction) => void;
+    // When given, the menu also offers pinning the card to the sidebar.
+    pin?: Pin;
 };
 
 const items = [
@@ -20,8 +25,10 @@ function stop(event: SyntheticEvent) {
     event.stopPropagation();
 }
 
-export function CardMenu({ onSelect }: CardMenuProps) {
+export function CardMenu({ onSelect, pin }: CardMenuProps) {
     const t = useTranslate();
+    const { isPinned } = usePins();
+    const pinned = pin !== undefined && isPinned(pin.kind, pin.id);
     // Viewport position of the open menu; null while closed. The menu is
     // portalled to <body> so scrolling card lists cannot clip it.
     const [anchor, setAnchor] = useState<{ top: number; right: number } | null>(
@@ -103,6 +110,26 @@ export function CardMenu({ onSelect }: CardMenuProps) {
                         style={{ top: anchor.top, right: anchor.right }}
                         className="fixed z-40 w-44 rounded-md border border-gray-200 bg-white py-1 text-sm shadow-lg"
                     >
+                        {pin && (
+                            <li role="none">
+                                <button
+                                    type="button"
+                                    role="menuitem"
+                                    onClick={() => {
+                                        setAnchor(null);
+                                        togglePin(pin);
+                                    }}
+                                    className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-gray-700 hover:bg-gray-100"
+                                >
+                                    {pinned ? (
+                                        <TbPinnedOff aria-hidden />
+                                    ) : (
+                                        <TbPin aria-hidden />
+                                    )}
+                                    {t(pinned ? "card.menu.unpin" : "card.menu.pin")}
+                                </button>
+                            </li>
+                        )}
                         {items.map(({ action, label, Icon }) => (
                             <li key={action} role="none">
                                 <button

@@ -28,7 +28,7 @@ export default function WorkspaceHomePage() {
 
     return (
         <div className="flex min-h-screen">
-            <Sidebar activeHref="/" />
+            <Sidebar />
             <div className="flex flex-1 flex-col">
                 <TopBar path={path} />
                 <main className="flex-1 p-8">

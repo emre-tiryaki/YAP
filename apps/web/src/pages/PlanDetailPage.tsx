@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { ApiError } from "../api/client";
 import { CreatePlanTaskForm } from "../components/CreatePlanTaskForm";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CreateStatusForm } from "../components/CreateStatusForm";
 import { EditStatusForm } from "../components/EditStatusForm";
 import { InlineError } from "../components/InlineError";
@@ -10,10 +11,16 @@ import { PlanBoard } from "../components/PlanBoard";
 import { PlanHeader, PlanHeaderSkeleton } from "../components/PlanHeader";
 import { Sidebar } from "../components/SideBar";
 import { TaskDialogs } from "../components/TaskDialogs";
+import { TaskDrawer } from "../components/TaskDrawer";
 import { TopBar } from "../components/TopBar";
 import type { BreadcrumbItem } from "../types/breadcrumb";
 import { ViewToggle, type BoardView } from "../components/ViewToggle";
-import { useMoveStatus, usePlan, usePlanStatuses } from "../hooks/usePlans";
+import {
+    useDeleteStatus,
+    useMoveStatus,
+    usePlan,
+    usePlanStatuses,
+} from "../hooks/usePlans";
 import { useProject } from "../hooks/useProjects";
 import { useMoveTask, usePlanTasks } from "../hooks/useTasks";
 import { useTranslate } from "../hooks/useTranslate";
@@ -36,16 +43,22 @@ export default function PlanDetailPage() {
     const tasks = usePlanTasks(projectId, planId);
     const moveTask = useMoveTask(projectId, planId);
     const moveStatus = useMoveStatus(projectId, planId);
+    const deleteStatus = useDeleteStatus(projectId, planId);
 
     const [newTaskStatusId, setNewTaskStatusId] = useState<string | null>(
         null,
     );
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
     const [editingStatus, setEditingStatus] = useState<Status | null>(null);
+    const [deletingStatus, setDeletingStatus] = useState<Status | null>(null);
     const [taskAction, setTaskAction] = useState<{
         task: PlanTask;
         action: CardAction;
     } | null>(null);
+    // Looked up in the query data so the drawer always shows fresh values
+    // and closes by itself once the task is gone.
+    const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+    const openTask = tasks.data?.find((task) => task.id === openTaskId);
 
     if (plan.error instanceof ApiError && plan.error.status === 404)
         return <NotFoundPage />;
@@ -59,12 +72,22 @@ export default function PlanDetailPage() {
         },
     ].filter((item) => item.label);
 
+    const deletingTaskCount = deletingStatus
+        ? (tasks.data?.filter((task) => task.statusId === deletingStatus.id)
+              .length ?? 0)
+        : 0;
+
+    function closeDeleteStatus() {
+        setDeletingStatus(null);
+        deleteStatus.reset();
+    }
+
     const boardLoading = statuses.isLoading || tasks.isLoading;
     const boardError = statuses.isError || tasks.isError;
 
     return (
         <div className="flex min-h-screen">
-            <Sidebar activeHref="/projects" />
+            <Sidebar />
             <div className="flex min-w-0 flex-1 flex-col">
                 <TopBar path={path} />
                 <main className="flex min-w-0 flex-1 flex-col p-8">
@@ -153,6 +176,7 @@ export default function PlanDetailPage() {
                                     onCreateStatus={() =>
                                         setIsStatusModalOpen(true)
                                     }
+                                    onOpenTask={(task) => setOpenTaskId(task.id)}
                                     onEditStatus={setEditingStatus}
                                 />
                             )}
@@ -200,9 +224,57 @@ export default function PlanDetailPage() {
                         planId={planId}
                         status={editingStatus}
                         onDone={() => setEditingStatus(null)}
+                        onDelete={() => {
+                            setDeletingStatus(editingStatus);
+                            setEditingStatus(null);
+                        }}
                     />
                 )}
             </Modal>
+
+            <ConfirmDialog
+                isOpen={deletingStatus !== null}
+                title={t("plan.status.delete.title")}
+                message={`"${deletingStatus?.title ?? ""}" — ${
+                    deletingTaskCount > 0
+                        ? t("plan.status.delete.messageWithTasks").replace(
+                              "{count}",
+                              String(deletingTaskCount),
+                          )
+                        : t("plan.status.delete.message")
+                }`}
+                confirmLabel={t("common.delete")}
+                isPending={deleteStatus.isPending}
+                isError={deleteStatus.isError}
+                errorMessage={
+                    deleteStatus.error instanceof ApiError &&
+                    deleteStatus.error.message === "conflict"
+                        ? t("plan.status.delete.lastDone")
+                        : undefined
+                }
+                onConfirm={() => {
+                    if (deletingStatus)
+                        deleteStatus.mutate(deletingStatus.id, {
+                            onSuccess: closeDeleteStatus,
+                        });
+                }}
+                onClose={closeDeleteStatus}
+            />
+
+            {openTask && statuses.data && tasks.data && (
+                <TaskDrawer
+                    projectId={projectId}
+                    planId={planId}
+                    task={openTask}
+                    statuses={statuses.data}
+                    tasks={tasks.data}
+                    onDelete={() => {
+                        setOpenTaskId(null);
+                        setTaskAction({ task: openTask, action: "delete" });
+                    }}
+                    onClose={() => setOpenTaskId(null)}
+                />
+            )}
 
             {taskAction && (
                 <TaskDialogs

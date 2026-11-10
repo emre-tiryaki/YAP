@@ -20,6 +20,7 @@ type StatusColumnProps = {
     onAddTask: () => void;
     onEdit: () => void;
     onTaskAction: (task: PlanTask, action: CardAction) => void;
+    onOpenTask: (task: PlanTask) => void;
 };
 
 export function StatusColumn({
@@ -29,6 +30,7 @@ export function StatusColumn({
     onAddTask,
     onEdit,
     onTaskAction,
+    onOpenTask,
 }: StatusColumnProps) {
     const t = useTranslate();
     // The column is both a sortable item (dragged by its handle) and the drop
@@ -115,6 +117,14 @@ export function StatusColumn({
                     <FiPlus aria-hidden />
                 </button>
             </header>
+            {status.description && (
+                <p
+                    title={status.description}
+                    className="line-clamp-2 px-3 pb-2 text-xs text-gray-600"
+                >
+                    {status.description}
+                </p>
+            )}
             <SortableContext
                 id={status.id}
                 items={tasks.map((task) => task.id)}
@@ -129,6 +139,7 @@ export function StatusColumn({
                             task={task}
                             layout={layout}
                             onAction={(action) => onTaskAction(task, action)}
+                            onOpen={() => onOpenTask(task)}
                         />
                     ))}
                     {tasks.length === 0 && (

@@ -46,6 +46,7 @@ type PlanBoardProps = {
     onMoveStatus: (move: { statusId: string; index: number }) => void;
     onAddTask: (statusId: string) => void;
     onTaskAction: (task: PlanTask, action: CardAction) => void;
+    onOpenTask: (task: PlanTask) => void;
     onCreateStatus: () => void;
     onEditStatus: (status: Status) => void;
 };
@@ -89,6 +90,7 @@ export function PlanBoard({
     onMoveStatus,
     onAddTask,
     onTaskAction,
+    onOpenTask,
     onCreateStatus,
     onEditStatus,
 }: PlanBoardProps) {
@@ -254,6 +256,7 @@ export function PlanBoard({
                             onAddTask={() => onAddTask(status.id)}
                             onEdit={() => onEditStatus(status)}
                             onTaskAction={onTaskAction}
+                            onOpenTask={onOpenTask}
                         />
                     ))}
                 </SortableContext>

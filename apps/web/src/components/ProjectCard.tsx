@@ -29,7 +29,15 @@ export function ProjectCard({ project }: ProjectCardProps) {
                 </p>
             </Link>
             <div className="absolute top-3 right-3">
-                <CardMenu onSelect={setAction} />
+                <CardMenu
+                    onSelect={setAction}
+                    pin={{
+                        kind: "project",
+                        id: project.id,
+                        label: project.name,
+                        href: `/projects/${project.id}`,
+                    }}
+                />
             </div>
             <ProjectDialogs
                 project={project}

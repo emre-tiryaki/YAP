@@ -1,6 +1,8 @@
 import { FiCalendar, FiCheckCircle } from "react-icons/fi";
+import { useParams } from "react-router";
 import type { CardAction } from "../types/cardAction";
 import type { PlanTask } from "../types/task";
+import { markdownToPlainText } from "../util/markdown";
 import { CardMenu } from "./CardMenu";
 import type { BoardView } from "./ViewToggle";
 
@@ -17,6 +19,9 @@ export function PlanTaskCard({
     onAction,
     isOverlay = false,
 }: PlanTaskCardProps) {
+    // Plan task cards only render on the plan page, so the route names the
+    // project and plan the task belongs to.
+    const { projectId = "", planId = "" } = useParams();
     const isDone = task.statusCategory === "done";
 
     return (
@@ -40,13 +45,22 @@ export function PlanTaskCard({
                     </p>
                     {layout === "board" && task.description && (
                         <p className="mt-1 line-clamp-2 text-xs text-gray-500">
-                            {task.description}
+                            {markdownToPlainText(task.description)}
                         </p>
                     )}
                 </div>
                 {onAction && (
                     <div className="-mt-1 -mr-1 shrink-0">
-                        <CardMenu onSelect={onAction} />
+                        <CardMenu
+                            onSelect={onAction}
+                            pin={{
+                                kind: "task",
+                                id: task.id,
+                                label: task.title,
+                                href: `/projects/${projectId}/plans/${planId}`,
+                                projectId,
+                            }}
+                        />
                     </div>
                 )}
             </div>

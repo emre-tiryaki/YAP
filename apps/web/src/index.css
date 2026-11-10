@@ -1,1 +1,68 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@theme {
+    --animate-drawer-in: drawer-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+    --animate-drawer-out: drawer-out 180ms ease-in forwards;
+    --animate-fade-in: fade-in 220ms ease-out;
+    --animate-fade-out: fade-out 180ms ease-in forwards;
+
+    @keyframes drawer-in {
+        from {
+            transform: translateX(100%);
+        }
+    }
+    @keyframes drawer-out {
+        to {
+            transform: translateX(100%);
+        }
+    }
+    @keyframes fade-in {
+        from {
+            opacity: 0;
+        }
+    }
+    @keyframes fade-out {
+        to {
+            opacity: 0;
+        }
+    }
+}
+
+/* Rich markdown editor (TipTap). */
+@layer components {
+    .markdown-body p.is-editor-empty:first-child::before {
+        content: attr(data-placeholder);
+        float: left;
+        height: 0;
+        pointer-events: none;
+        color: var(--color-gray-400);
+    }
+    .markdown-body ul[data-type="taskList"] {
+        list-style: none;
+        padding-left: 0;
+    }
+    .markdown-body li[data-type="taskItem"] {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+        padding-left: 0;
+    }
+    .markdown-body li[data-type="taskItem"] > label {
+        margin-top: 0.3em;
+        user-select: none;
+    }
+    .markdown-body li[data-type="taskItem"] > div {
+        flex: 1;
+    }
+    .markdown-body li[data-type="taskItem"] > div > p {
+        margin: 0;
+    }
+    .markdown-body li[data-type="taskItem"][data-checked="true"] > div {
+        color: var(--color-gray-400);
+        text-decoration: line-through;
+    }
+    .markdown-body :first-child {
+        margin-top: 0;
+    }
+}

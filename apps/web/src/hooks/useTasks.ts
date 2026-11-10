@@ -15,6 +15,7 @@ import {
     updateTask,
 } from "../api/client";
 import { planKey } from "./usePlans";
+import { relabelPin, unpinWhere } from "./usePins";
 
 type CreateTaskVariables = {
     projectId: string;
@@ -117,7 +118,10 @@ export function useDeleteTask() {
 
     return useMutation({
         mutationFn: deleteTask,
-        onSuccess: () => invalidateTaskViews(queryClient),
+        onSuccess: (_data, taskId) => {
+            unpinWhere((pin) => pin.kind === "task" && pin.id === taskId);
+            return invalidateTaskViews(queryClient);
+        },
     });
 }
 
@@ -132,6 +136,9 @@ export function useUpdateTask() {
     return useMutation({
         mutationFn: ({ taskId, input }: UpdateTaskVariables) =>
             updateTask(taskId, input),
-        onSuccess: () => invalidateTaskViews(queryClient),
+        onSuccess: (task) => {
+            relabelPin("task", task.id, task.title);
+            return invalidateTaskViews(queryClient);
+        },
     });
 }

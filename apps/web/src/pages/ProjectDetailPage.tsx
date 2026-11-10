@@ -34,7 +34,7 @@ export default function ProjectDetailPage() {
 
     return (
         <div className="flex min-h-screen">
-            <Sidebar activeHref="/projects" />
+            <Sidebar />
             <div className="flex flex-1 flex-col">
                 <TopBar path={path} />
                 <main className="flex-1 p-8">

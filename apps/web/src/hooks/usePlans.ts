@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
     createStatus,
+    deleteStatus,
     getPlan,
     listStatuses,
     moveStatus,
@@ -64,6 +65,22 @@ export function useUpdateStatus(projectId: string, planId: string) {
             queryClient.invalidateQueries({
                 queryKey: statusesKey(projectId, planId),
             }),
+    });
+}
+
+// Deleting a status also deletes its tasks, so every view that shows tasks or
+// task counts is refreshed, not only the plan's statuses.
+export function useDeleteStatus(projectId: string, planId: string) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (statusId: string) =>
+            deleteStatus(projectId, planId, statusId),
+        onSuccess: () =>
+            Promise.all([
+                queryClient.invalidateQueries({ queryKey: ["projects"] }),
+                queryClient.invalidateQueries({ queryKey: ["tasks"] }),
+            ]),
     });
 }
 
