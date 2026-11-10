@@ -1,9 +1,11 @@
-import { useDroppable } from "@dnd-kit/core";
 import {
     SortableContext,
+    useSortable,
     verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { FiFlag, FiPlus } from "react-icons/fi";
+import { CSS } from "@dnd-kit/utilities";
+import { FiEdit2, FiFlag, FiPlus } from "react-icons/fi";
+import { MdDragIndicator } from "react-icons/md";
 import { useTranslate } from "../hooks/useTranslate";
 import type { Status } from "../types/status";
 import type { CardAction } from "../types/cardAction";
@@ -16,6 +18,7 @@ type StatusColumnProps = {
     tasks: PlanTask[];
     layout: BoardView;
     onAddTask: () => void;
+    onEdit: () => void;
     onTaskAction: (task: PlanTask, action: CardAction) => void;
 };
 
@@ -24,20 +27,57 @@ export function StatusColumn({
     tasks,
     layout,
     onAddTask,
+    onEdit,
     onTaskAction,
 }: StatusColumnProps) {
     const t = useTranslate();
-    const { setNodeRef, isOver } = useDroppable({ id: status.id });
+    // The column is both a sortable item (dragged by its handle) and the drop
+    // target for tasks, so an empty column can still receive a task.
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        setActivatorNodeRef,
+        transform,
+        transition,
+        isDragging,
+        isOver,
+        active,
+    } = useSortable({ id: status.id, data: { type: "status" } });
     const isBoard = layout === "board";
+    const isTaskOver = isOver && active?.data.current?.type !== "status";
 
     return (
         <section
+            ref={setNodeRef}
             aria-label={status.title}
-            className={`flex flex-col rounded-lg border bg-gray-50 ${
+            style={{
+                transform: CSS.Translate.toString(transform),
+                transition,
+                // Tint the whole column with the status color; color-mix
+                // works for any CSS color string the backend stores.
+                backgroundColor: `color-mix(in srgb, ${status.color} 8%, white)`,
+                borderColor: `color-mix(in srgb, ${status.color} ${isTaskOver ? 70 : 30}%, white)`,
+                borderTopColor: status.color,
+            }}
+            className={`flex flex-col rounded-lg border border-t-4 ${
                 isBoard ? "max-h-full w-72 shrink-0" : "w-full"
-            } ${isOver ? "border-gray-400" : "border-gray-200"}`}
+            } ${isDragging ? "relative z-10 opacity-80 shadow-lg" : ""}`}
         >
             <header className="flex items-center gap-2 px-3 pt-3 pb-2">
+                <button
+                    type="button"
+                    ref={setActivatorNodeRef}
+                    aria-label={`${t("plan.status.reorder")}: ${status.title}`}
+                    title={t("plan.status.reorder")}
+                    className={`-ml-1 touch-none rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-700 ${
+                        isDragging ? "cursor-grabbing" : "cursor-grab"
+                    }`}
+                    {...attributes}
+                    {...listeners}
+                >
+                    <MdDragIndicator aria-hidden />
+                </button>
                 <span
                     aria-hidden
                     className="h-2.5 w-2.5 shrink-0 rounded-full"
@@ -58,10 +98,19 @@ export function StatusColumn({
                 )}
                 <button
                     type="button"
+                    onClick={onEdit}
+                    aria-label={`${t("plan.status.edit.title")}: ${status.title}`}
+                    title={t("plan.status.edit.title")}
+                    className="ml-auto cursor-pointer rounded p-1 text-gray-500 hover:bg-gray-200 hover:text-gray-900"
+                >
+                    <FiEdit2 aria-hidden />
+                </button>
+                <button
+                    type="button"
                     onClick={onAddTask}
                     aria-label={`${t("plan.task.add")}: ${status.title}`}
                     title={t("plan.task.add")}
-                    className="ml-auto cursor-pointer rounded p-1 text-gray-500 hover:bg-gray-200 hover:text-gray-900"
+                    className="cursor-pointer rounded p-1 text-gray-500 hover:bg-gray-200 hover:text-gray-900"
                 >
                     <FiPlus aria-hidden />
                 </button>
@@ -72,7 +121,6 @@ export function StatusColumn({
                 strategy={verticalListSortingStrategy}
             >
                 <ul
-                    ref={setNodeRef}
                     className={`flex min-h-16 flex-col gap-2 px-3 pb-3 ${isBoard ? "overflow-y-auto" : ""}`}
                 >
                     {tasks.map((task) => (

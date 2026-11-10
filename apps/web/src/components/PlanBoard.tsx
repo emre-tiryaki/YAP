@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+    closestCenter,
     closestCorners,
     DndContext,
     DragOverlay,
@@ -9,10 +10,17 @@ import {
     useSensors,
     type DragEndEvent,
     type DragOverEvent,
+    type CollisionDetection,
     type DragStartEvent,
     type UniqueIdentifier,
 } from "@dnd-kit/core";
-import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
+import {
+    arrayMove,
+    horizontalListSortingStrategy,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 import { FiPlus } from "react-icons/fi";
 import { useTranslate } from "../hooks/useTranslate";
 import type { CardAction } from "../types/cardAction";
@@ -35,9 +43,11 @@ type PlanBoardProps = {
         statusCategory: StatusCategory;
         index: number;
     }) => void;
+    onMoveStatus: (move: { statusId: string; index: number }) => void;
     onAddTask: (statusId: string) => void;
     onTaskAction: (task: PlanTask, action: CardAction) => void;
     onCreateStatus: () => void;
+    onEditStatus: (status: Status) => void;
 };
 
 function toColumns(statuses: Status[], tasks: PlanTask[]): Columns {
@@ -46,6 +56,22 @@ function toColumns(statuses: Status[], tasks: PlanTask[]): Columns {
     for (const task of tasks) columns[task.statusId]?.push(task.id);
     return columns;
 }
+
+function isStatusDrag(data: { current?: Record<string, unknown> }) {
+    return data.current?.type === "status";
+}
+
+// A dragged column only collides with other columns; a dragged task uses
+// the corners of columns and cards so it can land between two cards.
+const collisionDetection: CollisionDetection = (args) => {
+    if (!isStatusDrag(args.active.data)) return closestCorners(args);
+    return closestCenter({
+        ...args,
+        droppableContainers: args.droppableContainers.filter((container) =>
+            isStatusDrag(container.data),
+        ),
+    });
+};
 
 function findColumn(columns: Columns, id: UniqueIdentifier) {
     const key = String(id);
@@ -60,9 +86,11 @@ export function PlanBoard({
     tasks,
     layout,
     onMove,
+    onMoveStatus,
     onAddTask,
     onTaskAction,
     onCreateStatus,
+    onEditStatus,
 }: PlanBoardProps) {
     const t = useTranslate();
     const sensors = useSensors(
@@ -82,6 +110,17 @@ export function PlanBoard({
         columns: Columns;
     } | null>(null);
 
+    // Column order right after a status drop, tied to the status list it was
+    // derived from in the same way as `override`.
+    const [statusOverride, setStatusOverride] = useState<{
+        basis: Status[];
+        order: Status[];
+    } | null>(null);
+    const orderedStatuses =
+        statusOverride && statusOverride.basis === statuses
+            ? statusOverride.order
+            : statuses;
+
     const serverColumns = toColumns(statuses, tasks);
     const columns =
         override && override.basis === tasks ? override.columns : serverColumns;
@@ -89,12 +128,13 @@ export function PlanBoard({
     const activeTask = activeId ? taskById.get(activeId) : undefined;
 
     function handleDragStart({ active }: DragStartEvent) {
+        if (isStatusDrag(active.data)) return;
         setActiveId(String(active.id));
         setOverride({ basis: tasks, columns });
     }
 
     function handleDragOver({ active, over }: DragOverEvent) {
-        if (!over) return;
+        if (!over || isStatusDrag(active.data)) return;
         setOverride((prev) => {
             if (!prev) return prev;
             const cols = prev.columns;
@@ -117,7 +157,24 @@ export function PlanBoard({
         });
     }
 
-    function handleDragEnd({ active, over }: DragEndEvent) {
+    function handleStatusDragEnd({ active, over }: DragEndEvent) {
+        const ids = orderedStatuses.map((s) => s.id);
+        const oldIndex = ids.indexOf(String(active.id));
+        const newIndex = over ? ids.indexOf(String(over.id)) : -1;
+        if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return;
+        setStatusOverride({
+            basis: statuses,
+            order: arrayMove(orderedStatuses, oldIndex, newIndex),
+        });
+        onMoveStatus({ statusId: String(active.id), index: newIndex });
+    }
+
+    function handleDragEnd(event: DragEndEvent) {
+        if (isStatusDrag(event.active.data)) {
+            handleStatusDragEnd(event);
+            return;
+        }
+        const { active, over } = event;
         setActiveId(null);
         const task = taskById.get(String(active.id));
         const column = findColumn(columns, active.id);
@@ -164,7 +221,7 @@ export function PlanBoard({
     return (
         <DndContext
             sensors={sensors}
-            collisionDetection={closestCorners}
+            collisionDetection={collisionDetection}
             onDragStart={handleDragStart}
             onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
@@ -177,19 +234,29 @@ export function PlanBoard({
                         : "flex flex-col gap-4"
                 }
             >
-                {statuses.map((status) => (
-                    <StatusColumn
-                        key={status.id}
-                        status={status}
-                        layout={layout}
-                        tasks={(columns[status.id] ?? []).flatMap((id) => {
-                            const task = taskById.get(id);
-                            return task ? [task] : [];
-                        })}
-                        onAddTask={() => onAddTask(status.id)}
-                        onTaskAction={onTaskAction}
-                    />
-                ))}
+                <SortableContext
+                    items={orderedStatuses.map((status) => status.id)}
+                    strategy={
+                        isBoard
+                            ? horizontalListSortingStrategy
+                            : verticalListSortingStrategy
+                    }
+                >
+                    {orderedStatuses.map((status) => (
+                        <StatusColumn
+                            key={status.id}
+                            status={status}
+                            layout={layout}
+                            tasks={(columns[status.id] ?? []).flatMap((id) => {
+                                const task = taskById.get(id);
+                                return task ? [task] : [];
+                            })}
+                            onAddTask={() => onAddTask(status.id)}
+                            onEdit={() => onEditStatus(status)}
+                            onTaskAction={onTaskAction}
+                        />
+                    ))}
+                </SortableContext>
                 <button
                     type="button"
                     onClick={onCreateStatus}

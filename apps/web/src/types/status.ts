@@ -8,6 +8,12 @@ export type Status = {
     position: string;
 };
 
+// Partial update: omitted fields are kept.
+export type UpdateStatusInput = {
+    title?: string;
+    color?: string;
+};
+
 export type CreateStatusInput = {
     title: string;
     color: string;

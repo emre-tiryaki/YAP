@@ -23,9 +23,11 @@ export function PlanHeader({ plan, onDeleted }: PlanHeaderProps) {
             <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
                     <h1 className="text-2xl font-bold">{plan.name}</h1>
-                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700">
-                        {plan.teamName ?? t("project.plans.wholeProject")}
-                    </span>
+                    {plan.teamName && (
+                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700">
+                            {plan.teamName}
+                        </span>
+                    )}
                 </div>
                 <CardMenu onSelect={setAction} />
             </div>

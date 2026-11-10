@@ -3,7 +3,9 @@ import { ApiError } from "../api/client";
 import { useCreateStatus } from "../hooks/usePlans";
 import { useTranslate, type TranslationKey } from "../hooks/useTranslate";
 import type { StatusCategory } from "../types/task";
+import { statusColors } from "../util/statusColors";
 import { SelectInput } from "./SelectInput";
+import { StatusColorPicker } from "./StatusColorPicker";
 import { SubmitButton } from "./SubmitButton";
 import { TextInput } from "./TextInput";
 
@@ -12,17 +14,6 @@ type CreateStatusFormProps = {
     planId: string;
     onDone: () => void;
 };
-
-const colors = [
-    "#9ca3af",
-    "#3b82f6",
-    "#a855f7",
-    "#ec4899",
-    "#ef4444",
-    "#f97316",
-    "#eab308",
-    "#22c55e",
-];
 
 const categories: StatusCategory[] = ["todo", "in_progress", "done"];
 
@@ -46,7 +37,7 @@ export function CreateStatusForm({
     const t = useTranslate();
     const createStatus = useCreateStatus(projectId, planId);
     const [title, setTitle] = useState("");
-    const [color, setColor] = useState(colors[0]);
+    const [color, setColor] = useState(statusColors[0]);
     const [category, setCategory] = useState<StatusCategory>("in_progress");
 
     function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -63,32 +54,7 @@ export function CreateStatusForm({
                 required
                 autoFocus
             />
-            <fieldset className="flex flex-col gap-1 text-sm text-gray-700">
-                <legend className="mb-1">{t("plan.status.create.color")}</legend>
-                <div className="flex flex-wrap gap-2">
-                    {colors.map((c) => (
-                        <label
-                            key={c}
-                            className="cursor-pointer rounded-full has-checked:ring-2 has-checked:ring-gray-900 has-checked:ring-offset-2 has-focus-visible:ring-2 has-focus-visible:ring-gray-500"
-                        >
-                            <input
-                                type="radio"
-                                name="status-color"
-                                value={c}
-                                checked={color === c}
-                                onChange={() => setColor(c)}
-                                aria-label={c}
-                                className="sr-only"
-                            />
-                            <span
-                                aria-hidden
-                                className="block h-6 w-6 rounded-full"
-                                style={{ backgroundColor: c }}
-                            />
-                        </label>
-                    ))}
-                </div>
-            </fieldset>
+            <StatusColorPicker value={color} onChange={setColor} />
             <SelectInput
                 label={t("plan.status.create.category")}
                 value={category}

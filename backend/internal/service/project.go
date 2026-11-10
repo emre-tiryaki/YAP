@@ -29,6 +29,8 @@ type ProjectRepository interface {
 	GetPlan(ctx context.Context, q database.DBTX, workspaceID, projectID, planID string) (model.Plan, error)
 	ListStatuses(ctx context.Context, q database.DBTX, workspaceID, planID string) ([]model.Status, error)
 	LastStatusPosition(ctx context.Context, q database.DBTX, workspaceID, planID string) (string, error)
+	UpdateStatusPosition(ctx context.Context, q database.DBTX, workspaceID, statusID, pos, now string) error
+	UpdateStatus(ctx context.Context, q database.DBTX, workspaceID, statusID, title, color, now string) error
 	Update(ctx context.Context, q database.DBTX, workspaceID, projectID, name, description, now string) error
 	SoftDelete(ctx context.Context, q database.DBTX, workspaceID, projectID, now string) error
 	UpdatePlan(ctx context.Context, q database.DBTX, workspaceID, planID, name, description, now string) error
@@ -249,6 +251,100 @@ func (s *ProjectService) CreateStatus(ctx context.Context, workspaceID, projectI
 		}
 		status.Position = position.After(last)
 		return s.repo.InsertStatus(ctx, tx, status, nowUTC())
+	})
+	if err != nil {
+		return model.Status{}, err
+	}
+	return status, nil
+}
+
+// MoveStatus places a status at index among the other statuses of its plan;
+// out-of-range values are clamped. Only the moved row is written: its position
+// becomes the midpoint of its new neighbours.
+func (s *ProjectService) MoveStatus(ctx context.Context, workspaceID, projectID, planID, statusID string, index int) error {
+	return database.WithTx(ctx, s.db, func(tx *sql.Tx) error {
+		if err := s.requirePlan(ctx, tx, workspaceID, projectID, planID); err != nil {
+			return err
+		}
+		statuses, err := s.repo.ListStatuses(ctx, tx, workspaceID, planID)
+		if err != nil {
+			return err
+		}
+		found := false
+		positions := make([]string, 0, len(statuses))
+		for _, st := range statuses {
+			if st.ID == statusID {
+				found = true
+				continue
+			}
+			positions = append(positions, st.Position)
+		}
+		if !found {
+			return fmt.Errorf("%w: status", ErrNotFound)
+		}
+
+		index = min(max(index, 0), len(positions))
+		var lo, hi string
+		if index > 0 {
+			lo = positions[index-1]
+		}
+		if index < len(positions) {
+			hi = positions[index]
+		}
+		pos, err := position.Between(lo, hi)
+		if err != nil {
+			return fmt.Errorf("%w: cannot place status between %q and %q", ErrConflict, lo, hi)
+		}
+		return s.repo.UpdateStatusPosition(ctx, tx, workspaceID, statusID, pos, nowUTC())
+	})
+}
+
+// UpdateStatusInput carries the fields to change; nil fields are kept. The
+// category is not editable here: changing it would have to guard the plan's
+// last done-category status.
+type UpdateStatusInput struct {
+	Title *string
+	Color *string
+}
+
+// UpdateStatus renames and/or recolors a status of the plan.
+func (s *ProjectService) UpdateStatus(ctx context.Context, workspaceID, projectID, planID, statusID string, in UpdateStatusInput) (model.Status, error) {
+	if in.Title == nil && in.Color == nil {
+		return model.Status{}, fmt.Errorf("%w: nothing to update", ErrInvalidInput)
+	}
+	if in.Title != nil && strings.TrimSpace(*in.Title) == "" {
+		return model.Status{}, fmt.Errorf("%w: title is required", ErrInvalidInput)
+	}
+	if in.Color != nil && !colorPattern.MatchString(*in.Color) {
+		return model.Status{}, fmt.Errorf("%w: color must be #rrggbb", ErrInvalidInput)
+	}
+
+	var status model.Status
+	err := database.WithTx(ctx, s.db, func(tx *sql.Tx) error {
+		if err := s.requirePlan(ctx, tx, workspaceID, projectID, planID); err != nil {
+			return err
+		}
+		statuses, err := s.repo.ListStatuses(ctx, tx, workspaceID, planID)
+		if err != nil {
+			return err
+		}
+		found := false
+		for _, st := range statuses {
+			if st.ID == statusID {
+				status, found = st, true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("%w: status", ErrNotFound)
+		}
+		if in.Title != nil {
+			status.Title = strings.TrimSpace(*in.Title)
+		}
+		if in.Color != nil {
+			status.Color = strings.ToLower(*in.Color)
+		}
+		return s.repo.UpdateStatus(ctx, tx, workspaceID, statusID, status.Title, status.Color, nowUTC())
 	})
 	if err != nil {
 		return model.Status{}, err

@@ -30,6 +30,8 @@ func (h *ProjectHandler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/projects/{id}/plans/{planId}", h.deletePlan)
 	mux.HandleFunc("GET /api/projects/{id}/plans/{planId}/statuses", h.statuses)
 	mux.HandleFunc("POST /api/projects/{id}/plans/{planId}/statuses", h.createStatus)
+	mux.HandleFunc("PATCH /api/projects/{id}/plans/{planId}/statuses/{statusId}", h.updateStatus)
+	mux.HandleFunc("POST /api/projects/{id}/plans/{planId}/statuses/{statusId}/move", h.moveStatus)
 }
 
 type projectResponse struct {
@@ -218,6 +220,47 @@ func (h *ProjectHandler) createStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, toStatusResponse(status))
+}
+
+// updateStatusRequest is a partial update: omitted (or null) fields are kept.
+type updateStatusRequest struct {
+	Title *string `json:"title"`
+	Color *string `json:"color"`
+}
+
+func (h *ProjectHandler) updateStatus(w http.ResponseWriter, r *http.Request) {
+	var req updateStatusRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	status, err := h.svc.UpdateStatus(r.Context(), h.session.WorkspaceID, r.PathValue("id"), r.PathValue("planId"), r.PathValue("statusId"), service.UpdateStatusInput{
+		Title: req.Title,
+		Color: req.Color,
+	})
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, toStatusResponse(status))
+}
+
+type moveStatusRequest struct {
+	Index int `json:"index"`
+}
+
+func (h *ProjectHandler) moveStatus(w http.ResponseWriter, r *http.Request) {
+	var req moveStatusRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	err := h.svc.MoveStatus(r.Context(), h.session.WorkspaceID, r.PathValue("id"), r.PathValue("planId"), r.PathValue("statusId"), req.Index)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func parseStatusCategory(v string) (model.StatusCategory, error) {

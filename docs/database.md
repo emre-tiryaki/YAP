@@ -269,6 +269,8 @@ All of these rules are protected by unit tests.
 | Moving a task to another plan. | The status is mapped to a status of the target plan, because status IDs belong to a single plan. |
 | Every plan has at least one `done`-category status. | Plan creation always inserts the default `Done` status. A task counts as finished exactly while its status has `category = 'done'`; there is no separate flag. Any future status deletion or category change must reject removing the plan's last `done` status. |
 | Reordering or moving a task within its plan. | Only the moved row is written: its `position` becomes the midpoint (`position.Between`) of its new neighbours in the target status. The target status must belong to the task's plan. |
+| Reordering a status within its plan. | Only the moved row is written: its `position` becomes the midpoint (`position.Between`) of its new neighbours among the plan's non-deleted statuses. Tasks keep their `status_id` and `position`. |
+| Editing a status. | Only `title` and `color` can be changed (`#rrggbb`, stored lowercase); the status must belong to the plan in the URL. `category` and `position` are left untouched, so the "at least one `done` status" rule cannot be broken by an edit. |
 | When a task is deleted. | The task and all of its subtasks are marked with `deleted_at`, and their open `task_assignees` rows get `removed_at`, within the same transaction. |
 
 ## 5. Table Reference

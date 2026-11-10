@@ -4,7 +4,11 @@ import type {
     Project,
     UpdateProjectInput,
 } from "../types/project";
-import type { CreateStatusInput, Status } from "../types/status";
+import type {
+    CreateStatusInput,
+    Status,
+    UpdateStatusInput,
+} from "../types/status";
 import type {
     CreateTaskInput,
     MoveTaskInput,
@@ -243,6 +247,32 @@ export async function createStatus(
         { method: "POST", body: JSON.stringify(input) },
     );
     return toStatus(dto);
+}
+
+export async function updateStatus(
+    projectId: string,
+    planId: string,
+    statusId: string,
+    input: UpdateStatusInput,
+): Promise<Status> {
+    const dto = await request<StatusDto>(
+        `${planPath(projectId, planId)}/statuses/${statusId}`,
+        { method: "PATCH", body: JSON.stringify(input) },
+    );
+    return toStatus(dto);
+}
+
+// Places the status at `index` among the other statuses of its plan.
+export async function moveStatus(
+    projectId: string,
+    planId: string,
+    statusId: string,
+    index: number,
+): Promise<void> {
+    await request<void>(
+        `${planPath(projectId, planId)}/statuses/${statusId}/move`,
+        { method: "POST", body: JSON.stringify({ index }) },
+    );
 }
 
 export async function listPlanTasks(

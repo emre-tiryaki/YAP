@@ -162,3 +162,84 @@ func TestTaskMoveErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestPlanMoveStatus(t *testing.T) {
+	env := newTestEnv(t)
+	b := newPlanBoard(t, env)
+	done := b.statuses[2]
+
+	rec := env.do(t, http.MethodPost, b.path("/statuses/"+done.ID+"/move"), `{"index":0}`)
+	wantStatus(t, rec, http.StatusNoContent)
+
+	statuses := decode[[]statusResponse](t, env.do(t, http.MethodGet, b.path("/statuses"), ""))
+	got := []string{}
+	for _, s := range statuses {
+		got = append(got, s.Category)
+	}
+	want := []string{"done", "todo", "in_progress"}
+	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] || got[2] != want[2] {
+		t.Errorf("order = %v, want %v", got, want)
+	}
+}
+
+func TestPlanMoveStatusErrors(t *testing.T) {
+	env := newTestEnv(t)
+	b := newPlanBoard(t, env)
+	todo := b.statuses[0]
+
+	tests := []struct {
+		name, path, body string
+		status           int
+		code             string
+	}{
+		{"missing status", b.path("/statuses/missing/move"), `{"index":0}`, http.StatusNotFound, "not_found"},
+		{"missing plan", "/api/projects/" + b.project.ID + "/plans/missing/statuses/" + todo.ID + "/move", `{"index":0}`, http.StatusNotFound, "not_found"},
+		{"malformed body", b.path("/statuses/" + todo.ID + "/move"), `{`, http.StatusBadRequest, "invalid_input"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			wantErrorCode(t, env.do(t, http.MethodPost, tt.path, tt.body), tt.status, tt.code)
+		})
+	}
+}
+
+func TestPlanUpdateStatus(t *testing.T) {
+	env := newTestEnv(t)
+	b := newPlanBoard(t, env)
+	todo := b.statuses[0]
+
+	rec := env.do(t, http.MethodPatch, b.path("/statuses/"+todo.ID), `{"title":"Backlog","color":"#EF4444"}`)
+	wantStatus(t, rec, http.StatusOK)
+	updated := decode[statusResponse](t, rec)
+	if updated.Title != "Backlog" || updated.Color != "#ef4444" || updated.Category != todo.Category {
+		t.Errorf("updated = %+v", updated)
+	}
+
+	statuses := decode[[]statusResponse](t, env.do(t, http.MethodGet, b.path("/statuses"), ""))
+	if statuses[0] != updated {
+		t.Errorf("stored = %+v, want %+v", statuses[0], updated)
+	}
+}
+
+func TestPlanUpdateStatusErrors(t *testing.T) {
+	env := newTestEnv(t)
+	b := newPlanBoard(t, env)
+	todo := b.statuses[0]
+
+	tests := []struct {
+		name, path, body string
+		status           int
+		code             string
+	}{
+		{"missing status", b.path("/statuses/missing"), `{"title":"x"}`, http.StatusNotFound, "not_found"},
+		{"missing plan", "/api/projects/" + b.project.ID + "/plans/missing/statuses/" + todo.ID, `{"title":"x"}`, http.StatusNotFound, "not_found"},
+		{"empty body", b.path("/statuses/" + todo.ID), `{}`, http.StatusBadRequest, "invalid_input"},
+		{"bad color", b.path("/statuses/" + todo.ID), `{"color":"blue"}`, http.StatusBadRequest, "invalid_input"},
+		{"unknown field", b.path("/statuses/" + todo.ID), `{"category":"done"}`, http.StatusBadRequest, "invalid_input"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			wantErrorCode(t, env.do(t, http.MethodPatch, tt.path, tt.body), tt.status, tt.code)
+		})
+	}
+}

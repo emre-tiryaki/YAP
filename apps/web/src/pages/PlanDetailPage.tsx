@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router";
 import { ApiError } from "../api/client";
 import { CreatePlanTaskForm } from "../components/CreatePlanTaskForm";
 import { CreateStatusForm } from "../components/CreateStatusForm";
+import { EditStatusForm } from "../components/EditStatusForm";
 import { InlineError } from "../components/InlineError";
 import { Modal } from "../components/Modal";
 import { PlanBoard } from "../components/PlanBoard";
@@ -12,11 +13,12 @@ import { TaskDialogs } from "../components/TaskDialogs";
 import { TopBar } from "../components/TopBar";
 import type { BreadcrumbItem } from "../types/breadcrumb";
 import { ViewToggle, type BoardView } from "../components/ViewToggle";
-import { usePlan, usePlanStatuses } from "../hooks/usePlans";
+import { useMoveStatus, usePlan, usePlanStatuses } from "../hooks/usePlans";
 import { useProject } from "../hooks/useProjects";
 import { useMoveTask, usePlanTasks } from "../hooks/useTasks";
 import { useTranslate } from "../hooks/useTranslate";
 import type { CardAction } from "../types/cardAction";
+import type { Status } from "../types/status";
 import type { PlanTask } from "../types/task";
 import NotFoundPage from "./NotFoundPage";
 
@@ -33,11 +35,13 @@ export default function PlanDetailPage() {
     const statuses = usePlanStatuses(projectId, planId);
     const tasks = usePlanTasks(projectId, planId);
     const moveTask = useMoveTask(projectId, planId);
+    const moveStatus = useMoveStatus(projectId, planId);
 
     const [newTaskStatusId, setNewTaskStatusId] = useState<string | null>(
         null,
     );
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+    const [editingStatus, setEditingStatus] = useState<Status | null>(null);
     const [taskAction, setTaskAction] = useState<{
         task: PlanTask;
         action: CardAction;
@@ -104,6 +108,13 @@ export default function PlanDetailPage() {
                                     />
                                 </div>
                             )}
+                            {moveStatus.isError && (
+                                <div className="mb-4">
+                                    <InlineError
+                                        message={t("plan.board.moveStatusError")}
+                                    />
+                                </div>
+                            )}
                             {boardLoading && (
                                 <div
                                     aria-busy="true"
@@ -132,6 +143,9 @@ export default function PlanDetailPage() {
                                     tasks={tasks.data}
                                     layout={view}
                                     onMove={(move) => moveTask.mutate(move)}
+                                    onMoveStatus={(move) =>
+                                        moveStatus.mutate(move)
+                                    }
                                     onAddTask={setNewTaskStatusId}
                                     onTaskAction={(task, action) =>
                                         setTaskAction({ task, action })
@@ -139,6 +153,7 @@ export default function PlanDetailPage() {
                                     onCreateStatus={() =>
                                         setIsStatusModalOpen(true)
                                     }
+                                    onEditStatus={setEditingStatus}
                                 />
                             )}
                         </>
@@ -172,6 +187,21 @@ export default function PlanDetailPage() {
                     planId={planId}
                     onDone={() => setIsStatusModalOpen(false)}
                 />
+            </Modal>
+
+            <Modal
+                isOpen={editingStatus !== null}
+                title={t("plan.status.edit.title")}
+                onClose={() => setEditingStatus(null)}
+            >
+                {editingStatus && (
+                    <EditStatusForm
+                        projectId={projectId}
+                        planId={planId}
+                        status={editingStatus}
+                        onDone={() => setEditingStatus(null)}
+                    />
+                )}
             </Modal>
 
             {taskAction && (

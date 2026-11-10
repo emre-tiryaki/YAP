@@ -369,3 +369,177 @@ func TestListByPlanNotFound(t *testing.T) {
 		t.Errorf("ListByPlan() error = %v, want ErrNotFound", err)
 	}
 }
+
+func (e taskEnv) statusTitles(t *testing.T, projectID, planID string) []string {
+	t.Helper()
+	titles := []string{}
+	for _, s := range e.statuses(t, projectID, planID) {
+		titles = append(titles, s.Title)
+	}
+	return titles
+}
+
+func TestMoveStatus(t *testing.T) {
+	tests := []struct {
+		name   string
+		status int // index into To Do, In Progress, Done
+		index  int
+		want   []string
+	}{
+		{"to front", 2, 0, []string{"Done", "To Do", "In Progress"}},
+		{"to middle", 0, 1, []string{"In Progress", "To Do", "Done"}},
+		{"to end", 0, 2, []string{"In Progress", "Done", "To Do"}},
+		{"same place", 1, 1, []string{"To Do", "In Progress", "Done"}},
+		{"index clamped to end", 0, 99, []string{"In Progress", "Done", "To Do"}},
+		{"negative index clamped to front", 1, -5, []string{"In Progress", "To Do", "Done"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			env := newTaskEnv(t)
+			project := env.project(t, "Alpha")
+			planID := env.planOf(t, project.ID)
+			statuses := env.statuses(t, project.ID, planID)
+			task := env.createTasks(t, project.ID, "a")[0]
+
+			if err := env.projects.MoveStatus(ctx, env.session.WorkspaceID, project.ID, planID, statuses[tt.status].ID, tt.index); err != nil {
+				t.Fatalf("MoveStatus() error = %v", err)
+			}
+			if got := env.statusTitles(t, project.ID, planID); !equalStrings(got, tt.want) {
+				t.Errorf("statuses = %v, want %v", got, tt.want)
+			}
+			// Moving a column never moves its tasks.
+			if got := env.taskTitles(t, project.ID, planID, statuses[0].ID); !equalStrings(got, []string{task.Title}) {
+				t.Errorf("todo tasks = %v, want [%s]", got, task.Title)
+			}
+		})
+	}
+}
+
+func TestMoveStatusRepeatedlyBetweenSameNeighbours(t *testing.T) {
+	ctx := context.Background()
+	env := newTaskEnv(t)
+	project := env.project(t, "Alpha")
+	planID := env.planOf(t, project.ID)
+	statuses := env.statuses(t, project.ID, planID)
+
+	for i := 0; i < 50; i++ {
+		s := statuses[1+i%2]
+		if err := env.projects.MoveStatus(ctx, env.session.WorkspaceID, project.ID, planID, s.ID, 1); err != nil {
+			t.Fatalf("move %d: %v", i, err)
+		}
+	}
+	if got, want := env.statusTitles(t, project.ID, planID), []string{"To Do", "Done", "In Progress"}; !equalStrings(got, want) {
+		t.Errorf("statuses = %v, want %v", got, want)
+	}
+}
+
+func TestMoveStatusErrors(t *testing.T) {
+	ctx := context.Background()
+	env := newTaskEnv(t)
+	project := env.project(t, "Alpha")
+	planID := env.planOf(t, project.ID)
+	second, err := env.projects.CreatePlan(ctx, env.session.WorkspaceID, project.ID, CreatePlanInput{Name: "Second"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	own := env.statuses(t, project.ID, planID)[0]
+	foreign := env.statuses(t, project.ID, second.ID)[0]
+
+	tests := []struct {
+		name              string
+		projectID, planID string
+		statusID          string
+	}{
+		{"missing project", "missing", planID, own.ID},
+		{"missing plan", project.ID, "missing", own.ID},
+		{"missing status", project.ID, planID, "missing"},
+		{"status of another plan", project.ID, planID, foreign.ID},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := env.projects.MoveStatus(ctx, env.session.WorkspaceID, tt.projectID, tt.planID, tt.statusID, 0)
+			if !errors.Is(err, ErrNotFound) {
+				t.Errorf("MoveStatus() error = %v, want ErrNotFound", err)
+			}
+		})
+	}
+}
+
+func TestUpdateStatus(t *testing.T) {
+	ctx := context.Background()
+	str := func(v string) *string { return &v }
+	tests := []struct {
+		name      string
+		in        UpdateStatusInput
+		wantTitle string
+		wantColor string
+	}{
+		{"title only", UpdateStatusInput{Title: str("  Backlog  ")}, "Backlog", "#9ca3af"},
+		{"color only", UpdateStatusInput{Color: str("#EF4444")}, "To Do", "#ef4444"},
+		{"both", UpdateStatusInput{Title: str("Next"), Color: str("#22c55e")}, "Next", "#22c55e"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			env := newTaskEnv(t)
+			project := env.project(t, "Alpha")
+			planID := env.planOf(t, project.ID)
+			todo := env.statuses(t, project.ID, planID)[0]
+
+			got, err := env.projects.UpdateStatus(ctx, env.session.WorkspaceID, project.ID, planID, todo.ID, tt.in)
+			if err != nil {
+				t.Fatalf("UpdateStatus() error = %v", err)
+			}
+			stored := env.statuses(t, project.ID, planID)[0]
+			for _, s := range []model.Status{got, stored} {
+				if s.Title != tt.wantTitle || s.Color != tt.wantColor {
+					t.Errorf("status = %q %q, want %q %q", s.Title, s.Color, tt.wantTitle, tt.wantColor)
+				}
+				if s.Category != todo.Category || s.Position != todo.Position {
+					t.Errorf("status %+v changed category or position of %+v", s, todo)
+				}
+			}
+		})
+	}
+}
+
+func TestUpdateStatusErrors(t *testing.T) {
+	ctx := context.Background()
+	env := newTaskEnv(t)
+	project := env.project(t, "Alpha")
+	planID := env.planOf(t, project.ID)
+	second, err := env.projects.CreatePlan(ctx, env.session.WorkspaceID, project.ID, CreatePlanInput{Name: "Second"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	own := env.statuses(t, project.ID, planID)[0]
+	foreign := env.statuses(t, project.ID, second.ID)[0]
+	str := func(v string) *string { return &v }
+
+	tests := []struct {
+		name              string
+		projectID, planID string
+		statusID          string
+		in                UpdateStatusInput
+		want              error
+	}{
+		{"nothing to update", project.ID, planID, own.ID, UpdateStatusInput{}, ErrInvalidInput},
+		{"empty title", project.ID, planID, own.ID, UpdateStatusInput{Title: str(" ")}, ErrInvalidInput},
+		{"bad color", project.ID, planID, own.ID, UpdateStatusInput{Color: str("red")}, ErrInvalidInput},
+		{"missing project", "missing", planID, own.ID, UpdateStatusInput{Title: str("x")}, ErrNotFound},
+		{"missing plan", project.ID, "missing", own.ID, UpdateStatusInput{Title: str("x")}, ErrNotFound},
+		{"missing status", project.ID, planID, "missing", UpdateStatusInput{Title: str("x")}, ErrNotFound},
+		{"status of another plan", project.ID, planID, foreign.ID, UpdateStatusInput{Title: str("x")}, ErrNotFound},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := env.projects.UpdateStatus(ctx, env.session.WorkspaceID, tt.projectID, tt.planID, tt.statusID, tt.in)
+			if !errors.Is(err, tt.want) {
+				t.Errorf("UpdateStatus() error = %v, want %v", err, tt.want)
+			}
+		})
+	}
+	if got := env.statuses(t, project.ID, second.ID)[0]; got != foreign {
+		t.Errorf("foreign status = %+v, want unchanged %+v", got, foreign)
+	}
+}

@@ -22,9 +22,11 @@ export function PlanCard({ plan }: PlanCardProps) {
             >
                 <div className="flex items-center justify-between gap-2">
                     <h3 className="font-semibold">{plan.name}</h3>
-                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700">
-                        {plan.teamName ?? t("project.plans.wholeProject")}
-                    </span>
+                    {plan.teamName && (
+                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700">
+                            {plan.teamName}
+                        </span>
+                    )}
                 </div>
                 {plan.description && (
                     <p className="mt-1 text-sm text-gray-600">

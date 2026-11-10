@@ -281,6 +281,32 @@ func (*ProjectRepository) LastStatusPosition(ctx context.Context, q database.DBT
 	return pos, nil
 }
 
+// UpdateStatusPosition moves a non-deleted status to pos.
+func (*ProjectRepository) UpdateStatusPosition(ctx context.Context, q database.DBTX, workspaceID, statusID, pos, now string) error {
+	_, err := q.ExecContext(ctx,
+		`UPDATE statuses SET position = ?, updated_at = ?
+		 WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`,
+		pos, now, statusID, workspaceID,
+	)
+	if err != nil {
+		return fmt.Errorf("update status position: %w", err)
+	}
+	return nil
+}
+
+// UpdateStatus overwrites the title and color of a non-deleted status.
+func (*ProjectRepository) UpdateStatus(ctx context.Context, q database.DBTX, workspaceID, statusID, title, color, now string) error {
+	_, err := q.ExecContext(ctx,
+		`UPDATE statuses SET title = ?, color = ?, updated_at = ?
+		 WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`,
+		title, color, now, statusID, workspaceID,
+	)
+	if err != nil {
+		return fmt.Errorf("update status: %w", err)
+	}
+	return nil
+}
+
 // Update overwrites the name and description of a non-deleted project.
 func (*ProjectRepository) Update(ctx context.Context, q database.DBTX, workspaceID, projectID, name, description, now string) error {
 	_, err := q.ExecContext(ctx,
