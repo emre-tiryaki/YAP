@@ -1,5 +1,9 @@
-import type { CreatePlanInput, Plan } from "../types/plan";
-import type { CreateProjectInput, Project } from "../types/project";
+import type { CreatePlanInput, Plan, UpdatePlanInput } from "../types/plan";
+import type {
+    CreateProjectInput,
+    Project,
+    UpdateProjectInput,
+} from "../types/project";
 import type { CreateStatusInput, Status } from "../types/status";
 import type {
     CreateTaskInput,
@@ -7,6 +11,7 @@ import type {
     PlanTask,
     StatusCategory,
     Task,
+    UpdateTaskInput,
 } from "../types/task";
 import type { Workspace } from "../types/workspace";
 
@@ -262,4 +267,55 @@ export async function moveTask(
 
 export async function deleteTask(taskId: string): Promise<void> {
     await request<void>(`/api/tasks/${taskId}`, { method: "DELETE" });
+}
+
+export async function updateProject(
+    projectId: string,
+    input: UpdateProjectInput,
+): Promise<Project> {
+    const dto = await request<ProjectDto>(`/api/projects/${projectId}`, {
+        method: "PATCH",
+        body: JSON.stringify(input),
+    });
+    return toProject(dto);
+}
+
+export async function deleteProject(projectId: string): Promise<void> {
+    await request<void>(`/api/projects/${projectId}`, { method: "DELETE" });
+}
+
+export async function updatePlan(
+    projectId: string,
+    planId: string,
+    input: UpdatePlanInput,
+): Promise<Plan> {
+    const dto = await request<PlanDto>(planPath(projectId, planId), {
+        method: "PATCH",
+        body: JSON.stringify(input),
+    });
+    return toPlan(dto);
+}
+
+export async function deletePlan(
+    projectId: string,
+    planId: string,
+): Promise<void> {
+    await request<void>(planPath(projectId, planId), { method: "DELETE" });
+}
+
+// Only the fields present in `input` are sent; a null due date clears it.
+export async function updateTask(
+    taskId: string,
+    input: UpdateTaskInput,
+): Promise<PlanTask> {
+    const body: Record<string, string | null> = {};
+    if (input.title !== undefined) body.title = input.title;
+    if (input.description !== undefined) body.description = input.description;
+    if (input.dueDate !== undefined)
+        body.due_date = input.dueDate ? input.dueDate.toISOString() : null;
+    const dto = await request<PlanTaskDto>(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+    });
+    return toPlanTask(dto);
 }

@@ -27,6 +27,8 @@ type TaskRepository interface {
 	PositionsInStatus(ctx context.Context, q database.DBTX, workspaceID, planID, statusID, excludeTaskID string) ([]string, error)
 	UpdatePlacement(ctx context.Context, q database.DBTX, workspaceID, taskID, statusID, pos, now string) error
 	SoftDeleteTree(ctx context.Context, q database.DBTX, workspaceID, taskID, now string) error
+	Get(ctx context.Context, q database.DBTX, workspaceID, taskID string) (model.Task, error)
+	Update(ctx context.Context, q database.DBTX, workspaceID, taskID, title, description string, dueDate *time.Time, now string) error
 }
 
 type CreateTaskInput struct {
@@ -211,4 +213,54 @@ func (s *TaskService) Delete(ctx context.Context, session model.Session, taskID 
 		}
 		return s.tasks.SoftDeleteTree(ctx, tx, session.WorkspaceID, taskID, nowUTC())
 	})
+}
+
+// UpdateTaskInput carries the fields to change; nil fields are kept. The due
+// date is changed only when DueDateSet is true, and a nil DueDate clears it.
+type UpdateTaskInput struct {
+	Title       *string
+	Description *string
+	DueDate     *time.Time
+	DueDateSet  bool
+}
+
+// Update changes the title, description and/or due date of a task. Its
+// placement (plan, status, position) is left alone; use Move for that.
+func (s *TaskService) Update(ctx context.Context, session model.Session, taskID string, in UpdateTaskInput) (model.Task, error) {
+	if in.Title == nil && in.Description == nil && !in.DueDateSet {
+		return model.Task{}, fmt.Errorf("%w: nothing to update", ErrInvalidInput)
+	}
+	if in.Title != nil && strings.TrimSpace(*in.Title) == "" {
+		return model.Task{}, fmt.Errorf("%w: title is required", ErrInvalidInput)
+	}
+
+	var task model.Task
+	err := database.WithTx(ctx, s.db, func(tx *sql.Tx) error {
+		var err error
+		task, err = s.tasks.Get(ctx, tx, session.WorkspaceID, taskID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("%w: task", ErrNotFound)
+			}
+			return err
+		}
+		if in.Title != nil {
+			task.Title = strings.TrimSpace(*in.Title)
+		}
+		if in.Description != nil {
+			task.Description = strings.TrimSpace(*in.Description)
+		}
+		if in.DueDateSet {
+			task.DueDate = nil
+			if in.DueDate != nil {
+				due := in.DueDate.UTC()
+				task.DueDate = &due
+			}
+		}
+		return s.tasks.Update(ctx, tx, session.WorkspaceID, taskID, task.Title, task.Description, task.DueDate, nowUTC())
+	})
+	if err != nil {
+		return model.Task{}, err
+	}
+	return task, nil
 }

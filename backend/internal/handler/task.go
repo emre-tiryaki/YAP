@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -23,6 +24,7 @@ func (h *TaskHandler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/projects/{id}/tasks", h.create)
 	mux.HandleFunc("GET /api/projects/{id}/plans/{planId}/tasks", h.listByPlan)
 	mux.HandleFunc("POST /api/tasks/{id}/move", h.move)
+	mux.HandleFunc("PATCH /api/tasks/{id}", h.update)
 	mux.HandleFunc("DELETE /api/tasks/{id}", h.delete)
 }
 
@@ -77,6 +79,18 @@ func toTaskResponse(t model.Task) taskResponse {
 	}
 }
 
+func toPlanTaskResponse(t model.Task) planTaskResponse {
+	return planTaskResponse{
+		ID:             t.ID,
+		Title:          t.Title,
+		Description:    t.Description,
+		StatusID:       t.StatusID,
+		StatusCategory: string(t.StatusCategory),
+		Position:       t.Position,
+		DueDate:        formatDueDate(t.DueDate),
+	}
+}
+
 func (h *TaskHandler) upcoming(w http.ResponseWriter, r *http.Request) {
 	tasks, err := h.svc.Upcoming(r.Context(), h.session)
 	if err != nil {
@@ -97,14 +111,14 @@ func (h *TaskHandler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var due *time.Time
-	if req.DueDate != nil && *req.DueDate != "" {
-		parsed, err := time.Parse(time.RFC3339, *req.DueDate)
-		if err != nil {
-			writeError(w, r, fmt.Errorf("%w: due_date", service.ErrInvalidInput))
-			return
-		}
-		due = &parsed
+	var raw string
+	if req.DueDate != nil {
+		raw = *req.DueDate
+	}
+	due, err := parseDueDate(raw)
+	if err != nil {
+		writeError(w, r, err)
+		return
 	}
 
 	task, err := h.svc.Create(r.Context(), h.session, r.PathValue("id"), service.CreateTaskInput{
@@ -129,15 +143,7 @@ func (h *TaskHandler) listByPlan(w http.ResponseWriter, r *http.Request) {
 	}
 	res := make([]planTaskResponse, 0, len(tasks))
 	for _, t := range tasks {
-		res = append(res, planTaskResponse{
-			ID:             t.ID,
-			Title:          t.Title,
-			Description:    t.Description,
-			StatusID:       t.StatusID,
-			StatusCategory: string(t.StatusCategory),
-			Position:       t.Position,
-			DueDate:        formatDueDate(t.DueDate),
-		})
+		res = append(res, toPlanTaskResponse(t))
 	}
 	writeJSON(w, http.StatusOK, res)
 }
@@ -165,4 +171,58 @@ func (h *TaskHandler) delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// parseDueDate parses an RFC 3339 due date; an empty string means no date.
+func parseDueDate(v string) (*time.Time, error) {
+	if v == "" {
+		return nil, nil
+	}
+	parsed, err := time.Parse(time.RFC3339, v)
+	if err != nil {
+		return nil, fmt.Errorf("%w: due_date", service.ErrInvalidInput)
+	}
+	return &parsed, nil
+}
+
+// updateTaskRequest is a partial update: omitted (or null) title and
+// description are kept. due_date is changed only when present; null or ""
+// clears it. It stays raw so a present null can be told apart from absence.
+type updateTaskRequest struct {
+	Title       *string         `json:"title"`
+	Description *string         `json:"description"`
+	DueDate     json.RawMessage `json:"due_date"`
+}
+
+func (h *TaskHandler) update(w http.ResponseWriter, r *http.Request) {
+	var req updateTaskRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	in := service.UpdateTaskInput{Title: req.Title, Description: req.Description}
+	if req.DueDate != nil {
+		var raw *string
+		if err := json.Unmarshal(req.DueDate, &raw); err != nil {
+			writeError(w, r, fmt.Errorf("%w: due_date", service.ErrInvalidInput))
+			return
+		}
+		var v string
+		if raw != nil {
+			v = *raw
+		}
+		due, err := parseDueDate(v)
+		if err != nil {
+			writeError(w, r, err)
+			return
+		}
+		in.DueDate, in.DueDateSet = due, true
+	}
+
+	task, err := h.svc.Update(r.Context(), h.session, r.PathValue("id"), in)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, toPlanTaskResponse(task))
 }

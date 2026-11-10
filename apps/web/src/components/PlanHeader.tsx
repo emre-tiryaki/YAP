@@ -1,12 +1,18 @@
+import { useState } from "react";
 import { useTranslate } from "../hooks/useTranslate";
+import type { CardAction } from "../types/cardAction";
 import type { Plan } from "../types/plan";
+import { CardMenu } from "./CardMenu";
+import { PlanDialogs } from "./PlanDialogs";
 
 type PlanHeaderProps = {
     plan: Plan;
+    onDeleted: () => void;
 };
 
-export function PlanHeader({ plan }: PlanHeaderProps) {
+export function PlanHeader({ plan, onDeleted }: PlanHeaderProps) {
     const t = useTranslate();
+    const [action, setAction] = useState<CardAction | null>(null);
     const percent =
         plan.taskCount === 0
             ? 0
@@ -14,11 +20,14 @@ export function PlanHeader({ plan }: PlanHeaderProps) {
 
     return (
         <header className="mb-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-            <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold">{plan.name}</h1>
-                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700">
-                    {plan.teamName ?? t("project.plans.wholeProject")}
-                </span>
+            <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                    <h1 className="text-2xl font-bold">{plan.name}</h1>
+                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700">
+                        {plan.teamName ?? t("project.plans.wholeProject")}
+                    </span>
+                </div>
+                <CardMenu onSelect={setAction} />
             </div>
             {plan.description ? (
                 <p className="mt-2 text-sm text-gray-600">{plan.description}</p>
@@ -58,6 +67,12 @@ export function PlanHeader({ plan }: PlanHeaderProps) {
                     %{percent} {t("plan.stats.progress")}
                 </span>
             </div>
+            <PlanDialogs
+                plan={plan}
+                action={action}
+                onClose={() => setAction(null)}
+                onDeleted={onDeleted}
+            />
         </header>
     );
 }

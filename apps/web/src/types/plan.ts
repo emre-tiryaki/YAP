@@ -12,3 +12,8 @@ export type CreatePlanInput = {
     name: string;
     description: string;
 };
+
+export type UpdatePlanInput = {
+    name?: string;
+    description?: string;
+};

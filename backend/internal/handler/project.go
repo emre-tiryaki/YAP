@@ -21,9 +21,13 @@ func (h *ProjectHandler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/projects", h.list)
 	mux.HandleFunc("POST /api/projects", h.create)
 	mux.HandleFunc("GET /api/projects/{id}", h.get)
+	mux.HandleFunc("PATCH /api/projects/{id}", h.update)
+	mux.HandleFunc("DELETE /api/projects/{id}", h.delete)
 	mux.HandleFunc("GET /api/projects/{id}/plans", h.plans)
 	mux.HandleFunc("POST /api/projects/{id}/plans", h.createPlan)
 	mux.HandleFunc("GET /api/projects/{id}/plans/{planId}", h.getPlan)
+	mux.HandleFunc("PATCH /api/projects/{id}/plans/{planId}", h.updatePlan)
+	mux.HandleFunc("DELETE /api/projects/{id}/plans/{planId}", h.deletePlan)
 	mux.HandleFunc("GET /api/projects/{id}/plans/{planId}/statuses", h.statuses)
 	mux.HandleFunc("POST /api/projects/{id}/plans/{planId}/statuses", h.createStatus)
 }
@@ -222,4 +226,66 @@ func parseStatusCategory(v string) (model.StatusCategory, error) {
 		return c, nil
 	}
 	return "", fmt.Errorf("%w: category", service.ErrInvalidInput)
+}
+
+// updateProjectRequest is a partial update: omitted (or null) fields are kept.
+type updateProjectRequest struct {
+	Name        *string `json:"name"`
+	Description *string `json:"description"`
+}
+
+func (h *ProjectHandler) update(w http.ResponseWriter, r *http.Request) {
+	var req updateProjectRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	project, err := h.svc.Update(r.Context(), h.session.WorkspaceID, r.PathValue("id"), service.UpdateProjectInput{
+		Name:        req.Name,
+		Description: req.Description,
+	})
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, toProjectResponse(project))
+}
+
+func (h *ProjectHandler) delete(w http.ResponseWriter, r *http.Request) {
+	if err := h.svc.Delete(r.Context(), h.session.WorkspaceID, r.PathValue("id")); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// updatePlanRequest is a partial update: omitted (or null) fields are kept.
+type updatePlanRequest struct {
+	Name        *string `json:"name"`
+	Description *string `json:"description"`
+}
+
+func (h *ProjectHandler) updatePlan(w http.ResponseWriter, r *http.Request) {
+	var req updatePlanRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	plan, err := h.svc.UpdatePlan(r.Context(), h.session.WorkspaceID, r.PathValue("id"), r.PathValue("planId"), service.UpdatePlanInput{
+		Name:        req.Name,
+		Description: req.Description,
+	})
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, toPlanResponse(plan))
+}
+
+func (h *ProjectHandler) deletePlan(w http.ResponseWriter, r *http.Request) {
+	if err := h.svc.DeletePlan(r.Context(), h.session.WorkspaceID, r.PathValue("id"), r.PathValue("planId")); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

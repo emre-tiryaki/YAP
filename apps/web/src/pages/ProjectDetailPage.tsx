@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams } from "react-router";
+import { useNavigate, useParams } from "react-router";
 import { useTranslate } from "../hooks/useTranslate";
 import { useProject, useProjectPlans } from "../hooks/useProjects";
 import { ApiError } from "../api/client";
@@ -18,6 +18,7 @@ import { CreatePlanForm } from "../components/CreatePlanForm";
 
 export default function ProjectDetailPage() {
     const t = useTranslate();
+    const navigate = useNavigate();
     const { projectId = "" } = useParams();
     const project = useProject(projectId);
     const plans = useProjectPlans(projectId);
@@ -49,6 +50,9 @@ export default function ProjectDetailPage() {
                             <ProjectHeader
                                 project={project.data}
                                 planCount={plans.data?.length}
+                                onDeleted={() =>
+                                    void navigate("/home", { replace: true })
+                                }
                             />
                             <PlanList
                                 plans={plans.data ?? []}

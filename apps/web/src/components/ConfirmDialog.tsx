@@ -8,6 +8,8 @@ type ConfirmDialogProps = {
     confirmLabel: string;
     isPending?: boolean;
     isError?: boolean;
+    // Shown instead of the generic error text when isError is set.
+    errorMessage?: string;
     onConfirm: () => void;
     onClose: () => void;
 };
@@ -19,6 +21,7 @@ export function ConfirmDialog({
     confirmLabel,
     isPending = false,
     isError = false,
+    errorMessage,
     onConfirm,
     onClose,
 }: ConfirmDialogProps) {
@@ -29,7 +32,7 @@ export function ConfirmDialog({
             <p className="text-sm text-gray-600">{message}</p>
             {isError && (
                 <p role="alert" className="mt-3 text-sm text-red-600">
-                    {t("common.error")}
+                    {errorMessage ?? t("common.error")}
                 </p>
             )}
             <div className="mt-6 flex justify-end gap-2">

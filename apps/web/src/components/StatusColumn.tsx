@@ -6,6 +6,7 @@ import {
 import { FiFlag, FiPlus } from "react-icons/fi";
 import { useTranslate } from "../hooks/useTranslate";
 import type { Status } from "../types/status";
+import type { CardAction } from "../types/cardAction";
 import type { PlanTask } from "../types/task";
 import { SortableTaskCard } from "./SortableTaskCard";
 import type { BoardView } from "./ViewToggle";
@@ -15,7 +16,7 @@ type StatusColumnProps = {
     tasks: PlanTask[];
     layout: BoardView;
     onAddTask: () => void;
-    onDeleteTask: (task: PlanTask) => void;
+    onTaskAction: (task: PlanTask, action: CardAction) => void;
 };
 
 export function StatusColumn({
@@ -23,7 +24,7 @@ export function StatusColumn({
     tasks,
     layout,
     onAddTask,
-    onDeleteTask,
+    onTaskAction,
 }: StatusColumnProps) {
     const t = useTranslate();
     const { setNodeRef, isOver } = useDroppable({ id: status.id });
@@ -79,7 +80,7 @@ export function StatusColumn({
                             key={task.id}
                             task={task}
                             layout={layout}
-                            onDelete={() => onDeleteTask(task)}
+                            onAction={(action) => onTaskAction(task, action)}
                         />
                     ))}
                     {tasks.length === 0 && (

@@ -89,6 +89,7 @@ The following are enforced in the service layer and each has a unit test **(DB)*
 
 ### 2.8 Testing
 
+- Always write tests first before writing anything to backend. Write the minimum code for the feature then write full tests then write the feature and improve it until it passes all tests.
 - Table-driven tests with `t.Run`.
 - Repository and service tests run against a real SQLite database in `t.TempDir()` with the production pragmas. Do not mock the database.
 - Use `t.Helper()` in helpers and `t.Cleanup` for teardown.

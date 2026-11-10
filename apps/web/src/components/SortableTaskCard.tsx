@@ -1,5 +1,6 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import type { CardAction } from "../types/cardAction";
 import type { PlanTask } from "../types/task";
 import { PlanTaskCard } from "./PlanTaskCard";
 import type { BoardView } from "./ViewToggle";
@@ -7,13 +8,13 @@ import type { BoardView } from "./ViewToggle";
 type SortableTaskCardProps = {
     task: PlanTask;
     layout: BoardView;
-    onDelete: () => void;
+    onAction: (action: CardAction) => void;
 };
 
 export function SortableTaskCard({
     task,
     layout,
-    onDelete,
+    onAction,
 }: SortableTaskCardProps) {
     const {
         attributes,
@@ -32,7 +33,7 @@ export function SortableTaskCard({
             {...attributes}
             {...listeners}
         >
-            <PlanTaskCard task={task} layout={layout} onDelete={onDelete} />
+            <PlanTaskCard task={task} layout={layout} onAction={onAction} />
         </li>
     );
 }

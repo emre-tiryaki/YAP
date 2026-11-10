@@ -1,17 +1,30 @@
+import { useState } from "react";
 import { useTranslate } from "../hooks/useTranslate";
+import type { CardAction } from "../types/cardAction";
 import type { Project } from "../types/project";
+import { CardMenu } from "./CardMenu";
+import { ProjectDialogs } from "./ProjectDialogs";
 
 type ProjectHeaderProps = {
     project: Project;
     planCount: number | undefined;
+    onDeleted: () => void;
 };
 
-export function ProjectHeader({ project, planCount }: ProjectHeaderProps) {
+export function ProjectHeader({
+    project,
+    planCount,
+    onDeleted,
+}: ProjectHeaderProps) {
     const t = useTranslate();
+    const [action, setAction] = useState<CardAction | null>(null);
 
     return (
         <header className="mb-8 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-            <h1 className="text-2xl font-bold">{project.name}</h1>
+            <div className="flex items-start justify-between gap-3">
+                <h1 className="text-2xl font-bold">{project.name}</h1>
+                <CardMenu onSelect={setAction} />
+            </div>
             {project.description ? (
                 <p className="mt-2 text-sm text-gray-600">
                     {project.description}
@@ -35,6 +48,12 @@ export function ProjectHeader({ project, planCount }: ProjectHeaderProps) {
                     <dd>{t("project.plans.count")}</dd>
                 </div>
             </dl>
+            <ProjectDialogs
+                project={project}
+                action={action}
+                onClose={() => setAction(null)}
+                onDeleted={onDeleted}
+            />
         </header>
     );
 }

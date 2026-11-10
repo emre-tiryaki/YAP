@@ -72,7 +72,7 @@ func TestProjectDetailMethodNotAllowed(t *testing.T) {
 	env := newTestEnv(t)
 	project := createProject(t, env, "Alpha")
 
-	for _, method := range []string{http.MethodPost, http.MethodPut, http.MethodDelete} {
+	for _, method := range []string{http.MethodPost, http.MethodPut} {
 		t.Run(method, func(t *testing.T) {
 			wantStatus(t, env.do(t, method, "/api/projects/"+project.ID, ""), http.StatusMethodNotAllowed)
 		})

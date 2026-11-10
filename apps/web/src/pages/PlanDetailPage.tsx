@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { useParams, useSearchParams } from "react-router";
+import { useNavigate, useParams, useSearchParams } from "react-router";
 import { ApiError } from "../api/client";
-import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CreatePlanTaskForm } from "../components/CreatePlanTaskForm";
 import { CreateStatusForm } from "../components/CreateStatusForm";
 import { InlineError } from "../components/InlineError";
@@ -9,18 +8,21 @@ import { Modal } from "../components/Modal";
 import { PlanBoard } from "../components/PlanBoard";
 import { PlanHeader, PlanHeaderSkeleton } from "../components/PlanHeader";
 import { Sidebar } from "../components/SideBar";
+import { TaskDialogs } from "../components/TaskDialogs";
 import { TopBar } from "../components/TopBar";
 import type { BreadcrumbItem } from "../types/breadcrumb";
 import { ViewToggle, type BoardView } from "../components/ViewToggle";
 import { usePlan, usePlanStatuses } from "../hooks/usePlans";
 import { useProject } from "../hooks/useProjects";
-import { useDeleteTask, useMoveTask, usePlanTasks } from "../hooks/useTasks";
+import { useMoveTask, usePlanTasks } from "../hooks/useTasks";
 import { useTranslate } from "../hooks/useTranslate";
+import type { CardAction } from "../types/cardAction";
 import type { PlanTask } from "../types/task";
 import NotFoundPage from "./NotFoundPage";
 
 export default function PlanDetailPage() {
     const t = useTranslate();
+    const navigate = useNavigate();
     const { projectId = "", planId = "" } = useParams();
     const [searchParams, setSearchParams] = useSearchParams();
     const view: BoardView =
@@ -31,13 +33,15 @@ export default function PlanDetailPage() {
     const statuses = usePlanStatuses(projectId, planId);
     const tasks = usePlanTasks(projectId, planId);
     const moveTask = useMoveTask(projectId, planId);
-    const deleteTask = useDeleteTask();
 
     const [newTaskStatusId, setNewTaskStatusId] = useState<string | null>(
         null,
     );
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
-    const [taskToDelete, setTaskToDelete] = useState<PlanTask | null>(null);
+    const [taskAction, setTaskAction] = useState<{
+        task: PlanTask;
+        action: CardAction;
+    } | null>(null);
 
     if (plan.error instanceof ApiError && plan.error.status === 404)
         return <NotFoundPage />;
@@ -54,11 +58,6 @@ export default function PlanDetailPage() {
     const boardLoading = statuses.isLoading || tasks.isLoading;
     const boardError = statuses.isError || tasks.isError;
 
-    function closeDeleteDialog() {
-        setTaskToDelete(null);
-        deleteTask.reset();
-    }
-
     return (
         <div className="flex min-h-screen">
             <Sidebar activeHref="/projects" />
@@ -72,7 +71,16 @@ export default function PlanDetailPage() {
                             onRetry={() => void plan.refetch()}
                         />
                     )}
-                    {plan.data && <PlanHeader plan={plan.data} />}
+                    {plan.data && (
+                        <PlanHeader
+                            plan={plan.data}
+                            onDeleted={() =>
+                                void navigate(`/projects/${projectId}`, {
+                                    replace: true,
+                                })
+                            }
+                        />
+                    )}
 
                     {plan.data && (
                         <>
@@ -125,7 +133,9 @@ export default function PlanDetailPage() {
                                     layout={view}
                                     onMove={(move) => moveTask.mutate(move)}
                                     onAddTask={setNewTaskStatusId}
-                                    onDeleteTask={setTaskToDelete}
+                                    onTaskAction={(task, action) =>
+                                        setTaskAction({ task, action })
+                                    }
                                     onCreateStatus={() =>
                                         setIsStatusModalOpen(true)
                                     }
@@ -164,21 +174,13 @@ export default function PlanDetailPage() {
                 />
             </Modal>
 
-            <ConfirmDialog
-                isOpen={taskToDelete !== null}
-                title={t("plan.task.delete.title")}
-                message={`"${taskToDelete?.title ?? ""}" — ${t("plan.task.delete.message")}`}
-                confirmLabel={t("plan.task.delete.confirm")}
-                isPending={deleteTask.isPending}
-                isError={deleteTask.isError}
-                onConfirm={() => {
-                    if (taskToDelete)
-                        deleteTask.mutate(taskToDelete.id, {
-                            onSuccess: closeDeleteDialog,
-                        });
-                }}
-                onClose={closeDeleteDialog}
-            />
+            {taskAction && (
+                <TaskDialogs
+                    task={taskAction.task}
+                    action={taskAction.action}
+                    onClose={() => setTaskAction(null)}
+                />
+            )}
         </div>
     );
 }

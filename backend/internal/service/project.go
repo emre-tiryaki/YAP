@@ -29,6 +29,12 @@ type ProjectRepository interface {
 	GetPlan(ctx context.Context, q database.DBTX, workspaceID, projectID, planID string) (model.Plan, error)
 	ListStatuses(ctx context.Context, q database.DBTX, workspaceID, planID string) ([]model.Status, error)
 	LastStatusPosition(ctx context.Context, q database.DBTX, workspaceID, planID string) (string, error)
+	Update(ctx context.Context, q database.DBTX, workspaceID, projectID, name, description, now string) error
+	SoftDelete(ctx context.Context, q database.DBTX, workspaceID, projectID, now string) error
+	UpdatePlan(ctx context.Context, q database.DBTX, workspaceID, planID, name, description, now string) error
+	SoftDeletePlan(ctx context.Context, q database.DBTX, workspaceID, planID, now string) error
+	PlanNameTaken(ctx context.Context, q database.DBTX, workspaceID, projectID, teamID, name, excludePlanID string) (bool, error)
+	CountWholeProjectPlans(ctx context.Context, q database.DBTX, workspaceID, projectID string) (int, error)
 }
 
 var colorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
@@ -266,4 +272,129 @@ func validCategory(c model.StatusCategory) bool {
 		return true
 	}
 	return false
+}
+
+// UpdateProjectInput carries the fields to change; nil fields are kept.
+type UpdateProjectInput struct {
+	Name        *string
+	Description *string
+}
+
+// UpdatePlanInput carries the fields to change; nil fields are kept.
+type UpdatePlanInput struct {
+	Name        *string
+	Description *string
+}
+
+// Update changes the name and/or description of a project.
+func (s *ProjectService) Update(ctx context.Context, workspaceID, projectID string, in UpdateProjectInput) (model.Project, error) {
+	if in.Name == nil && in.Description == nil {
+		return model.Project{}, fmt.Errorf("%w: nothing to update", ErrInvalidInput)
+	}
+	if in.Name != nil && strings.TrimSpace(*in.Name) == "" {
+		return model.Project{}, fmt.Errorf("%w: name is required", ErrInvalidInput)
+	}
+
+	var project model.Project
+	err := database.WithTx(ctx, s.db, func(tx *sql.Tx) error {
+		var err error
+		project, err = s.repo.Get(ctx, tx, workspaceID, projectID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("%w: project", ErrNotFound)
+			}
+			return err
+		}
+		if in.Name != nil {
+			project.Name = strings.TrimSpace(*in.Name)
+		}
+		if in.Description != nil {
+			project.Description = strings.TrimSpace(*in.Description)
+		}
+		return s.repo.Update(ctx, tx, workspaceID, projectID, project.Name, project.Description, nowUTC())
+	})
+	if err != nil {
+		return model.Project{}, err
+	}
+	return project, nil
+}
+
+// Delete soft-deletes a project together with its plans, statuses, tasks and
+// team links in one transaction.
+func (s *ProjectService) Delete(ctx context.Context, workspaceID, projectID string) error {
+	return database.WithTx(ctx, s.db, func(tx *sql.Tx) error {
+		if _, err := s.repo.Name(ctx, tx, workspaceID, projectID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("%w: project", ErrNotFound)
+			}
+			return err
+		}
+		return s.repo.SoftDelete(ctx, tx, workspaceID, projectID, nowUTC())
+	})
+}
+
+// UpdatePlan changes the name and/or description of a plan. The new name must
+// stay unique among the non-deleted plans of the same project and team scope.
+func (s *ProjectService) UpdatePlan(ctx context.Context, workspaceID, projectID, planID string, in UpdatePlanInput) (model.Plan, error) {
+	if in.Name == nil && in.Description == nil {
+		return model.Plan{}, fmt.Errorf("%w: nothing to update", ErrInvalidInput)
+	}
+	if in.Name != nil && strings.TrimSpace(*in.Name) == "" {
+		return model.Plan{}, fmt.Errorf("%w: name is required", ErrInvalidInput)
+	}
+
+	var plan model.Plan
+	err := database.WithTx(ctx, s.db, func(tx *sql.Tx) error {
+		var err error
+		plan, err = s.repo.GetPlan(ctx, tx, workspaceID, projectID, planID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("%w: plan", ErrNotFound)
+			}
+			return err
+		}
+		if in.Name != nil {
+			plan.Name = strings.TrimSpace(*in.Name)
+			taken, err := s.repo.PlanNameTaken(ctx, tx, workspaceID, projectID, plan.TeamID, plan.Name, planID)
+			if err != nil {
+				return err
+			}
+			if taken {
+				return fmt.Errorf("%w: plan name already used", ErrConflict)
+			}
+		}
+		if in.Description != nil {
+			plan.Description = strings.TrimSpace(*in.Description)
+		}
+		return s.repo.UpdatePlan(ctx, tx, workspaceID, planID, plan.Name, plan.Description, nowUTC())
+	})
+	if err != nil {
+		return model.Plan{}, err
+	}
+	return plan, nil
+}
+
+// DeletePlan soft-deletes a plan together with its statuses and tasks. The
+// project's last whole-project plan cannot be deleted, because tasks created
+// without an explicit plan need a default plan to land in.
+func (s *ProjectService) DeletePlan(ctx context.Context, workspaceID, projectID, planID string) error {
+	return database.WithTx(ctx, s.db, func(tx *sql.Tx) error {
+		plan, err := s.repo.GetPlan(ctx, tx, workspaceID, projectID, planID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("%w: plan", ErrNotFound)
+			}
+			return err
+		}
+		if plan.TeamID == "" {
+			n, err := s.repo.CountWholeProjectPlans(ctx, tx, workspaceID, projectID)
+			if err != nil {
+				return err
+			}
+			if n <= 1 {
+				return fmt.Errorf("%w: project needs at least one whole-project plan", ErrConflict)
+			}
+		}
+		return s.repo.SoftDeletePlan(ctx, tx, workspaceID, planID, nowUTC())
+	})
 }

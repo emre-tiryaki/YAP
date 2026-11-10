@@ -280,3 +280,105 @@ func (*ProjectRepository) LastStatusPosition(ctx context.Context, q database.DBT
 	}
 	return pos, nil
 }
+
+// Update overwrites the name and description of a non-deleted project.
+func (*ProjectRepository) Update(ctx context.Context, q database.DBTX, workspaceID, projectID, name, description, now string) error {
+	_, err := q.ExecContext(ctx,
+		`UPDATE projects SET name = ?, description = ?, updated_at = ?
+		 WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`,
+		name, nullIfEmpty(description), now, projectID, workspaceID,
+	)
+	if err != nil {
+		return fmt.Errorf("update project: %w", err)
+	}
+	return nil
+}
+
+// SoftDelete marks the project and its plans, statuses and tasks as deleted
+// and closes its team links, so every row carries its own deletion record.
+func (*ProjectRepository) SoftDelete(ctx context.Context, q database.DBTX, workspaceID, projectID, now string) error {
+	steps := []struct{ name, query string }{
+		{"tasks", `UPDATE tasks SET deleted_at = ?, updated_at = ?
+			 WHERE workspace_id = ? AND project_id = ? AND deleted_at IS NULL`},
+		{"statuses", `UPDATE statuses SET deleted_at = ?, updated_at = ?
+			 WHERE workspace_id = ? AND deleted_at IS NULL
+			   AND plan_id IN (SELECT id FROM plans WHERE workspace_id = statuses.workspace_id AND project_id = ?)`},
+		{"plans", `UPDATE plans SET deleted_at = ?, updated_at = ?
+			 WHERE workspace_id = ? AND project_id = ? AND deleted_at IS NULL`},
+		{"project teams", `UPDATE project_teams SET removed_at = ?, updated_at = ?
+			 WHERE workspace_id = ? AND project_id = ? AND removed_at IS NULL`},
+		{"project", `UPDATE projects SET deleted_at = ?, updated_at = ?
+			 WHERE workspace_id = ? AND id = ? AND deleted_at IS NULL`},
+	}
+	for _, step := range steps {
+		if _, err := q.ExecContext(ctx, step.query, now, now, workspaceID, projectID); err != nil {
+			return fmt.Errorf("delete %s: %w", step.name, err)
+		}
+	}
+	return nil
+}
+
+// UpdatePlan overwrites the name and description of a non-deleted plan.
+func (*ProjectRepository) UpdatePlan(ctx context.Context, q database.DBTX, workspaceID, planID, name, description, now string) error {
+	_, err := q.ExecContext(ctx,
+		`UPDATE plans SET name = ?, description = ?, updated_at = ?
+		 WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`,
+		name, nullIfEmpty(description), now, planID, workspaceID,
+	)
+	if err != nil {
+		return fmt.Errorf("update plan: %w", err)
+	}
+	return nil
+}
+
+// SoftDeletePlan marks the plan and its statuses and tasks as deleted.
+func (*ProjectRepository) SoftDeletePlan(ctx context.Context, q database.DBTX, workspaceID, planID, now string) error {
+	steps := []struct{ name, query string }{
+		{"tasks", `UPDATE tasks SET deleted_at = ?, updated_at = ?
+			 WHERE workspace_id = ? AND plan_id = ? AND deleted_at IS NULL`},
+		{"statuses", `UPDATE statuses SET deleted_at = ?, updated_at = ?
+			 WHERE workspace_id = ? AND plan_id = ? AND deleted_at IS NULL`},
+		{"plan", `UPDATE plans SET deleted_at = ?, updated_at = ?
+			 WHERE workspace_id = ? AND id = ? AND deleted_at IS NULL`},
+	}
+	for _, step := range steps {
+		if _, err := q.ExecContext(ctx, step.query, now, now, workspaceID, planID); err != nil {
+			return fmt.Errorf("delete plan %s: %w", step.name, err)
+		}
+	}
+	return nil
+}
+
+// PlanNameTaken reports whether another non-deleted plan of the project in the
+// same team scope (empty teamID means whole-project) already uses name. It
+// mirrors idx_plans_project_id_team_id_name, so archived plans still count.
+func (*ProjectRepository) PlanNameTaken(ctx context.Context, q database.DBTX, workspaceID, projectID, teamID, name, excludePlanID string) (bool, error) {
+	var taken bool
+	err := q.QueryRowContext(ctx,
+		`SELECT EXISTS (
+			SELECT 1 FROM plans
+			 WHERE workspace_id = ? AND project_id = ? AND COALESCE(team_id, '') = ?
+			   AND name = ? AND id <> ? AND deleted_at IS NULL)`,
+		workspaceID, projectID, teamID, name, excludePlanID,
+	).Scan(&taken)
+	if err != nil {
+		return false, fmt.Errorf("plan name taken: %w", err)
+	}
+	return taken, nil
+}
+
+// CountWholeProjectPlans counts the non-deleted, non-archived plans of the
+// project that belong to no team, i.e. the candidates for the default plan.
+func (*ProjectRepository) CountWholeProjectPlans(ctx context.Context, q database.DBTX, workspaceID, projectID string) (int, error) {
+	var n int
+	err := q.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM plans
+		 WHERE workspace_id = ? AND project_id = ? AND team_id IS NULL
+		   AND deleted_at IS NULL AND archived_at IS NULL`,
+		workspaceID, projectID,
+	).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("count whole-project plans: %w", err)
+	}
+	return n, nil
+}

@@ -251,3 +251,50 @@ func (*TaskRepository) SoftDeleteTree(ctx context.Context, q database.DBTX, work
 	}
 	return nil
 }
+
+// Get returns a non-deleted task with its project name and status category.
+func (*TaskRepository) Get(ctx context.Context, q database.DBTX, workspaceID, taskID string) (model.Task, error) {
+	t := model.Task{ID: taskID, WorkspaceID: workspaceID}
+	var description, dueDate sql.NullString
+	var category string
+	err := q.QueryRowContext(ctx,
+		`SELECT t.project_id, p.name, t.plan_id, t.status_id, t.created_by, t.title,
+			t.description, t.position, t.due_date, s.category
+		 FROM tasks t
+		 JOIN projects p ON p.id = t.project_id AND p.workspace_id = t.workspace_id
+		 JOIN statuses s ON s.id = t.status_id AND s.plan_id = t.plan_id
+		 WHERE t.id = ? AND t.workspace_id = ? AND t.deleted_at IS NULL`,
+		taskID, workspaceID,
+	).Scan(&t.ProjectID, &t.ProjectName, &t.PlanID, &t.StatusID, &t.CreatedBy, &t.Title,
+		&description, &t.Position, &dueDate, &category)
+	if err != nil {
+		return model.Task{}, fmt.Errorf("get task: %w", err)
+	}
+	t.Description = description.String
+	t.StatusCategory = model.StatusCategory(category)
+	if dueDate.Valid {
+		parsed, err := time.Parse(time.RFC3339, dueDate.String)
+		if err != nil {
+			return model.Task{}, fmt.Errorf("parse due date: %w", err)
+		}
+		t.DueDate = &parsed
+	}
+	return t, nil
+}
+
+// Update overwrites the title, description and due date of a non-deleted task.
+func (*TaskRepository) Update(ctx context.Context, q database.DBTX, workspaceID, taskID, title, description string, dueDate *time.Time, now string) error {
+	var due any
+	if dueDate != nil {
+		due = dueDate.UTC().Format(time.RFC3339)
+	}
+	_, err := q.ExecContext(ctx,
+		`UPDATE tasks SET title = ?, description = ?, due_date = ?, updated_at = ?
+		 WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`,
+		title, nullIfEmpty(description), due, now, taskID, workspaceID,
+	)
+	if err != nil {
+		return fmt.Errorf("update task: %w", err)
+	}
+	return nil
+}

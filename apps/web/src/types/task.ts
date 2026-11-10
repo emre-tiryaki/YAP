@@ -31,3 +31,10 @@ export type MoveTaskInput = {
   // Position among the other tasks of the target status.
   index: number
 }
+
+// Omitted fields are kept; a null due date clears it.
+export type UpdateTaskInput = {
+  title?: string
+  description?: string
+  dueDate?: Date | null
+}

@@ -4,6 +4,7 @@ import type {
     MoveTaskInput,
     PlanTask,
     StatusCategory,
+    UpdateTaskInput,
 } from "../types/task";
 import {
     createTask,
@@ -11,6 +12,7 @@ import {
     listPlanTasks,
     listUpcomingTasks,
     moveTask,
+    updateTask,
 } from "../api/client";
 import { planKey } from "./usePlans";
 
@@ -115,6 +117,21 @@ export function useDeleteTask() {
 
     return useMutation({
         mutationFn: deleteTask,
+        onSuccess: () => invalidateTaskViews(queryClient),
+    });
+}
+
+type UpdateTaskVariables = {
+    taskId: string;
+    input: UpdateTaskInput;
+};
+
+export function useUpdateTask() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ taskId, input }: UpdateTaskVariables) =>
+            updateTask(taskId, input),
         onSuccess: () => invalidateTaskViews(queryClient),
     });
 }

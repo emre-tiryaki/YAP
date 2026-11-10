@@ -15,6 +15,7 @@ import {
 import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { FiPlus } from "react-icons/fi";
 import { useTranslate } from "../hooks/useTranslate";
+import type { CardAction } from "../types/cardAction";
 import type { Status } from "../types/status";
 import type { PlanTask, StatusCategory } from "../types/task";
 import { PlanTaskCard } from "./PlanTaskCard";
@@ -35,7 +36,7 @@ type PlanBoardProps = {
         index: number;
     }) => void;
     onAddTask: (statusId: string) => void;
-    onDeleteTask: (task: PlanTask) => void;
+    onTaskAction: (task: PlanTask, action: CardAction) => void;
     onCreateStatus: () => void;
 };
 
@@ -60,7 +61,7 @@ export function PlanBoard({
     layout,
     onMove,
     onAddTask,
-    onDeleteTask,
+    onTaskAction,
     onCreateStatus,
 }: PlanBoardProps) {
     const t = useTranslate();
@@ -186,7 +187,7 @@ export function PlanBoard({
                             return task ? [task] : [];
                         })}
                         onAddTask={() => onAddTask(status.id)}
-                        onDeleteTask={onDeleteTask}
+                        onTaskAction={onTaskAction}
                     />
                 ))}
                 <button
