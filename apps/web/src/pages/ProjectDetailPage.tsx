@@ -4,7 +4,6 @@ import { useTranslate } from "../hooks/useTranslate";
 import { useProject, useProjectPlans } from "../hooks/useProjects";
 import { ApiError } from "../api/client";
 import NotFoundPage from "./NotFoundPage";
-import { Sidebar } from "../components/SideBar";
 import { TopBar } from "../components/TopBar";
 import type { BreadcrumbItem } from "../types/breadcrumb";
 import {
@@ -33,38 +32,35 @@ export default function ProjectDetailPage() {
     ].filter((item) => item.label);
 
     return (
-        <div className="flex min-h-screen">
-            <Sidebar />
-            <div className="flex flex-1 flex-col">
-                <TopBar path={path} />
-                <main className="flex-1 p-8">
-                    {project.isLoading && <ProjectHeaderSkeleton />}
-                    {project.isError && (
-                        <InlineError
-                            message={t("project.loadError")}
-                            onRetry={() => void project.refetch()}
+        <div className="flex min-w-0 flex-1 flex-col">
+            <TopBar path={path} />
+            <main className="flex-1 p-8">
+                {project.isLoading && <ProjectHeaderSkeleton />}
+                {project.isError && (
+                    <InlineError
+                        message={t("project.loadError")}
+                        onRetry={() => void project.refetch()}
+                    />
+                )}
+                {project.data && (
+                    <>
+                        <ProjectHeader
+                            project={project.data}
+                            planCount={plans.data?.length}
+                            onDeleted={() =>
+                                void navigate("/home", { replace: true })
+                            }
                         />
-                    )}
-                    {project.data && (
-                        <>
-                            <ProjectHeader
-                                project={project.data}
-                                planCount={plans.data?.length}
-                                onDeleted={() =>
-                                    void navigate("/home", { replace: true })
-                                }
-                            />
-                            <PlanList
-                                plans={plans.data ?? []}
-                                isLoading={plans.isLoading}
-                                isError={plans.isError}
-                                onRetry={() => void plans.refetch()}
-                                onCreate={() => setIsPlanModalOpen(true)}
-                            />
-                        </>
-                    )}
-                </main>
-            </div>
+                        <PlanList
+                            plans={plans.data ?? []}
+                            isLoading={plans.isLoading}
+                            isError={plans.isError}
+                            onRetry={() => void plans.refetch()}
+                            onCreate={() => setIsPlanModalOpen(true)}
+                        />
+                    </>
+                )}
+            </main>
 
             <Modal
                 isOpen={isPlanModalOpen}

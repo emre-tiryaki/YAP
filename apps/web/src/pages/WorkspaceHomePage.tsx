@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Sidebar } from "../components/SideBar";
 import { TopBar } from "../components/TopBar";
 import type { BreadcrumbItem } from "../types/breadcrumb";
 import { Modal } from "../components/Modal";
@@ -27,31 +26,28 @@ export default function WorkspaceHomePage() {
     ].filter((item) => item.label);
 
     return (
-        <div className="flex min-h-screen">
-            <Sidebar />
-            <div className="flex flex-1 flex-col">
-                <TopBar path={path} />
-                <main className="flex-1 p-8">
-                    <h1 className="mb-8 text-2xl font-bold">
-                        {t("workspace.welcome")}
-                        {workspace.data && `, ${workspace.data.username}`}
-                    </h1>
-                    <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-                        <ProjectList
-                            projects={projectItems}
-                            isError={projects.isError}
-                            isLoading={projects.isLoading}
-                            onCreate={() => setIsProjectModalOpen(true)}
-                        />
-                        <TaskList
-                            tasks={tasks.data ?? []}
-                            isError={tasks.isError}
-                            isLoading={tasks.isLoading}
-                            onCreate={() => setIsTaskModalOpen(true)}
-                        />
-                    </div>
-                </main>
-            </div>
+        <div className="flex min-w-0 flex-1 flex-col">
+            <TopBar path={path} />
+            <main className="flex-1 p-8">
+                <h1 className="mb-8 text-2xl font-bold">
+                    {t("workspace.welcome")}
+                    {workspace.data && `, ${workspace.data.username}`}
+                </h1>
+                <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+                    <ProjectList
+                        projects={projectItems}
+                        isError={projects.isError}
+                        isLoading={projects.isLoading}
+                        onCreate={() => setIsProjectModalOpen(true)}
+                    />
+                    <TaskList
+                        tasks={tasks.data ?? []}
+                        isError={tasks.isError}
+                        isLoading={tasks.isLoading}
+                        onCreate={() => setIsTaskModalOpen(true)}
+                    />
+                </div>
+            </main>
 
             <Modal
                 isOpen={isProjectModalOpen}

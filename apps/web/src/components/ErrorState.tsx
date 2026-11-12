@@ -11,7 +11,7 @@ export function ErrorState({ code, title, message, actions }: ErrorStateProps) {
     return (
         <main
             role="alert"
-            className="flex min-h-screen flex-col items-center justify-center gap-4 bg-gray-50 p-8 text-center"
+            className="flex min-h-screen flex-1 flex-col items-center justify-center gap-4 bg-gray-50 p-8 text-center"
         >
             {code && (
                 <p className="text-6xl font-bold tracking-tight text-gray-900">

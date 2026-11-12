@@ -9,7 +9,6 @@ import { InlineError } from "../components/InlineError";
 import { Modal } from "../components/Modal";
 import { PlanBoard } from "../components/PlanBoard";
 import { PlanHeader, PlanHeaderSkeleton } from "../components/PlanHeader";
-import { Sidebar } from "../components/SideBar";
 import { TaskDialogs } from "../components/TaskDialogs";
 import { TaskDrawer } from "../components/TaskDrawer";
 import { TopBar } from "../components/TopBar";
@@ -86,104 +85,101 @@ export default function PlanDetailPage() {
     const boardError = statuses.isError || tasks.isError;
 
     return (
-        <div className="flex min-h-screen">
-            <Sidebar />
-            <div className="flex min-w-0 flex-1 flex-col">
-                <TopBar path={path} />
-                <main className="flex min-w-0 flex-1 flex-col p-8">
-                    {plan.isLoading && <PlanHeaderSkeleton />}
-                    {plan.isError && (
-                        <InlineError
-                            message={t("plan.loadError")}
-                            onRetry={() => void plan.refetch()}
-                        />
-                    )}
-                    {plan.data && (
-                        <PlanHeader
-                            plan={plan.data}
-                            onDeleted={() =>
-                                void navigate(`/projects/${projectId}`, {
-                                    replace: true,
-                                })
-                            }
-                        />
-                    )}
+        <div className="flex min-w-0 flex-1 flex-col">
+            <TopBar path={path} />
+            <main className="flex min-w-0 flex-1 flex-col p-8">
+                {plan.isLoading && <PlanHeaderSkeleton />}
+                {plan.isError && (
+                    <InlineError
+                        message={t("plan.loadError")}
+                        onRetry={() => void plan.refetch()}
+                    />
+                )}
+                {plan.data && (
+                    <PlanHeader
+                        plan={plan.data}
+                        onDeleted={() =>
+                            void navigate(`/projects/${projectId}`, {
+                                replace: true,
+                            })
+                        }
+                    />
+                )}
 
-                    {plan.data && (
-                        <>
-                            <div className="mb-4 flex items-center justify-between">
-                                <ViewToggle
-                                    value={view}
-                                    onChange={(next) =>
-                                        setSearchParams(
-                                            next === "board"
-                                                ? {}
-                                                : { view: next },
-                                            { replace: true },
-                                        )
-                                    }
+                {plan.data && (
+                    <>
+                        <div className="mb-4 flex items-center justify-between">
+                            <ViewToggle
+                                value={view}
+                                onChange={(next) =>
+                                    setSearchParams(
+                                        next === "board"
+                                            ? {}
+                                            : { view: next },
+                                        { replace: true },
+                                    )
+                                }
+                            />
+                        </div>
+                        {moveTask.isError && (
+                            <div className="mb-4">
+                                <InlineError
+                                    message={t("plan.board.moveError")}
                                 />
                             </div>
-                            {moveTask.isError && (
-                                <div className="mb-4">
-                                    <InlineError
-                                        message={t("plan.board.moveError")}
-                                    />
-                                </div>
-                            )}
-                            {moveStatus.isError && (
-                                <div className="mb-4">
-                                    <InlineError
-                                        message={t("plan.board.moveStatusError")}
-                                    />
-                                </div>
-                            )}
-                            {boardLoading && (
-                                <div
-                                    aria-busy="true"
-                                    className="flex gap-4"
-                                >
-                                    {[0, 1, 2].map((i) => (
-                                        <div
-                                            key={i}
-                                            className="h-64 w-72 animate-pulse rounded-lg border border-gray-200 bg-gray-100"
-                                        />
-                                    ))}
-                                </div>
-                            )}
-                            {boardError && (
+                        )}
+                        {moveStatus.isError && (
+                            <div className="mb-4">
                                 <InlineError
-                                    message={t("plan.board.loadError")}
-                                    onRetry={() => {
-                                        void statuses.refetch();
-                                        void tasks.refetch();
-                                    }}
+                                    message={t("plan.board.moveStatusError")}
                                 />
-                            )}
-                            {statuses.data && tasks.data && (
-                                <PlanBoard
-                                    statuses={statuses.data}
-                                    tasks={tasks.data}
-                                    layout={view}
-                                    onMove={(move) => moveTask.mutate(move)}
-                                    onMoveStatus={(move) =>
-                                        moveStatus.mutate(move)
-                                    }
-                                    onAddTask={setNewTaskStatusId}
-                                    onTaskAction={(task, action) =>
-                                        setTaskAction({ task, action })
-                                    }
-                                    onCreateStatus={() =>
-                                        setIsStatusModalOpen(true)
-                                    }
-                                    onOpenTask={(task) => setOpenTaskId(task.id)}
-                                    onEditStatus={setEditingStatus}
-                                />
-                            )}
-                        </>
-                    )}
-                </main>
-            </div>
+                            </div>
+                        )}
+                        {boardLoading && (
+                            <div
+                                aria-busy="true"
+                                className="flex gap-4"
+                            >
+                                {[0, 1, 2].map((i) => (
+                                    <div
+                                        key={i}
+                                        className="h-64 w-72 animate-pulse rounded-lg border border-gray-200 bg-gray-100"
+                                    />
+                                ))}
+                            </div>
+                        )}
+                        {boardError && (
+                            <InlineError
+                                message={t("plan.board.loadError")}
+                                onRetry={() => {
+                                    void statuses.refetch();
+                                    void tasks.refetch();
+                                }}
+                            />
+                        )}
+                        {statuses.data && tasks.data && (
+                            <PlanBoard
+                                statuses={statuses.data}
+                                tasks={tasks.data}
+                                layout={view}
+                                onMove={(move) => moveTask.mutate(move)}
+                                onMoveStatus={(move) =>
+                                    moveStatus.mutate(move)
+                                }
+                                onAddTask={setNewTaskStatusId}
+                                onTaskAction={(task, action) =>
+                                    setTaskAction({ task, action })
+                                }
+                                onCreateStatus={() =>
+                                    setIsStatusModalOpen(true)
+                                }
+                                onOpenTask={(task) => setOpenTaskId(task.id)}
+                                onEditStatus={setEditingStatus}
+                            />
+                        )}
+                    </>
+                )}
+            </main>
 
             <Modal
                 isOpen={newTaskStatusId !== null}
