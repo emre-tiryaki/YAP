@@ -40,7 +40,7 @@ export function PlanTaskCard({
     const params = useParams();
     const projectId = location.projectId ?? params.projectId ?? "";
     const planId = location.planId ?? params.planId ?? "";
-    const isDone = task.statusCategory === "done";
+    const isDone = task.completedAt !== null;
     const hasSubtasks = task.subtaskCount > 0;
     const allSubtasksDone =
         hasSubtasks && task.doneSubtaskCount === task.subtaskCount;
@@ -56,7 +56,7 @@ export function PlanTaskCard({
             } ${
                 isOverlay
                     ? "cursor-grabbing shadow-lg"
-                    : `${isDraggable ? "cursor-grab" : "cursor-pointer"} shadow-sm hover:border-gray-400`
+                    : `${isDraggable ? "cursor-grab" : "cursor-pointer"} shadow-sm transition-colors hover:border-accent/50`
             }`}
         >
             <div className="flex min-w-0 flex-1 items-start gap-2">

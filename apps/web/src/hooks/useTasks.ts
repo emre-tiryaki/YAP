@@ -109,8 +109,8 @@ export function useMoveTask(projectId: string, planId: string) {
                 (old) => old && applyMove(old, move),
             );
         },
-        // On failure the refetch restores the server's order. A status
-        // change can move the task in or out of the upcoming list too.
+        // On failure the refetch restores the server's order; the upcoming
+        // list shows the task's status too.
         onSettled: () =>
             Promise.all([
                 queryClient.invalidateQueries({
@@ -180,7 +180,7 @@ type SetDoneVariables = {
 };
 
 // Checks a subtask off (or back on). The checkbox flips at once; the refetch
-// afterwards brings the real status and the parent's counts.
+// afterwards brings the real completion time and the parent's counts.
 export function useSetSubtaskDone(parentId: string) {
     const queryClient = useQueryClient();
     const key = subtasksKey(parentId);
@@ -193,11 +193,31 @@ export function useSetSubtaskDone(parentId: string) {
             queryClient.setQueryData<Subtask[]>(key, (old) =>
                 old?.map((sub) =>
                     sub.id === taskId
-                        ? {
-                              ...sub,
-                              statusCategory: done ? "done" : "todo",
-                          }
+                        ? { ...sub, completedAt: done ? new Date() : null }
                         : sub,
+                ),
+            );
+        },
+        onSettled: () => invalidateTaskViews(queryClient),
+    });
+}
+
+// Marks a plan task finished (or reopens it) without moving it on the board.
+// The check flips at once; the refetch brings the plan counts.
+export function useSetTaskDone(projectId: string, planId: string) {
+    const queryClient = useQueryClient();
+    const key = planTasksKey(projectId, planId);
+
+    return useMutation({
+        mutationFn: ({ taskId, done }: SetDoneVariables) =>
+            setTaskDone(taskId, done),
+        onMutate: async ({ taskId, done }) => {
+            await queryClient.cancelQueries({ queryKey: key });
+            queryClient.setQueryData<PlanTask[]>(key, (old) =>
+                old?.map((task) =>
+                    task.id === taskId
+                        ? { ...task, completedAt: done ? new Date() : null }
+                        : task,
                 ),
             );
         },

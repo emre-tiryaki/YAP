@@ -281,8 +281,10 @@ func TestTaskListUpcoming(t *testing.T) {
 	second := seedTask(t, db, s, plan, doing, "second", "a1", &d2)
 	first := seedTask(t, db, s, plan, todo, "first", "a2", &d1)
 	third := seedTask(t, db, s, secondPlan, secondStatuses[model.StatusToDo], "third", "a3", &d3)
-	finished := seedTask(t, db, s, plan, done, "finished", "a4", &d1)
+	// Completion, not the column, decides what is open.
+	finished := seedTask(t, db, s, plan, todo, "finished", "a4", &d1)
 	undated := seedTask(t, db, s, plan, todo, "undated", "a5", nil)
+	parked := seedTask(t, db, s, plan, done, "open in done column", "a9", nil)
 	deletedTask := seedTask(t, db, s, plan, todo, "deleted task", "a6", &d1)
 	removedAssignee := seedTask(t, db, s, plan, todo, "removed assignee", "a7", &d1)
 	notMine := seedTask(t, db, s, plan, todo, "not mine", "a8", &d1)
@@ -292,7 +294,7 @@ func TestTaskListUpcoming(t *testing.T) {
 	dpStatuses := seedStatuses(t, db, s.WorkspaceID, dpPlan.ID)
 	inDeletedProject := seedTask(t, db, s, dpPlan, dpStatuses[model.StatusToDo], "in deleted project", "a0", &d1)
 
-	for _, task := range []model.Task{second, first, third, finished, undated, deletedTask, removedAssignee, inDeletedProject} {
+	for _, task := range []model.Task{second, first, third, finished, undated, parked, deletedTask, removedAssignee, inDeletedProject} {
 		assign(t, db, s.WorkspaceID, task.ID, s.MembershipID)
 	}
 	assign(t, db, s.WorkspaceID, notMine.ID, colleague)
@@ -304,6 +306,7 @@ func TestTaskListUpcoming(t *testing.T) {
 	assign(t, db, foreign.WorkspaceID, foreignTask.ID, foreign.MembershipID)
 
 	mustExec(t, db, `UPDATE tasks SET deleted_at = ? WHERE id = ?`, baseNow, deletedTask.ID)
+	mustExec(t, db, `UPDATE tasks SET completed_at = ? WHERE id = ?`, baseNow, finished.ID)
 	mustExec(t, db, `UPDATE task_assignees SET removed_at = ? WHERE task_id = ?`, baseNow, removedAssignee.ID)
 	mustExec(t, db, `UPDATE projects SET deleted_at = ? WHERE id = ?`, baseNow, deletedProject.ID)
 
@@ -312,7 +315,7 @@ func TestTaskListUpcoming(t *testing.T) {
 		t.Fatalf("ListUpcoming() error = %v", err)
 	}
 
-	wantTitles := []string{"first", "second", "third", "undated"}
+	wantTitles := []string{"first", "second", "third", "undated", "open in done column"}
 	if len(got) != len(wantTitles) {
 		t.Fatalf("ListUpcoming() returned %d tasks (%+v), want %d", len(got), got, len(wantTitles))
 	}

@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { useTranslate } from "../hooks/useTranslate";
 import type { CardAction } from "../types/cardAction";
 import type { Project } from "../types/project";
-import { accentFor, initials } from "../util/accent";
+import { cardAccent as accent, initials } from "../util/accent";
 import { CardMenu } from "./CardMenu";
 import { ProjectDialogs } from "./ProjectDialogs";
 
@@ -14,7 +14,6 @@ type ProjectCardProps = {
 export function ProjectCard({ project }: ProjectCardProps) {
     const t = useTranslate();
     const [action, setAction] = useState<CardAction | null>(null);
-    const accent = accentFor(project.id);
 
     return (
         <div className="relative">

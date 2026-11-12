@@ -30,7 +30,7 @@ export function SubtaskList({ taskId }: SubtaskListProps) {
 
     const items = subtasks.data ?? [];
     const total = items.length;
-    const done = items.filter((sub) => sub.statusCategory === "done").length;
+    const done = items.filter((sub) => sub.completedAt !== null).length;
     const percent = total === 0 ? 0 : Math.round((done / total) * 100);
 
     function handleAdd(event: FormEvent<HTMLFormElement>) {
@@ -108,7 +108,7 @@ export function SubtaskList({ taskId }: SubtaskListProps) {
                             onToggle={() =>
                                 setDone.mutate({
                                     taskId: sub.id,
-                                    done: sub.statusCategory !== "done",
+                                    done: sub.completedAt === null,
                                 })
                             }
                             onRename={(title) =>
@@ -196,7 +196,7 @@ function SubtaskItem({
 }: SubtaskItemProps) {
     const t = useTranslate();
     const [title, setTitle] = useState(subtask.title);
-    const isDone = subtask.statusCategory === "done";
+    const isDone = subtask.completedAt !== null;
     const toggleLabel = isDone
         ? t("task.detail.markOpen")
         : t("task.detail.markDone");

@@ -156,11 +156,10 @@ func (*ProjectRepository) ListPlans(ctx context.Context, q database.DBTX, worksp
 				AND t.workspace_id = pl.workspace_id
 				AND t.deleted_at IS NULL),
 			(SELECT COUNT(*) FROM tasks t
-				JOIN statuses s ON s.id = t.status_id AND s.plan_id = t.plan_id
 				WHERE t.plan_id = pl.id
 				AND t.workspace_id = pl.workspace_id
 				AND t.deleted_at IS NULL
-				AND s.category = 'done')
+				AND t.completed_at IS NOT NULL)
 			 FROM plans pl
 			 LEFT JOIN teams tm ON tm.id = pl.team_id AND tm.workspace_id = pl.workspace_id
 			 WHERE pl.workspace_id = ? AND pl.project_id = ?
@@ -222,11 +221,10 @@ func (*ProjectRepository) GetPlan(ctx context.Context, q database.DBTX, workspac
 				AND t.workspace_id = pl.workspace_id
 				AND t.deleted_at IS NULL),
 			(SELECT COUNT(*) FROM tasks t
-				JOIN statuses s ON s.id = t.status_id AND s.plan_id = t.plan_id
 				WHERE t.plan_id = pl.id
 				AND t.workspace_id = pl.workspace_id
 				AND t.deleted_at IS NULL
-				AND s.category = 'done')
+				AND t.completed_at IS NOT NULL)
 		 FROM plans pl
 		 LEFT JOIN teams tm ON tm.id = pl.team_id AND tm.workspace_id = pl.workspace_id
 		 WHERE pl.id = ? AND pl.workspace_id = ? AND pl.project_id = ?

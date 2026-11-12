@@ -5,7 +5,7 @@ import {
     verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { FiEdit2, FiFlag, FiPlus } from "react-icons/fi";
+import { FiEdit2, FiPlus } from "react-icons/fi";
 import { MdDragIndicator } from "react-icons/md";
 import { useTranslate } from "../hooks/useTranslate";
 import type { Status } from "../types/status";
@@ -97,15 +97,6 @@ export function StatusColumn({
                     {status.title}
                 </h2>
                 <span className="text-xs text-gray-500">{tasks.length}</span>
-                {status.category === "done" && (
-                    <span
-                        title={t("plan.status.doneBadgeHint")}
-                        className="flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700"
-                    >
-                        <FiFlag aria-hidden />
-                        {t("plan.status.doneBadge")}
-                    </span>
-                )}
                 <button
                     type="button"
                     onClick={onEdit}

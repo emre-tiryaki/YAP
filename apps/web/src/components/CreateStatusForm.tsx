@@ -78,9 +78,6 @@ export function CreateStatusForm({
                     label: t(`status.category.${c}`),
                 }))}
             />
-            <p className="text-xs text-gray-500">
-                {t("plan.status.create.doneHint")}
-            </p>
             {createStatus.error && (
                 <p role="alert" className="text-sm text-red-600">
                     {t(errorKey(createStatus.error))}

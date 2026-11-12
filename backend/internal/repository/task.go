@@ -29,7 +29,7 @@ const taskCounts = `(SELECT COUNT(*) FROM tasks c
 	(SELECT COUNT(*) FROM tasks c
 	 JOIN statuses cs ON cs.id = c.status_id AND cs.plan_id = c.plan_id
 	 WHERE c.parent_id = t.id AND c.workspace_id = t.workspace_id
-	   AND c.deleted_at IS NULL AND cs.deleted_at IS NULL AND cs.category = 'done'),
+	   AND c.deleted_at IS NULL AND cs.deleted_at IS NULL AND c.completed_at IS NOT NULL),
 	(SELECT COUNT(*) FROM task_comments tc
 	 WHERE tc.task_id = t.id AND tc.workspace_id = t.workspace_id AND tc.deleted_at IS NULL)`
 
@@ -66,17 +66,14 @@ func (*TaskRepository) LastPosition(ctx context.Context, q database.DBTX, worksp
 }
 
 func (*TaskRepository) Insert(ctx context.Context, q database.DBTX, t model.Task, now string) error {
-	var dueDate any
-	if t.DueDate != nil {
-		dueDate = t.DueDate.UTC().Format(time.RFC3339)
-	}
+	dueDate := formatTime(t.DueDate)
 
 	_, err := q.ExecContext(ctx,
 		`INSERT INTO tasks
-			(id, workspace_id, project_id, plan_id, status_id, parent_id, created_by, title, description, position, due_date, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			(id, workspace_id, project_id, plan_id, status_id, parent_id, created_by, title, description, position, due_date, completed_at, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		t.ID, t.WorkspaceID, t.ProjectID, t.PlanID, t.StatusID, nullIfEmpty(t.ParentID), t.CreatedBy, t.Title,
-		nullIfEmpty(t.Description), t.Position, dueDate, now, now,
+		nullIfEmpty(t.Description), t.Position, dueDate, formatTime(t.CompletedAt), now, now,
 	)
 	if err != nil {
 		return fmt.Errorf("insert task: %w", err)
@@ -96,23 +93,23 @@ func (*TaskRepository) InsertAssignee(ctx context.Context, q database.DBTX, work
 	return nil
 }
 
-// ListUpcoming returns the member's open (not done) tasks: dated ones first by
+// ListUpcoming returns the member's open (not completed) tasks: dated ones first by
 // due date, then the undated ones.
 func (*TaskRepository) ListUpcoming(ctx context.Context, q database.DBTX, workspaceID, membershipID string, limit int) ([]model.Task, error) {
 	rows, err := q.QueryContext(ctx,
 		`SELECT t.id, t.title, t.description, t.project_id, t.plan_id, t.status_id, t.position,
-			p.name, t.due_date, s.category
+			p.name, t.due_date, s.category, t.completed_at
 		 FROM task_assignees ta
 		 JOIN tasks t ON t.id = ta.task_id AND t.workspace_id = ta.workspace_id
 		 JOIN projects p ON p.id = t.project_id AND p.workspace_id = t.workspace_id
 		 JOIN statuses s ON s.id = t.status_id AND s.plan_id = t.plan_id
 		 WHERE ta.workspace_id = ? AND ta.membership_id = ? AND ta.removed_at IS NULL
 		   AND t.deleted_at IS NULL AND p.deleted_at IS NULL AND s.deleted_at IS NULL
-		   AND s.category <> ?
+		   AND t.completed_at IS NULL
 		   AND `+notNestedSubtask+`
 		 ORDER BY t.due_date IS NULL, t.due_date, t.id
 		 LIMIT ?`,
-		workspaceID, membershipID, string(model.StatusDone), limit,
+		workspaceID, membershipID, limit,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("list upcoming tasks: %w", err)
@@ -122,20 +119,16 @@ func (*TaskRepository) ListUpcoming(ctx context.Context, q database.DBTX, worksp
 	tasks := []model.Task{}
 	for rows.Next() {
 		t := model.Task{WorkspaceID: workspaceID}
-		var description, dueDate sql.NullString
+		var description, dueDate, completedAt sql.NullString
 		var category string
 		if err := rows.Scan(&t.ID, &t.Title, &description, &t.ProjectID, &t.PlanID, &t.StatusID, &t.Position,
-			&t.ProjectName, &dueDate, &category); err != nil {
+			&t.ProjectName, &dueDate, &category, &completedAt); err != nil {
 			return nil, fmt.Errorf("scan task: %w", err)
 		}
 		t.Description = description.String
 		t.StatusCategory = model.StatusCategory(category)
-		if dueDate.Valid {
-			parsed, err := time.Parse(time.RFC3339, dueDate.String)
-			if err != nil {
-				return nil, fmt.Errorf("parse due date: %w", err)
-			}
-			t.DueDate = &parsed
+		if err := scanTaskTimes(&t, dueDate, completedAt); err != nil {
+			return nil, err
 		}
 		tasks = append(tasks, t)
 	}
@@ -148,7 +141,7 @@ func (*TaskRepository) ListUpcoming(ctx context.Context, q database.DBTX, worksp
 func (*TaskRepository) ListByPlan(ctx context.Context, q database.DBTX, workspaceID, planID string) ([]model.Task, error) {
 	rows, err := q.QueryContext(ctx,
 		`SELECT t.id, t.project_id, t.status_id, t.created_by, t.title, t.description,
-			t.position, t.due_date, s.category, `+taskCounts+`
+			t.position, t.due_date, s.category, t.completed_at, `+taskCounts+`
 		 FROM tasks t
 		 JOIN statuses s ON s.id = t.status_id AND s.plan_id = t.plan_id
 		 WHERE t.workspace_id = ? AND t.plan_id = ?
@@ -165,20 +158,16 @@ func (*TaskRepository) ListByPlan(ctx context.Context, q database.DBTX, workspac
 	tasks := []model.Task{}
 	for rows.Next() {
 		t := model.Task{WorkspaceID: workspaceID, PlanID: planID}
-		var description, dueDate sql.NullString
+		var description, dueDate, completedAt sql.NullString
 		var category string
 		if err := rows.Scan(&t.ID, &t.ProjectID, &t.StatusID, &t.CreatedBy, &t.Title, &description,
-			&t.Position, &dueDate, &category, &t.SubtaskCount, &t.DoneSubtaskCount, &t.CommentCount); err != nil {
+			&t.Position, &dueDate, &category, &completedAt, &t.SubtaskCount, &t.DoneSubtaskCount, &t.CommentCount); err != nil {
 			return nil, fmt.Errorf("scan task: %w", err)
 		}
 		t.Description = description.String
 		t.StatusCategory = model.StatusCategory(category)
-		if dueDate.Valid {
-			parsed, err := time.Parse(time.RFC3339, dueDate.String)
-			if err != nil {
-				return nil, fmt.Errorf("parse due date: %w", err)
-			}
-			t.DueDate = &parsed
+		if err := scanTaskTimes(&t, dueDate, completedAt); err != nil {
+			return nil, err
 		}
 		tasks = append(tasks, t)
 	}
@@ -295,40 +284,33 @@ func (*TaskRepository) SoftDeleteTree(ctx context.Context, q database.DBTX, work
 // Get returns a non-deleted task with its project name and status category.
 func (*TaskRepository) Get(ctx context.Context, q database.DBTX, workspaceID, taskID string) (model.Task, error) {
 	t := model.Task{ID: taskID, WorkspaceID: workspaceID}
-	var description, dueDate, parentID sql.NullString
+	var description, dueDate, completedAt, parentID sql.NullString
 	var category string
 	err := q.QueryRowContext(ctx,
 		`SELECT t.project_id, p.name, t.plan_id, t.status_id, t.parent_id, t.created_by, t.title,
-			t.description, t.position, t.due_date, s.category, `+taskCounts+`
+			t.description, t.position, t.due_date, s.category, t.completed_at, `+taskCounts+`
 		 FROM tasks t
 		 JOIN projects p ON p.id = t.project_id AND p.workspace_id = t.workspace_id
 		 JOIN statuses s ON s.id = t.status_id AND s.plan_id = t.plan_id
 		 WHERE t.id = ? AND t.workspace_id = ? AND t.deleted_at IS NULL`,
 		taskID, workspaceID,
 	).Scan(&t.ProjectID, &t.ProjectName, &t.PlanID, &t.StatusID, &parentID, &t.CreatedBy, &t.Title,
-		&description, &t.Position, &dueDate, &category, &t.SubtaskCount, &t.DoneSubtaskCount, &t.CommentCount)
+		&description, &t.Position, &dueDate, &category, &completedAt, &t.SubtaskCount, &t.DoneSubtaskCount, &t.CommentCount)
 	if err != nil {
 		return model.Task{}, fmt.Errorf("get task: %w", err)
 	}
 	t.ParentID = parentID.String
 	t.Description = description.String
 	t.StatusCategory = model.StatusCategory(category)
-	if dueDate.Valid {
-		parsed, err := time.Parse(time.RFC3339, dueDate.String)
-		if err != nil {
-			return model.Task{}, fmt.Errorf("parse due date: %w", err)
-		}
-		t.DueDate = &parsed
+	if err := scanTaskTimes(&t, dueDate, completedAt); err != nil {
+		return model.Task{}, err
 	}
 	return t, nil
 }
 
 // Update overwrites the title, description and due date of a non-deleted task.
 func (*TaskRepository) Update(ctx context.Context, q database.DBTX, workspaceID, taskID, title, description string, dueDate *time.Time, now string) error {
-	var due any
-	if dueDate != nil {
-		due = dueDate.UTC().Format(time.RFC3339)
-	}
+	due := formatTime(dueDate)
 	_, err := q.ExecContext(ctx,
 		`UPDATE tasks SET title = ?, description = ?, due_date = ?, updated_at = ?
 		 WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`,
@@ -344,7 +326,7 @@ func (*TaskRepository) Update(ctx context.Context, q database.DBTX, workspaceID,
 func (*TaskRepository) ListSubtasks(ctx context.Context, q database.DBTX, workspaceID, parentID string) ([]model.Task, error) {
 	rows, err := q.QueryContext(ctx,
 		`SELECT t.id, t.project_id, t.plan_id, t.status_id, t.created_by, t.title, t.description,
-			t.position, t.due_date, s.category
+			t.position, t.due_date, s.category, t.completed_at
 		 FROM tasks t
 		 JOIN statuses s ON s.id = t.status_id AND s.plan_id = t.plan_id
 		 WHERE t.workspace_id = ? AND t.parent_id = ?
@@ -360,20 +342,16 @@ func (*TaskRepository) ListSubtasks(ctx context.Context, q database.DBTX, worksp
 	tasks := []model.Task{}
 	for rows.Next() {
 		t := model.Task{WorkspaceID: workspaceID, ParentID: parentID}
-		var description, dueDate sql.NullString
+		var description, dueDate, completedAt sql.NullString
 		var category string
 		if err := rows.Scan(&t.ID, &t.ProjectID, &t.PlanID, &t.StatusID, &t.CreatedBy, &t.Title, &description,
-			&t.Position, &dueDate, &category); err != nil {
+			&t.Position, &dueDate, &category, &completedAt); err != nil {
 			return nil, fmt.Errorf("scan subtask: %w", err)
 		}
 		t.Description = description.String
 		t.StatusCategory = model.StatusCategory(category)
-		if dueDate.Valid {
-			parsed, err := time.Parse(time.RFC3339, dueDate.String)
-			if err != nil {
-				return nil, fmt.Errorf("parse due date: %w", err)
-			}
-			t.DueDate = &parsed
+		if err := scanTaskTimes(&t, dueDate, completedAt); err != nil {
+			return nil, err
 		}
 		tasks = append(tasks, t)
 	}
@@ -381,4 +359,48 @@ func (*TaskRepository) ListSubtasks(ctx context.Context, q database.DBTX, worksp
 		return nil, fmt.Errorf("list subtasks: %w", err)
 	}
 	return tasks, nil
+}
+
+// SetCompletedAt marks a non-deleted task finished at completedAt, or reopens
+// it when completedAt is nil. Its status and position are left alone.
+func (*TaskRepository) SetCompletedAt(ctx context.Context, q database.DBTX, workspaceID, taskID string, completedAt *time.Time, now string) error {
+	_, err := q.ExecContext(ctx,
+		`UPDATE tasks SET completed_at = ?, updated_at = ?
+		 WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`,
+		formatTime(completedAt), now, taskID, workspaceID,
+	)
+	if err != nil {
+		return fmt.Errorf("set task completed_at: %w", err)
+	}
+	return nil
+}
+
+// formatTime renders an optional time as a UTC RFC 3339 string, or NULL.
+func formatTime(v *time.Time) any {
+	if v == nil {
+		return nil
+	}
+	return v.UTC().Format(time.RFC3339)
+}
+
+// scanTaskTimes parses the optional due date and completion time of a task.
+func scanTaskTimes(t *model.Task, dueDate, completedAt sql.NullString) error {
+	for _, f := range []struct {
+		name string
+		src  sql.NullString
+		dst  **time.Time
+	}{
+		{"due date", dueDate, &t.DueDate},
+		{"completed_at", completedAt, &t.CompletedAt},
+	} {
+		if !f.src.Valid {
+			continue
+		}
+		parsed, err := time.Parse(time.RFC3339, f.src.String)
+		if err != nil {
+			return fmt.Errorf("parse %s: %w", f.name, err)
+		}
+		*f.dst = &parsed
+	}
+	return nil
 }

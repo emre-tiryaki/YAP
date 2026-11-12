@@ -4,7 +4,7 @@ import { Link } from "react-router";
 import { useTranslate } from "../hooks/useTranslate";
 import type { CardAction } from "../types/cardAction";
 import type { Plan } from "../types/plan";
-import { accentFor, initials } from "../util/accent";
+import { cardAccent as accent, initials } from "../util/accent";
 import { CardMenu } from "./CardMenu";
 import { PlanDialogs } from "./PlanDialogs";
 
@@ -15,7 +15,6 @@ type PlanCardProps = {
 export function PlanCard({ plan }: PlanCardProps) {
     const t = useTranslate();
     const [action, setAction] = useState<CardAction | null>(null);
-    const accent = accentFor(plan.id);
     const progress =
         plan.taskCount === 0
             ? 0

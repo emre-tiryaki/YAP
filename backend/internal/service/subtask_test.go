@@ -144,16 +144,19 @@ func TestSubtasksOnBoard(t *testing.T) {
 
 func TestSetDone(t *testing.T) {
 	tests := []struct {
-		name         string
-		startDone    bool
-		done         bool
-		wantCategory model.StatusCategory
-		wantMoved    bool
+		name      string
+		column    int // index into To Do, In Progress, Done
+		startDone bool
+		done      bool
+		wantDone  bool
+		wantWrite bool
 	}{
-		{"complete open task", false, true, model.StatusDone, true},
-		{"reopen finished task", true, false, model.StatusToDo, true},
-		{"complete finished task is a no-op", true, true, model.StatusDone, false},
-		{"reopen open task is a no-op", false, false, model.StatusToDo, false},
+		{"complete open task", 0, false, true, true, true},
+		{"complete task in progress", 1, false, true, true, true},
+		{"reopen finished task", 0, true, false, false, true},
+		{"reopen finished task in done column", 2, true, false, false, true},
+		{"complete finished task is a no-op", 0, true, true, true, false},
+		{"reopen open task is a no-op", 0, false, false, false, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -162,44 +165,42 @@ func TestSetDone(t *testing.T) {
 			project := env.project(t, "Alpha")
 			planID := env.planOf(t, project.ID)
 			statuses := env.statuses(t, project.ID, planID)
-			// Another finished task, so a completed task lands after it.
-			env.createTasks(t, project.ID, "earlier")
-			earlier, _ := env.tasks.ListByPlan(ctx, env.session, project.ID, planID)
-			if _, err := env.tasks.SetDone(ctx, env.session, earlier[0].ID, true); err != nil {
+			column := statuses[tt.column]
+
+			task, err := env.tasks.Create(ctx, env.session, project.ID, CreateTaskInput{Title: "task", PlanID: planID, StatusID: column.ID})
+			if err != nil {
 				t.Fatal(err)
 			}
-
-			task := env.createTasks(t, project.ID, "task")[0]
 			if tt.startDone {
 				if _, err := env.tasks.SetDone(ctx, env.session, task.ID, true); err != nil {
 					t.Fatal(err)
 				}
 			}
-			before := env.nullableColumn(t, `SELECT status_id || '|' || position FROM tasks WHERE id = ?`, task.ID)
+			const row = `SELECT status_id || '|' || position || '|' || COALESCE(completed_at, '') || '|' || updated_at FROM tasks WHERE id = ?`
+			const placement = `SELECT status_id || '|' || position FROM tasks WHERE id = ?`
+			if _, err := env.db.Exec(`UPDATE tasks SET updated_at = '2000-01-01T00:00:00Z' WHERE id = ?`, task.ID); err != nil {
+				t.Fatal(err)
+			}
+			before, beforePlacement := env.nullableColumn(t, row, task.ID), env.nullableColumn(t, placement, task.ID)
 
 			got, err := env.tasks.SetDone(ctx, env.session, task.ID, tt.done)
 			if err != nil {
 				t.Fatalf("SetDone() error = %v", err)
 			}
-			if got.StatusCategory != tt.wantCategory {
-				t.Errorf("category = %q, want %q", got.StatusCategory, tt.wantCategory)
+			if (got.CompletedAt != nil) != tt.wantDone {
+				t.Errorf("CompletedAt = %v, want done = %v", got.CompletedAt, tt.wantDone)
 			}
-			wantStatus := statuses[0].ID
-			if tt.wantCategory == model.StatusDone {
-				wantStatus = statuses[len(statuses)-1].ID
+			if stored := env.nullableColumn(t, `SELECT completed_at FROM tasks WHERE id = ?`, task.ID); (stored != nil) != tt.wantDone {
+				t.Errorf("stored completed_at = %v, want done = %v", stored, tt.wantDone)
 			}
-			if got.StatusID != wantStatus {
-				t.Errorf("status = %s, want %s", got.StatusID, wantStatus)
+			if got.StatusID != column.ID {
+				t.Errorf("status = %s, want it to stay in %s", got.StatusID, column.ID)
 			}
-			after := env.nullableColumn(t, `SELECT status_id || '|' || position FROM tasks WHERE id = ?`, task.ID)
-			if moved := *before != *after; moved != tt.wantMoved {
-				t.Errorf("moved = %v (%s -> %s), want %v", moved, *before, *after, tt.wantMoved)
+			if after := env.nullableColumn(t, placement, task.ID); *after != *beforePlacement {
+				t.Errorf("placement %s -> %s, want unchanged", *beforePlacement, *after)
 			}
-			if tt.done && tt.wantMoved {
-				titles := env.taskTitles(t, project.ID, planID, wantStatus)
-				if !equalStrings(titles, []string{"earlier", "task"}) {
-					t.Errorf("done column = %v, want task appended last", titles)
-				}
+			if wrote := *env.nullableColumn(t, row, task.ID) != *before; wrote != tt.wantWrite {
+				t.Errorf("row written = %v, want %v", wrote, tt.wantWrite)
 			}
 		})
 	}

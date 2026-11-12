@@ -85,8 +85,12 @@ func TestGetPlanCountsDoneTasks(t *testing.T) {
 	tasks := env.createTasks(t, project.ID, "a", "b", "c")
 	done := env.statuses(t, project.ID, planID)[2]
 
-	if err := env.tasks.Move(ctx, env.session, tasks[0].ID, MoveTaskInput{StatusID: done.ID}); err != nil {
+	// Sitting in the done column does not finish a task; only SetDone does.
+	if err := env.tasks.Move(ctx, env.session, tasks[2].ID, MoveTaskInput{StatusID: done.ID}); err != nil {
 		t.Fatalf("Move() error = %v", err)
+	}
+	if _, err := env.tasks.SetDone(ctx, env.session, tasks[0].ID, true); err != nil {
+		t.Fatalf("SetDone() error = %v", err)
 	}
 	if err := env.tasks.Delete(ctx, env.session, tasks[1].ID); err != nil {
 		t.Fatalf("Delete() error = %v", err)
@@ -213,21 +217,20 @@ func TestTaskCreateRejectsStatusOfAnotherPlan(t *testing.T) {
 
 func TestTaskMove(t *testing.T) {
 	tests := []struct {
-		name        string
-		task        int // index into a, b, c (all start in To Do)
-		status      int // index into To Do, In Progress, Done
-		index       int
-		wantTodo    []string
-		wantTarget  []string
-		wantDoneCat bool
+		name       string
+		task       int // index into a, b, c (all start in To Do)
+		status     int // index into To Do, In Progress, Done
+		index      int
+		wantTodo   []string
+		wantTarget []string
 	}{
-		{"to front of same status", 2, 0, 0, []string{"c", "a", "b"}, nil, false},
-		{"to middle of same status", 0, 0, 1, []string{"b", "a", "c"}, nil, false},
-		{"to end of same status", 0, 0, 2, []string{"b", "c", "a"}, nil, false},
-		{"index clamped to end", 0, 0, 99, []string{"b", "c", "a"}, nil, false},
-		{"negative index clamped to front", 1, 0, -5, []string{"b", "a", "c"}, nil, false},
-		{"into another status", 1, 1, 0, []string{"a", "c"}, []string{"b"}, false},
-		{"into done counts as done", 0, 2, 0, []string{"b", "c"}, []string{"a"}, true},
+		{"to front of same status", 2, 0, 0, []string{"c", "a", "b"}, nil},
+		{"to middle of same status", 0, 0, 1, []string{"b", "a", "c"}, nil},
+		{"to end of same status", 0, 0, 2, []string{"b", "c", "a"}, nil},
+		{"index clamped to end", 0, 0, 99, []string{"b", "c", "a"}, nil},
+		{"negative index clamped to front", 1, 0, -5, []string{"b", "a", "c"}, nil},
+		{"into another status", 1, 1, 0, []string{"a", "c"}, []string{"b"}},
+		{"into done does not finish the task", 0, 2, 0, []string{"b", "c"}, []string{"a"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -255,12 +258,8 @@ func TestTaskMove(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			wantDone := 0
-			if tt.wantDoneCat {
-				wantDone = 1
-			}
-			if plan.DoneCount != wantDone {
-				t.Errorf("DoneCount = %d, want %d", plan.DoneCount, wantDone)
+			if plan.DoneCount != 0 {
+				t.Errorf("DoneCount = %d, want 0: moving never finishes a task", plan.DoneCount)
 			}
 		})
 	}

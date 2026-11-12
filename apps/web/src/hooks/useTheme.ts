@@ -8,13 +8,18 @@ const darkQuery = "(prefers-color-scheme: dark)";
 // updates live when it changes. index.html applies the same rule before the
 // first paint so a dark page never flashes light.
 // The accent preference is mirrored to `data-accent` on <html>, which selects
-// the `--color-accent` palette in index.css.
+// the `--color-accent` palette in index.css, and the density preference to
+// `data-density`, which sets the `--spacing` scale there.
 export function useTheme() {
-  const { theme, accent } = usePreferences();
+  const { theme, accent, density } = usePreferences();
 
   useEffect(() => {
     document.documentElement.dataset.accent = accent;
   }, [accent]);
+
+  useEffect(() => {
+    document.documentElement.dataset.density = density;
+  }, [density]);
 
   useEffect(() => {
     const media = window.matchMedia(darkQuery);

@@ -8,6 +8,8 @@ export type PlanTask = {
   statusCategory: StatusCategory;
   position: string;
   dueDate: Date | null;
+  // Set while the task is finished; independent of the status it sits in.
+  completedAt: Date | null;
   subtaskCount: number;
   doneSubtaskCount: number;
   commentCount: number;
@@ -49,4 +51,5 @@ export type Subtask = {
   planId: string
   statusId: string
   statusCategory: StatusCategory
+  completedAt: Date | null
 }

@@ -28,6 +28,7 @@ import { useUpdateWorkspace, useWorkspace } from "../hooks/useWorkspace";
 import type {
   Accent,
   DateFormat,
+  Density,
   Language,
   SettingsSection,
   Theme,
@@ -38,9 +39,9 @@ import type { UpdateWorkspaceInput } from "../types/workspace";
 import { formatDate } from "../util/date";
 import type { StatusCategory } from "../types/task";
 
-// General, account and shortcut settings are applied and saved. Appearance,
-// categories and notifications are still design only: their controls keep
-// local state and nothing is saved.
+// General, account, shortcut and appearance settings (except the collapsed
+// sidebar default) are applied and saved. Categories and notifications are
+// still design only: their controls keep local state and nothing is saved.
 
 type IconType = ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
 
@@ -415,7 +416,7 @@ const accentSwatches: Record<Accent, string> = {
 
 function AppearanceSettings() {
   const t = useTranslate();
-  const { theme, accent } = usePreferences();
+  const { theme, accent, density } = usePreferences();
 
   return (
     <div className="flex flex-col gap-6">
@@ -474,6 +475,10 @@ function AppearanceSettings() {
         <SettingRow label={t("settings.appearance.density")}>
           <Segmented
             label={t("settings.appearance.density")}
+            value={density}
+            onChange={(density) =>
+              updatePreferences({ density: density as Density })
+            }
             options={[
               {
                 value: "comfortable",

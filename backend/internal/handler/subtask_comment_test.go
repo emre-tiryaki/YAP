@@ -19,13 +19,13 @@ func TestSubtaskEndpoints(t *testing.T) {
 
 	rec = env.do(t, http.MethodPost, "/api/tasks/"+sub.ID+"/done", `{"done":true}`)
 	wantStatus(t, rec, http.StatusOK)
-	if got := decode[subtaskResponse](t, rec); got.StatusCategory != "done" || got.StatusID != b.statuses[2].ID {
-		t.Errorf("POST done = %+v, want the Done status", got)
+	if got := decode[subtaskResponse](t, rec); got.CompletedAt == nil || got.StatusCategory != "todo" || got.StatusID != sub.StatusID {
+		t.Errorf("POST done = %+v, want completed and left in its status", got)
 	}
 
 	rec = env.do(t, http.MethodGet, "/api/tasks/"+parent.ID+"/subtasks", "")
 	wantStatus(t, rec, http.StatusOK)
-	if list := decode[[]subtaskResponse](t, rec); len(list) != 1 || list[0].ID != sub.ID || list[0].StatusCategory != "done" {
+	if list := decode[[]subtaskResponse](t, rec); len(list) != 1 || list[0].ID != sub.ID || list[0].CompletedAt == nil {
 		t.Errorf("GET subtasks = %+v", list)
 	}
 

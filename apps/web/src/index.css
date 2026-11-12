@@ -222,6 +222,16 @@
     :root[data-accent="emerald"] { --color-accent: var(--color-emerald-700); }
 }
 
+/* Compact density (`data-density` on <html>, set from the density preference,
+   see hooks/useTheme.ts). Every spacing and size utility (`p-4`, `gap-2`,
+   `h-8`, ...) is a multiple of `--spacing`, so shrinking the base unit
+   tightens the whole UI while font sizes stay as they are. */
+@layer theme {
+    :root[data-density="compact"] {
+        --spacing: 0.2rem;
+    }
+}
+
 @layer base {
     html {
         background-color: var(--color-white);

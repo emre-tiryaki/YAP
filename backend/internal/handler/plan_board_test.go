@@ -36,8 +36,10 @@ func TestPlanGetReportsCounts(t *testing.T) {
 	env := newTestEnv(t)
 	b := newPlanBoard(t, env)
 	done := b.statuses[2]
-	b.createTask(t, env, `{"title":"open"}`)
-	b.createTask(t, env, `{"title":"finished","plan_id":"`+b.plan.ID+`","status_id":"`+done.ID+`"}`)
+	// A task in the done column is not finished until it is marked done.
+	b.createTask(t, env, `{"title":"parked","plan_id":"`+b.plan.ID+`","status_id":"`+done.ID+`"}`)
+	finished := b.createTask(t, env, `{"title":"finished"}`)
+	wantStatus(t, env.do(t, http.MethodPost, "/api/tasks/"+finished.ID+"/done", `{"done":true}`), http.StatusOK)
 
 	rec := env.do(t, http.MethodGet, b.path(""), "")
 	wantStatus(t, rec, http.StatusOK)

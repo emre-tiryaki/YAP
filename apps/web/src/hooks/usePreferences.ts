@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 import type {
   Accent,
   DateFormat,
+  Density,
   Language,
   Preferences,
   Theme,
@@ -19,6 +20,7 @@ const weekStarts: readonly WeekStart[] = ["monday", "sunday"];
 const dateFormats: readonly DateFormat[] = ["dmy", "mdy", "iso"];
 const timeFormats: readonly TimeFormat[] = ["24h", "12h"];
 const themes: readonly Theme[] = ["light", "dark", "system"];
+const densities: readonly Density[] = ["comfortable", "compact"];
 export const accents: readonly Accent[] = [
   "neutral",
   "blue",
@@ -40,6 +42,7 @@ function defaults(): Preferences {
     shortcutsEnabled: true,
     theme: "system",
     accent: "neutral",
+    density: "comfortable",
   };
 }
 
@@ -74,6 +77,7 @@ function read(): Preferences {
         : base.shortcutsEnabled,
     theme: pick(themes, stored.theme, base.theme),
     accent: pick(accents, stored.accent, base.accent),
+    density: pick(densities, stored.density, base.density),
   };
   return cache;
 }

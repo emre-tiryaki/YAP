@@ -46,6 +46,7 @@ type TaskDto = {
     position: string;
     due_date: string | null;
     status_category: StatusCategory;
+    completed_at: string | null;
 };
 
 type PlanDto = {
@@ -78,6 +79,7 @@ type PlanTaskDto = {
     status_category: StatusCategory;
     position: string;
     due_date: string | null;
+    completed_at: string | null;
     // Sent for plan tasks; the upcoming list leaves them out.
     subtask_count?: number;
     done_subtask_count?: number;
@@ -91,6 +93,7 @@ type SubtaskDto = {
     plan_id: string;
     status_id: string;
     status_category: StatusCategory;
+    completed_at: string | null;
 };
 
 type CommentDto = {
@@ -187,6 +190,7 @@ function toPlanTask(dto: PlanTaskDto): PlanTask {
         statusCategory: dto.status_category,
         position: dto.position,
         dueDate: dto.due_date ? new Date(dto.due_date) : null,
+        completedAt: dto.completed_at ? new Date(dto.completed_at) : null,
         subtaskCount: dto.subtask_count ?? 0,
         doneSubtaskCount: dto.done_subtask_count ?? 0,
         commentCount: dto.comment_count ?? 0,
@@ -201,6 +205,7 @@ function toSubtask(dto: SubtaskDto): Subtask {
         planId: dto.plan_id,
         statusId: dto.status_id,
         statusCategory: dto.status_category,
+        completedAt: dto.completed_at ? new Date(dto.completed_at) : null,
     };
 }
 
@@ -439,7 +444,7 @@ export async function createSubtask(
     return toSubtask(dto);
 }
 
-// Moves the task to its plan's first done status, or back to the first todo one.
+// Marks the task finished or reopens it. Its status and position are kept.
 export async function setTaskDone(
     taskId: string,
     done: boolean,

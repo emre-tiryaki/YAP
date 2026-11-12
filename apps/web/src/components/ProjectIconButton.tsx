@@ -10,7 +10,6 @@ export function ProjectIconButton({ project }: ProjectIconButtonProps) {
     const update = useUpdateProject();
     return (
         <IconButton
-            id={project.id}
             name={project.name}
             icon={project.icon}
             error={update.error}

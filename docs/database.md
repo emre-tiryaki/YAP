@@ -115,6 +115,7 @@ erDiagram
         TEXT title
         TEXT description
         TEXT position
+        DATETIME completed_at
         DATETIME created_at
         DATETIME updated_at
         DATETIME deleted_at
@@ -209,7 +210,7 @@ Assumption: For workspaces where `kind = team`, the server is the source of trut
 | Team       | A permanent group of people within a workspace (Backend, Frontend, Mobile). Teams are flat; nested teams are not supported. |
 | Project    | A unit of work belonging to a workspace. It is associated with one or more teams and contains one or more plans. |
 | Plan       | A board inside a project. `team_id IS NULL` means the plan covers the whole project; otherwise it belongs to one team of that project. Statuses and tasks belong to a plan. |
-| Status     | A Kanban column belonging to a plan. The `category` field defines the column's meaning: `todo`, `in_progress`, or `done`. |
+| Status     | A Kanban column belonging to a plan. The `category` field labels the column: `todo`, `in_progress`, or `done`. It does not decide whether a task is finished; `tasks.completed_at` does. |
 | Task       | A unit of work within a plan and a status. The owning team is derived from the plan. |
 | Subtask    | A task with `parent_id` set. Subtasks are one level deep. A subtask in its parent's plan is shown inside the parent (as a checklist item) rather than on the board; a subtask in another plan is that plan's share of the work and stays on that plan's board. |
 | Comment    | A plain-text note a member leaves on a task. Only its author may edit or delete it. |
@@ -279,7 +280,8 @@ All of these rules are protected by unit tests.
 | A subtask cannot create a cycle. | Subtasks are one level deep: a subtask cannot get subtasks of its own (rejected as invalid input), which also rules out cycles on creation. |
 | Creating a subtask. | It goes into the parent's plan, in the plan's first `todo` status, and the creator is assigned, like any new task. The parent must exist and not be deleted. |
 | Board and upcoming lists leave out nested subtasks. | A subtask whose non-deleted parent is in the same plan is listed only under its parent. Each board task reports its direct subtask count, finished subtask count and comment count. |
-| Completing or reopening a task (`done` toggle). | Moves it to the end of its plan's first `done` status, or of its first `todo` status when reopened. A task already in the wanted state is left untouched. |
+| Completing or reopening a task (`done` toggle). | Sets `completed_at` to the current time, or clears it when reopened. The task's status and position are left alone. A task already in the wanted state is left untouched. |
+| A task is finished exactly while `completed_at` is set. | Independent of its status: moving a task into (or out of) a `done`-category status does not finish (or reopen) it. Plan done counts, finished subtask counts and the upcoming list all go by `completed_at`. |
 | Comment body. | Trimmed; empty is rejected; at most 10 000 code points. |
 | Only the author edits or deletes a comment. | Others get `forbidden`. Deleting is soft (`deleted_at`). |
 | Creating a project creates a default whole-project plan with the default statuses. | Done in one transaction. |
@@ -292,7 +294,7 @@ All of these rules are protected by unit tests.
 | A project or plan icon is a single emoji. | Trimmed; empty means no icon and is stored as `NULL`. At most 8 code points, with no letters, digits, ASCII characters or whitespace, so an emoji with skin tone, ZWJ sequence or flag fits but text does not. |
 | When a project is deleted. | Its `plans`, `statuses`, `tasks`, `task_comments` and `project_teams` rows are individually marked with `deleted_at` / `removed_at` within the same transaction. The system does not rely on the parent being hidden, because each row needs its own deletion record for synchronization. |
 | Moving a task to another plan. | The status is mapped to a status of the target plan, because status IDs belong to a single plan. |
-| Every plan has at least one `done`-category status. | Plan creation always inserts the default `Done` status. A task counts as finished exactly while its status has `category = 'done'`; there is no separate flag. Deleting the plan's last `done` status is rejected with a conflict; any future category change must reject it too. |
+| Every plan has at least one `done`-category status. | Plan creation always inserts the default `Done` status. Deleting the plan's last `done` status is rejected with a conflict; any future category change must reject it too. |
 | Reordering or moving a task within its plan. | Only the moved row is written: its `position` becomes the midpoint (`position.Between`) of its new neighbours in the target status. The target status must belong to the task's plan. |
 | Reordering a status within its plan. | Only the moved row is written: its `position` becomes the midpoint (`position.Between`) of its new neighbours among the plan's non-deleted statuses. Tasks keep their `status_id` and `position`. |
 | Editing a status. | Only `title`, `description` and `color` can be changed (`#rrggbb`, stored lowercase); the status must belong to the plan in the URL. `category` and `position` are left untouched, so the "at least one `done` status" rule cannot be broken by an edit. |
@@ -312,8 +314,8 @@ All of these rules are protected by unit tests.
 | projects       | Both     | Unit of work | `archived_at` indicates archival; `deleted_at` indicates deletion. `icon` is an optional emoji (`NULL` = none). |
 | project_teams  | Both     | Association between a project and a team | |
 | plans          | Both     | Board of a project, for the whole project or for one team | `team_id` is nullable; `archived_at` indicates archival. `icon` is an optional emoji (`NULL` = none). |
-| statuses       | Both     | Kanban columns belonging to a plan | The meaning of `done` is defined by `category`. |
-| tasks          | Both     | Tasks | `plan_id` and `project_id` are both stored; `parent_id` identifies a subtask. |
+| statuses       | Both     | Kanban columns belonging to a plan | `category` labels the column; it does not finish tasks. |
+| tasks          | Both     | Tasks | `plan_id` and `project_id` are both stored; `parent_id` identifies a subtask; `completed_at` is set while the task is finished. |
 | task_assignees | Both     | Person assignments to tasks | |
 | task_comments  | Both     | Comments on tasks | `author_id` is a membership; soft-deleted with `deleted_at`. |
 | invitations    | Server   | Workspace invitations | The token is never stored in plaintext; only its hash is stored. |

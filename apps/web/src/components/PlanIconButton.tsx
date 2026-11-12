@@ -10,7 +10,6 @@ export function PlanIconButton({ plan }: PlanIconButtonProps) {
     const update = useUpdatePlan(plan.projectId);
     return (
         <IconButton
-            id={plan.id}
             name={plan.name}
             icon={plan.icon}
             error={update.error}

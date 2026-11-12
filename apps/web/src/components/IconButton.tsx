@@ -1,13 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError } from "../api/client";
 import { useTranslate } from "../hooks/useTranslate";
-import { accentFor, initials } from "../util/accent";
+import { cardAccent as accent, initials } from "../util/accent";
 import { FormError } from "./FormError";
 import { IconPicker } from "./IconPicker";
 
 type IconButtonProps = {
-    // Used for the accent colour of the initials tile.
-    id: string;
     name: string;
     // A single emoji, or "" for none.
     icon: string;
@@ -21,7 +19,6 @@ type IconButtonProps = {
 // An icon tile (emoji, or initials when there is none). Clicking it opens a
 // picker that saves the chosen icon right away.
 export function IconButton({
-    id,
     name,
     icon,
     error,
@@ -31,7 +28,6 @@ export function IconButton({
     const t = useTranslate();
     const [isOpen, setIsOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
-    const accent = accentFor(id);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -84,7 +80,7 @@ export function IconButton({
                 title={t("icon.change")}
                 aria-haspopup="dialog"
                 aria-expanded={isOpen}
-                className={`grid size-12 cursor-pointer place-items-center rounded-lg font-semibold transition hover:ring-2 hover:ring-gray-300 focus-visible:outline-2 focus-visible:outline-accent ${
+                className={`grid size-12 cursor-pointer place-items-center rounded-lg font-semibold transition hover:ring-2 hover:ring-accent/50 focus-visible:outline-2 focus-visible:outline-accent ${
                     icon ? "text-3xl" : `text-base ${accent.tile}`
                 }`}
             >

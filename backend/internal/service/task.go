@@ -30,6 +30,7 @@ type TaskRepository interface {
 	Get(ctx context.Context, q database.DBTX, workspaceID, taskID string) (model.Task, error)
 	Update(ctx context.Context, q database.DBTX, workspaceID, taskID, title, description string, dueDate *time.Time, now string) error
 	ListSubtasks(ctx context.Context, q database.DBTX, workspaceID, parentID string) ([]model.Task, error)
+	SetCompletedAt(ctx context.Context, q database.DBTX, workspaceID, taskID string, completedAt *time.Time, now string) error
 }
 
 type CreateTaskInput struct {
@@ -327,9 +328,10 @@ func (s *TaskService) Subtasks(ctx context.Context, session model.Session, paren
 	return s.tasks.ListSubtasks(ctx, s.db, session.WorkspaceID, parentID)
 }
 
-// SetDone marks a task finished by moving it to the end of its plan's first
-// done status, or reopens it by moving it to the first todo status. A task
-// already in the wanted state is left where it is.
+// SetDone marks a task finished, or reopens it. Finishing is independent of
+// the board: the task keeps its status and position, and moving a task into
+// a done-category status does not finish it. A task already in the wanted
+// state is left untouched.
 func (s *TaskService) SetDone(ctx context.Context, session model.Session, taskID string, done bool) (model.Task, error) {
 	var task model.Task
 	err := database.WithTx(ctx, s.db, func(tx *sql.Tx) error {
@@ -338,30 +340,23 @@ func (s *TaskService) SetDone(ctx context.Context, session model.Session, taskID
 		if err != nil {
 			return err
 		}
-		if (task.StatusCategory == model.StatusDone) == done {
+		if (task.CompletedAt != nil) == done {
 			return nil
 		}
 
-		category := model.StatusToDo
+		now := nowUTC()
+		var completedAt *time.Time
 		if done {
-			category = model.StatusDone
-		}
-		statusID, err := s.tasks.FirstStatusID(ctx, tx, session.WorkspaceID, task.PlanID, category)
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return fmt.Errorf("%w: plan has no %s status", ErrConflict, category)
+			parsed, err := time.Parse(time.RFC3339, now)
+			if err != nil {
+				return fmt.Errorf("parse now: %w", err)
 			}
+			completedAt = &parsed
+		}
+		if err := s.tasks.SetCompletedAt(ctx, tx, session.WorkspaceID, taskID, completedAt, now); err != nil {
 			return err
 		}
-		last, err := s.tasks.LastPosition(ctx, tx, session.WorkspaceID, task.PlanID, statusID)
-		if err != nil {
-			return err
-		}
-		pos := position.After(last)
-		if err := s.tasks.UpdatePlacement(ctx, tx, session.WorkspaceID, taskID, statusID, pos, nowUTC()); err != nil {
-			return err
-		}
-		task.StatusID, task.StatusCategory, task.Position = statusID, category, pos
+		task.CompletedAt = completedAt
 		return nil
 	})
 	if err != nil {

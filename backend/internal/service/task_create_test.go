@@ -350,11 +350,7 @@ func TestTaskUpcomingExcludesDoneTasks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = env.db.Exec(
-		`UPDATE tasks SET status_id = (SELECT id FROM statuses WHERE plan_id = ? AND category = 'done') WHERE id = ?`,
-		finished.PlanID, finished.ID,
-	)
-	if err != nil {
+	if _, err := env.tasks.SetDone(ctx, env.session, finished.ID, true); err != nil {
 		t.Fatal(err)
 	}
 

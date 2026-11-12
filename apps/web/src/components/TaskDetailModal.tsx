@@ -1,7 +1,11 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { FiCheck, FiTrash2, FiX } from "react-icons/fi";
 import { ApiError } from "../api/client";
-import { useMoveTask, useUpdateTask } from "../hooks/useTasks";
+import {
+    useMoveTask,
+    useSetTaskDone,
+    useUpdateTask,
+} from "../hooks/useTasks";
 import { useTranslate } from "../hooks/useTranslate";
 import type { Status } from "../types/status";
 import type { PlanTask, UpdateTaskInput } from "../types/task";
@@ -113,15 +117,12 @@ function TaskDetailBody({
     const t = useTranslate();
     const update = useUpdateTask();
     const move = useMoveTask(projectId, planId);
+    const setDone = useSetTaskDone(projectId, planId);
     const [title, setTitle] = useState(task.title);
     const [description, setDescription] = useState(task.description);
 
     const status = statuses.find((s) => s.id === task.statusId);
-    const isDone = task.statusCategory === "done";
-    // The status the round check button moves the task to.
-    const toggleTarget = statuses.find((s) =>
-        isDone ? s.category === "todo" : s.category === "done",
-    );
+    const isDone = task.completedAt !== null;
 
     function save(input: UpdateTaskInput) {
         update.mutate({ taskId: task.id, input });
@@ -159,7 +160,7 @@ function TaskDetailBody({
         update.error instanceof ApiError &&
         update.error.message === "invalid_input"
             ? t("plan.task.create.invalid")
-            : update.error || move.error
+            : update.error || move.error || setDone.error
               ? t("task.detail.saveError")
               : null;
 
@@ -181,9 +182,9 @@ function TaskDetailBody({
                                 ? t("task.detail.markOpen")
                                 : t("task.detail.markDone")
                         }
-                        disabled={!toggleTarget || move.isPending}
+                        disabled={setDone.isPending}
                         onClick={() =>
-                            toggleTarget && changeStatus(toggleTarget.id)
+                            setDone.mutate({ taskId: task.id, done: !isDone })
                         }
                         className={`mt-2.5 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full border-2 transition-colors disabled:cursor-not-allowed ${
                             isDone

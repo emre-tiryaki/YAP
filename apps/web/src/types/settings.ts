@@ -21,6 +21,8 @@ export type Accent =
   | "rose"
   | "teal"
   | "emerald";
+// "compact" tightens the spacing scale (see index.css).
+export type Density = "comfortable" | "compact";
 
 // Per-device interface preferences.
 export type Preferences = {
@@ -31,4 +33,5 @@ export type Preferences = {
   shortcutsEnabled: boolean;
   theme: Theme;
   accent: Accent;
+  density: Density;
 };

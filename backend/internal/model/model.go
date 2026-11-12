@@ -82,6 +82,9 @@ type Task struct {
 	Position       string
 	StatusCategory StatusCategory
 	DueDate        *time.Time
+	// CompletedAt is set while the task is finished. It does not depend on
+	// the task's status: moving a task between columns leaves it alone.
+	CompletedAt *time.Time
 	// ParentID is empty for a top-level task.
 	ParentID         string
 	SubtaskCount     int

@@ -42,6 +42,7 @@ type taskResponse struct {
 	Position       string  `json:"position"`
 	DueDate        *string `json:"due_date"`
 	StatusCategory string  `json:"status_category"`
+	CompletedAt    *string `json:"completed_at"`
 }
 
 type createTaskRequest struct {
@@ -60,18 +61,20 @@ type planTaskResponse struct {
 	StatusCategory   string  `json:"status_category"`
 	Position         string  `json:"position"`
 	DueDate          *string `json:"due_date"`
+	CompletedAt      *string `json:"completed_at"`
 	SubtaskCount     int     `json:"subtask_count"`
 	DoneSubtaskCount int     `json:"done_subtask_count"`
 	CommentCount     int     `json:"comment_count"`
 }
 
 type subtaskResponse struct {
-	ID             string `json:"id"`
-	ParentID       string `json:"parent_id"`
-	Title          string `json:"title"`
-	PlanID         string `json:"plan_id"`
-	StatusID       string `json:"status_id"`
-	StatusCategory string `json:"status_category"`
+	ID             string  `json:"id"`
+	ParentID       string  `json:"parent_id"`
+	Title          string  `json:"title"`
+	PlanID         string  `json:"plan_id"`
+	StatusID       string  `json:"status_id"`
+	StatusCategory string  `json:"status_category"`
+	CompletedAt    *string `json:"completed_at"`
 }
 
 type createSubtaskRequest struct {
@@ -87,7 +90,7 @@ type moveTaskRequest struct {
 	Index    int    `json:"index"`
 }
 
-func formatDueDate(d *time.Time) *string {
+func formatTime(d *time.Time) *string {
 	if d == nil {
 		return nil
 	}
@@ -106,7 +109,8 @@ func toTaskResponse(t model.Task) taskResponse {
 		StatusID:       t.StatusID,
 		Position:       t.Position,
 		StatusCategory: string(t.StatusCategory),
-		DueDate:        formatDueDate(t.DueDate),
+		DueDate:        formatTime(t.DueDate),
+		CompletedAt:    formatTime(t.CompletedAt),
 	}
 }
 
@@ -118,7 +122,8 @@ func toPlanTaskResponse(t model.Task) planTaskResponse {
 		StatusID:         t.StatusID,
 		StatusCategory:   string(t.StatusCategory),
 		Position:         t.Position,
-		DueDate:          formatDueDate(t.DueDate),
+		DueDate:          formatTime(t.DueDate),
+		CompletedAt:      formatTime(t.CompletedAt),
 		SubtaskCount:     t.SubtaskCount,
 		DoneSubtaskCount: t.DoneSubtaskCount,
 		CommentCount:     t.CommentCount,
@@ -133,6 +138,7 @@ func toSubtaskResponse(t model.Task) subtaskResponse {
 		PlanID:         t.PlanID,
 		StatusID:       t.StatusID,
 		StatusCategory: string(t.StatusCategory),
+		CompletedAt:    formatTime(t.CompletedAt),
 	}
 }
 
