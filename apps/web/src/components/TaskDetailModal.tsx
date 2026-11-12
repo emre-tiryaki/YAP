@@ -27,7 +27,7 @@ type TaskDetailModalProps = {
     onClose: () => void;
 };
 
-// Centered dialog with every detail of a plan task. The wide left column holds
+// Side panel that slides in from the right with every detail of a plan task. The wide left column holds
 // the content (title, description, subtasks, comments); the right column holds
 // the properties. Fields are saved as soon as they are left or changed.
 export function TaskDetailModal({
@@ -58,13 +58,13 @@ export function TaskDetailModal({
     const status = statuses.find((s) => s.id === task.statusId);
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6">
+        <div className="fixed inset-0 z-50">
             <div
                 aria-hidden
                 onClick={() => setIsClosing(true)}
-                className={`absolute inset-0 bg-black/40 ${isClosing ? "animate-fade-out" : "animate-fade-in"}`}
+                className={`absolute inset-0 bg-black/30 ${isClosing ? "animate-fade-out" : "animate-fade-in"}`}
             />
-            <div
+            <aside
                 role="dialog"
                 aria-modal="true"
                 aria-label={t("task.detail.label")}
@@ -72,8 +72,8 @@ export function TaskDetailModal({
                     if (isClosing && event.target === event.currentTarget)
                         onClose();
                 }}
-                className={`relative flex h-full max-h-[52rem] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl ${
-                    isClosing ? "animate-modal-out" : "animate-modal-in"
+                className={`absolute inset-y-0 right-0 flex w-full max-w-5xl flex-col overflow-hidden bg-white shadow-2xl sm:w-[85vw] ${
+                    isClosing ? "animate-drawer-out" : "animate-drawer-in"
                 }`}
             >
                 <header className="flex items-center justify-between gap-4 border-b border-gray-200 px-5 py-3">
@@ -115,7 +115,7 @@ export function TaskDetailModal({
                     tasks={tasks}
                     onDelete={onDelete}
                 />
-            </div>
+            </aside>
         </div>
     );
 }
