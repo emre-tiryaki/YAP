@@ -34,7 +34,7 @@ export function PlanList({
                     {[0, 1, 2].map((i) => (
                         <div
                             key={i}
-                            className="h-24 animate-pulse rounded-lg border border-gray-200 bg-gray-100"
+                            className="h-40 animate-pulse rounded-xl border border-gray-200 bg-gray-100"
                         />
                     ))}
                 </div>
