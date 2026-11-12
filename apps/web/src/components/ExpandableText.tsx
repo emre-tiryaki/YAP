@@ -29,7 +29,7 @@ export function ExpandableText({ text, className = "" }: ExpandableTextProps) {
         <div>
             <p
                 ref={ref}
-                className={`break-words whitespace-pre-wrap ${
+                className={`wrap-break-word whitespace-pre-wrap ${
                     expanded ? "" : "line-clamp-4"
                 } ${className}`}
             >

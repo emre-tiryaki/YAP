@@ -9,6 +9,7 @@ import {
 import { useTranslate } from "../hooks/useTranslate";
 import type { Comment } from "../types/comment";
 import { formatRelativeTime } from "../util/date";
+import { ExpandableText } from "./ExpandableText";
 import { FormError } from "./FormError";
 import { InlineError } from "./InlineError";
 
@@ -255,9 +256,12 @@ function CommentItem({ taskId, comment }: CommentItemProps) {
                         />
                     </form>
                 ) : (
-                    <p className="rounded-lg rounded-tl-none bg-gray-50 px-3 py-2 text-sm wrap-break-word whitespace-pre-wrap text-gray-800">
-                        {comment.body}
-                    </p>
+                    <div className="rounded-lg rounded-tl-none bg-gray-50 px-3 py-2">
+                        <ExpandableText
+                            text={comment.body}
+                            className="text-sm text-gray-800"
+                        />
+                    </div>
                 )}
 
                 {isConfirmingDelete && (
