@@ -33,6 +33,7 @@ type Project struct {
 	WorkspaceID string
 	Name        string
 	Description string
+	Icon        string
 	TaskCount   int
 }
 

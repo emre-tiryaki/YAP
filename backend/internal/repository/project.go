@@ -17,7 +17,7 @@ func NewProjectRepository() *ProjectRepository {
 
 func (*ProjectRepository) List(ctx context.Context, q database.DBTX, workspaceID string) ([]model.Project, error) {
 	rows, err := q.QueryContext(ctx,
-		`SELECT p.id, p.name, p.description,
+		`SELECT p.id, p.name, p.description, p.icon,
 			(SELECT COUNT(*) FROM tasks t
 				WHERE t.project_id = p.id
 				AND t.workspace_id = p.workspace_id
@@ -35,11 +35,12 @@ func (*ProjectRepository) List(ctx context.Context, q database.DBTX, workspaceID
 	projects := []model.Project{}
 	for rows.Next() {
 		p := model.Project{WorkspaceID: workspaceID}
-		var description sql.NullString
-		if err := rows.Scan(&p.ID, &p.Name, &description, &p.TaskCount); err != nil {
+		var description, icon sql.NullString
+		if err := rows.Scan(&p.ID, &p.Name, &description, &icon, &p.TaskCount); err != nil {
 			return nil, fmt.Errorf("scan project: %w", err)
 		}
 		p.Description = description.String
+		p.Icon = icon.String
 		projects = append(projects, p)
 	}
 	if err := rows.Err(); err != nil {
@@ -50,9 +51,9 @@ func (*ProjectRepository) List(ctx context.Context, q database.DBTX, workspaceID
 
 func (*ProjectRepository) Insert(ctx context.Context, q database.DBTX, p model.Project, now string) error {
 	_, err := q.ExecContext(ctx,
-		`INSERT INTO projects (id, workspace_id, name, description, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?)`,
-		p.ID, p.WorkspaceID, p.Name, nullIfEmpty(p.Description), now, now,
+		`INSERT INTO projects (id, workspace_id, name, description, icon, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		p.ID, p.WorkspaceID, p.Name, nullIfEmpty(p.Description), nullIfEmpty(p.Icon), now, now,
 	)
 	if err != nil {
 		return fmt.Errorf("insert project: %w", err)
@@ -128,9 +129,9 @@ func (*ProjectRepository) PlanID(ctx context.Context, q database.DBTX, workspace
 
 func (*ProjectRepository) Get(ctx context.Context, q database.DBTX, workspaceID, projectID string) (model.Project, error) {
 	p := model.Project{ID: projectID, WorkspaceID: workspaceID}
-	var description sql.NullString
+	var description, icon sql.NullString
 	err := q.QueryRowContext(ctx,
-		`SELECT p.name, p.description,
+		`SELECT p.name, p.description, p.icon,
 			(SELECT COUNT(*) FROM tasks t
 				WHERE t.project_id = p.id
 				AND t.workspace_id = p.workspace_id
@@ -138,11 +139,12 @@ func (*ProjectRepository) Get(ctx context.Context, q database.DBTX, workspaceID,
 		 FROM projects p
 		 WHERE p.id = ? AND p.workspace_id = ? AND p.deleted_at IS NULL`,
 		projectID, workspaceID,
-	).Scan(&p.Name, &description, &p.TaskCount)
+	).Scan(&p.Name, &description, &icon, &p.TaskCount)
 	if err != nil {
 		return model.Project{}, fmt.Errorf("get project: %w", err)
 	}
 	p.Description = description.String
+	p.Icon = icon.String
 	return p, nil
 }
 
@@ -309,12 +311,12 @@ func (*ProjectRepository) UpdateStatus(ctx context.Context, q database.DBTX, wor
 	return nil
 }
 
-// Update overwrites the name and description of a non-deleted project.
-func (*ProjectRepository) Update(ctx context.Context, q database.DBTX, workspaceID, projectID, name, description, now string) error {
+// Update overwrites the name, description and icon of a non-deleted project.
+func (*ProjectRepository) Update(ctx context.Context, q database.DBTX, p model.Project, now string) error {
 	_, err := q.ExecContext(ctx,
-		`UPDATE projects SET name = ?, description = ?, updated_at = ?
+		`UPDATE projects SET name = ?, description = ?, icon = ?, updated_at = ?
 		 WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`,
-		name, nullIfEmpty(description), now, projectID, workspaceID,
+		p.Name, nullIfEmpty(p.Description), nullIfEmpty(p.Icon), now, p.ID, p.WorkspaceID,
 	)
 	if err != nil {
 		return fmt.Errorf("update project: %w", err)

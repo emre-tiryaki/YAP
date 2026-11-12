@@ -1,8 +1,10 @@
+import { ApiError } from "../api/client";
 import { useState, type FormEvent } from "react";
 import { useCreateProjects } from "../hooks/useProjects";
 import { useTranslate } from "../hooks/useTranslate";
 import { TextInput } from "./TextInput";
 import { SubmitButton } from "./SubmitButton";
+import { ProjectIconPicker } from "./ProjectIconPicker";
 import { useNavigate } from "react-router";
 
 type CreateProjectFormProps = {
@@ -15,11 +17,12 @@ export function CreateProjectForm({ onDone }: CreateProjectFormProps) {
     const navigate = useNavigate();
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
+    const [icon, setIcon] = useState("");
 
     function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         createProject.mutate(
-            { name, description },
+            { name, description, icon },
             {
                 onSuccess: (project) => {
                     onDone();
@@ -43,8 +46,14 @@ export function CreateProjectForm({ onDone }: CreateProjectFormProps) {
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
             />
+            <ProjectIconPicker value={icon} onChange={setIcon} />
             {createProject.isError && (
-                <p className="text-sm text-red-600">{t("common.error")}</p>
+                <p className="text-sm text-red-600">
+                    {createProject.error instanceof ApiError &&
+                    createProject.error.message === "invalid_input"
+                        ? t("project.invalid")
+                        : t("common.error")}
+                </p>
             )}
             <div>
                 <SubmitButton disabled={createProject.isPending}>

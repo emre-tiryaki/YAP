@@ -49,10 +49,12 @@ export function Sidebar() {
   }, [isCollapsed]);
 
   const projectItems = projects.data ?? [];
-  // Show the live project name, so a rename elsewhere is picked up at once.
-  const projectNames = new Map(projectItems.map((p) => [p.id, p.name]));
+  // Show the live project name and icon, so an edit elsewhere is picked up at once.
+  const projectsById = new Map(projectItems.map((p) => [p.id, p]));
   const pinLabel = (pin: Pin) =>
-    (pin.kind === "project" && projectNames.get(pin.id)) || pin.label;
+    (pin.kind === "project" && projectsById.get(pin.id)?.name) || pin.label;
+  const pinEmoji = (pin: Pin) =>
+    pin.kind === "project" ? projectsById.get(pin.id)?.icon : undefined;
 
   return (
     <aside
@@ -110,6 +112,7 @@ export function Sidebar() {
               href={pin.href}
               label={pinLabel(pin)}
               Icon={pin.kind === "project" ? FiFolder : FiCheckSquare}
+              emoji={pinEmoji(pin)}
               isActive={false}
               isCollapsed={isCollapsed}
               onUnpin={() =>
@@ -143,6 +146,7 @@ export function Sidebar() {
                 href={href}
                 label={project.name}
                 Icon={FiFolder}
+                emoji={project.icon}
                 isActive={
                   pathname === href || pathname.startsWith(`${href}/`)
                 }
@@ -183,6 +187,8 @@ type NavLinkProps = {
   href: string;
   label: string;
   Icon: IconType;
+  // Shown instead of Icon when set, e.g. a project's emoji.
+  emoji?: string;
   isActive: boolean;
   isCollapsed: boolean;
   onUnpin?: () => void;
@@ -192,6 +198,7 @@ function NavLink({
   href,
   label,
   Icon,
+  emoji,
   isActive,
   isCollapsed,
   onUnpin,
@@ -208,7 +215,13 @@ function NavLink({
           isCollapsed ? "justify-center px-2" : "px-3"
         } ${onUnpin && !isCollapsed ? "pr-8" : ""}`}
       >
-        <Icon aria-hidden className="shrink-0 text-base text-gray-500" />
+        {emoji ? (
+          <span aria-hidden className="w-4 shrink-0 text-center text-base leading-none">
+            {emoji}
+          </span>
+        ) : (
+          <Icon aria-hidden className="shrink-0 text-base text-gray-500" />
+        )}
         {isCollapsed ? (
           <span className="sr-only">{label}</span>
         ) : (

@@ -29,6 +29,7 @@ type ProjectDto = {
     id: string;
     name: string;
     description: string;
+    icon: string;
     task_count: number;
 };
 
@@ -112,6 +113,7 @@ function toProject(dto: ProjectDto): Project {
         id: dto.id,
         name: dto.name,
         description: dto.description,
+        icon: dto.icon,
         taskCount: dto.task_count,
     };
 }

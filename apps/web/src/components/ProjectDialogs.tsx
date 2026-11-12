@@ -59,6 +59,7 @@ export function ProjectDialogs({
                 isOpen={action === "edit"}
                 title={t("project.edit.title")}
                 initial={project}
+                withIcon
                 isPending={update.isPending}
                 errorMessage={updateError}
                 onSubmit={(input) =>

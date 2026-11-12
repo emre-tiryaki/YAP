@@ -39,16 +39,18 @@ type projectResponse struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	Icon        string `json:"icon"`
 	TaskCount   int    `json:"task_count"`
 }
 
 type createProjectRequest struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	Icon        string `json:"icon"`
 }
 
 func toProjectResponse(p model.Project) projectResponse {
-	return projectResponse{ID: p.ID, Name: p.Name, Description: p.Description, TaskCount: p.TaskCount}
+	return projectResponse{ID: p.ID, Name: p.Name, Description: p.Description, Icon: p.Icon, TaskCount: p.TaskCount}
 }
 
 func (h *ProjectHandler) list(w http.ResponseWriter, r *http.Request) {
@@ -73,6 +75,7 @@ func (h *ProjectHandler) create(w http.ResponseWriter, r *http.Request) {
 	project, err := h.svc.Create(r.Context(), h.session.WorkspaceID, service.CreateProjectInput{
 		Name:        req.Name,
 		Description: req.Description,
+		Icon:        req.Icon,
 	})
 	if err != nil {
 		writeError(w, r, err)
@@ -287,9 +290,11 @@ func parseStatusCategory(v string) (model.StatusCategory, error) {
 }
 
 // updateProjectRequest is a partial update: omitted (or null) fields are kept.
+// An empty icon removes it.
 type updateProjectRequest struct {
 	Name        *string `json:"name"`
 	Description *string `json:"description"`
+	Icon        *string `json:"icon"`
 }
 
 func (h *ProjectHandler) update(w http.ResponseWriter, r *http.Request) {
@@ -301,6 +306,7 @@ func (h *ProjectHandler) update(w http.ResponseWriter, r *http.Request) {
 	project, err := h.svc.Update(r.Context(), h.session.WorkspaceID, r.PathValue("id"), service.UpdateProjectInput{
 		Name:        req.Name,
 		Description: req.Description,
+		Icon:        req.Icon,
 	})
 	if err != nil {
 		writeError(w, r, err)

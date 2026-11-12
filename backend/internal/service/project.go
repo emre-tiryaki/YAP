@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/emre-tiryaki/YAP/backend/internal/database"
 	"github.com/emre-tiryaki/YAP/backend/internal/model"
@@ -31,7 +33,7 @@ type ProjectRepository interface {
 	LastStatusPosition(ctx context.Context, q database.DBTX, workspaceID, planID string) (string, error)
 	UpdateStatusPosition(ctx context.Context, q database.DBTX, workspaceID, statusID, pos, now string) error
 	UpdateStatus(ctx context.Context, q database.DBTX, workspaceID, statusID, title, description, color, now string) error
-	Update(ctx context.Context, q database.DBTX, workspaceID, projectID, name, description, now string) error
+	Update(ctx context.Context, q database.DBTX, p model.Project, now string) error
 	SoftDelete(ctx context.Context, q database.DBTX, workspaceID, projectID, now string) error
 	UpdatePlan(ctx context.Context, q database.DBTX, workspaceID, planID, name, description, now string) error
 	SoftDeletePlan(ctx context.Context, q database.DBTX, workspaceID, planID, now string) error
@@ -56,6 +58,7 @@ var defaultStatuses = []struct {
 type CreateProjectInput struct {
 	Name        string
 	Description string
+	Icon        string
 }
 
 type CreatePlanInput struct {
@@ -88,15 +91,20 @@ func (s *ProjectService) Create(ctx context.Context, workspaceID string, in Crea
 	if name == "" {
 		return model.Project{}, fmt.Errorf("%w: name is required", ErrInvalidInput)
 	}
+	icon, err := normalizeIcon(in.Icon)
+	if err != nil {
+		return model.Project{}, err
+	}
 
 	project := model.Project{
 		ID:          model.NewID(),
 		WorkspaceID: workspaceID,
 		Name:        name,
 		Description: strings.TrimSpace(in.Description),
+		Icon:        icon,
 	}
 
-	err := database.WithTx(ctx, s.db, func(tx *sql.Tx) error {
+	err = database.WithTx(ctx, s.db, func(tx *sql.Tx) error {
 		now := nowUTC()
 		if err := s.repo.Insert(ctx, tx, project, now); err != nil {
 			return err
@@ -415,6 +423,8 @@ func validCategory(c model.StatusCategory) bool {
 type UpdateProjectInput struct {
 	Name        *string
 	Description *string
+	// Icon set to "" removes the icon.
+	Icon *string
 }
 
 // UpdatePlanInput carries the fields to change; nil fields are kept.
@@ -423,13 +433,20 @@ type UpdatePlanInput struct {
 	Description *string
 }
 
-// Update changes the name and/or description of a project.
+// Update changes the name, description and/or icon of a project.
 func (s *ProjectService) Update(ctx context.Context, workspaceID, projectID string, in UpdateProjectInput) (model.Project, error) {
-	if in.Name == nil && in.Description == nil {
+	if in.Name == nil && in.Description == nil && in.Icon == nil {
 		return model.Project{}, fmt.Errorf("%w: nothing to update", ErrInvalidInput)
 	}
 	if in.Name != nil && strings.TrimSpace(*in.Name) == "" {
 		return model.Project{}, fmt.Errorf("%w: name is required", ErrInvalidInput)
+	}
+	var icon string
+	if in.Icon != nil {
+		var err error
+		if icon, err = normalizeIcon(*in.Icon); err != nil {
+			return model.Project{}, err
+		}
 	}
 
 	var project model.Project
@@ -448,7 +465,10 @@ func (s *ProjectService) Update(ctx context.Context, workspaceID, projectID stri
 		if in.Description != nil {
 			project.Description = strings.TrimSpace(*in.Description)
 		}
-		return s.repo.Update(ctx, tx, workspaceID, projectID, project.Name, project.Description, nowUTC())
+		if in.Icon != nil {
+			project.Icon = icon
+		}
+		return s.repo.Update(ctx, tx, project, nowUTC())
 	})
 	if err != nil {
 		return model.Project{}, err
@@ -534,4 +554,27 @@ func (s *ProjectService) DeletePlan(ctx context.Context, workspaceID, projectID,
 		}
 		return s.repo.SoftDeletePlan(ctx, tx, workspaceID, planID, nowUTC())
 	})
+}
+
+// maxIconRunes bounds a project icon. A single emoji can span several code
+// points (skin tones, ZWJ sequences, flags), so the limit is generous, but it
+// keeps the icon from turning into a second name.
+const maxIconRunes = 8
+
+// normalizeIcon trims the icon and rejects anything that is not a short run
+// of non-ASCII symbols. An empty result means "no icon".
+func normalizeIcon(raw string) (string, error) {
+	icon := strings.TrimSpace(raw)
+	if icon == "" {
+		return "", nil
+	}
+	if !utf8.ValidString(icon) || utf8.RuneCountInString(icon) > maxIconRunes {
+		return "", fmt.Errorf("%w: icon", ErrInvalidInput)
+	}
+	for _, r := range icon {
+		if r < utf8.RuneSelf || unicode.IsSpace(r) || unicode.IsLetter(r) || unicode.IsDigit(r) {
+			return "", fmt.Errorf("%w: icon", ErrInvalidInput)
+		}
+	}
+	return icon, nil
 }

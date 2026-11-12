@@ -77,6 +77,7 @@ erDiagram
         TEXT workspace_id FK
         TEXT name
         TEXT description
+        TEXT icon
         DATETIME created_at
         DATETIME updated_at
         DATETIME archived_at
@@ -265,6 +266,7 @@ All of these rules are protected by unit tests.
 | When a plan is deleted. | Its `statuses` and `tasks` rows are individually marked with `deleted_at` within the same transaction. |
 | A project keeps at least one whole-project plan. | Deleting the project's last non-deleted, non-archived plan with `team_id IS NULL` is rejected with a conflict, so tasks created without an explicit plan always have a default plan. |
 | Renaming a plan keeps plan names unique. | Same check as plan creation, scoped to the plan's own project and team and excluding the plan itself. |
+| A project icon is a single emoji. | Trimmed; empty means no icon and is stored as `NULL`. At most 8 code points, with no letters, digits, ASCII characters or whitespace, so an emoji with skin tone, ZWJ sequence or flag fits but text does not. |
 | When a project is deleted. | Its `plans`, `statuses`, `tasks`, and `project_teams` rows are individually marked with `deleted_at` / `removed_at` within the same transaction. The system does not rely on the parent being hidden, because each row needs its own deletion record for synchronization. |
 | Moving a task to another plan. | The status is mapped to a status of the target plan, because status IDs belong to a single plan. |
 | Every plan has at least one `done`-category status. | Plan creation always inserts the default `Done` status. A task counts as finished exactly while its status has `category = 'done'`; there is no separate flag. Deleting the plan's last `done` status is rejected with a conflict; any future category change must reject it too. |
@@ -284,7 +286,7 @@ All of these rules are protected by unit tests.
 | memberships    | Both     | Role connecting a user to a workspace | `created_by` and assignments reference this table. |
 | teams          | Both     | Groups of people within a workspace | |
 | team_members   | Both     | Team membership | `role`: `lead` or `member`. |
-| projects       | Both     | Unit of work | `archived_at` indicates archival; `deleted_at` indicates deletion. |
+| projects       | Both     | Unit of work | `archived_at` indicates archival; `deleted_at` indicates deletion. `icon` is an optional emoji (`NULL` = none). |
 | project_teams  | Both     | Association between a project and a team | |
 | plans          | Both     | Board of a project, for the whole project or for one team | `team_id` is nullable; `archived_at` indicates archival. |
 | statuses       | Both     | Kanban columns belonging to a plan | The meaning of `done` is defined by `category`. |

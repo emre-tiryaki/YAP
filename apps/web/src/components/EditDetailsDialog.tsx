@@ -2,25 +2,30 @@ import { useState, type FormEvent } from "react";
 import { useTranslate } from "../hooks/useTranslate";
 import { FormError } from "./FormError";
 import { Modal } from "./Modal";
+import { ProjectIconPicker } from "./ProjectIconPicker";
 import { SubmitButton } from "./SubmitButton";
 import { TextInput } from "./TextInput";
 
 export type DetailsValue = {
     name: string;
     description: string;
+    // Only set when the dialog edits an icon (projects).
+    icon?: string;
 };
 
 type EditDetailsDialogProps = {
     isOpen: boolean;
     title: string;
     initial: DetailsValue;
+    // Shows the emoji picker and includes `icon` in the submitted value.
+    withIcon?: boolean;
     isPending: boolean;
     errorMessage: string | null;
     onSubmit: (value: DetailsValue) => void;
     onClose: () => void;
 };
 
-// Edits the name and description of a project or plan.
+// Edits the name and description of a project or plan, plus a project's icon.
 export function EditDetailsDialog({
     isOpen,
     title,
@@ -41,6 +46,7 @@ type EditDetailsFormProps = Omit<
 
 function EditDetailsForm({
     initial,
+    withIcon = false,
     isPending,
     errorMessage,
     onSubmit,
@@ -48,10 +54,11 @@ function EditDetailsForm({
     const t = useTranslate();
     const [name, setName] = useState(initial.name);
     const [description, setDescription] = useState(initial.description);
+    const [icon, setIcon] = useState(initial.icon ?? "");
 
     function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
-        onSubmit({ name, description });
+        onSubmit(withIcon ? { name, description, icon } : { name, description });
     }
 
     return (
@@ -68,6 +75,7 @@ function EditDetailsForm({
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
             />
+            {withIcon && <ProjectIconPicker value={icon} onChange={setIcon} />}
             <FormError message={errorMessage} />
             <div>
                 <SubmitButton disabled={isPending || name.trim() === ""}>

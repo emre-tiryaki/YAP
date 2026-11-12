@@ -24,9 +24,11 @@ export function ProjectCard({ project }: ProjectCardProps) {
             >
                 <span
                     aria-hidden
-                    className={`grid size-10 shrink-0 place-items-center rounded-lg text-sm font-semibold ${accent.tile}`}
+                    className={`grid size-10 shrink-0 place-items-center rounded-lg font-semibold ${
+                        project.icon ? "text-2xl" : `text-sm ${accent.tile}`
+                    }`}
                 >
-                    {initials(project.name)}
+                    {project.icon || initials(project.name)}
                 </span>
                 <div className="min-w-0 flex-1">
                     <h3
