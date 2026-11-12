@@ -32,6 +32,8 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 		writeJSON(w, http.StatusNotFound, errorResponse{Error: "not_found"})
 	case errors.Is(err, service.ErrConflict):
 		writeJSON(w, http.StatusConflict, errorResponse{Error: "conflict"})
+	case errors.Is(err, service.ErrForbidden):
+		writeJSON(w, http.StatusForbidden, errorResponse{Error: "forbidden"})
 	default:
 		slog.Error("request failed", "method", r.Method, "path", r.URL.Path, "error", err)
 		writeJSON(w, http.StatusInternalServerError, errorResponse{Error: "internal"})

@@ -12,6 +12,27 @@ import (
 
 type TaskRepository struct{}
 
+// notNestedSubtask keeps a task `t` unless it is a subtask living in the same
+// plan as its parent; those are shown inside the parent instead of on the
+// board. A subtask in another plan (a team's share of the work) stays visible.
+const notNestedSubtask = `NOT EXISTS (
+	SELECT 1 FROM tasks parent
+	 WHERE parent.id = t.parent_id AND parent.workspace_id = t.workspace_id
+	   AND parent.plan_id = t.plan_id AND parent.deleted_at IS NULL)`
+
+// taskCounts selects the direct subtask, finished subtask and comment counts
+// of a task `t`.
+const taskCounts = `(SELECT COUNT(*) FROM tasks c
+	 JOIN statuses cs ON cs.id = c.status_id AND cs.plan_id = c.plan_id
+	 WHERE c.parent_id = t.id AND c.workspace_id = t.workspace_id
+	   AND c.deleted_at IS NULL AND cs.deleted_at IS NULL),
+	(SELECT COUNT(*) FROM tasks c
+	 JOIN statuses cs ON cs.id = c.status_id AND cs.plan_id = c.plan_id
+	 WHERE c.parent_id = t.id AND c.workspace_id = t.workspace_id
+	   AND c.deleted_at IS NULL AND cs.deleted_at IS NULL AND cs.category = 'done'),
+	(SELECT COUNT(*) FROM task_comments tc
+	 WHERE tc.task_id = t.id AND tc.workspace_id = t.workspace_id AND tc.deleted_at IS NULL)`
+
 func NewTaskRepository() *TaskRepository {
 	return &TaskRepository{}
 }
@@ -52,9 +73,9 @@ func (*TaskRepository) Insert(ctx context.Context, q database.DBTX, t model.Task
 
 	_, err := q.ExecContext(ctx,
 		`INSERT INTO tasks
-			(id, workspace_id, project_id, plan_id, status_id, created_by, title, description, position, due_date, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		t.ID, t.WorkspaceID, t.ProjectID, t.PlanID, t.StatusID, t.CreatedBy, t.Title,
+			(id, workspace_id, project_id, plan_id, status_id, parent_id, created_by, title, description, position, due_date, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		t.ID, t.WorkspaceID, t.ProjectID, t.PlanID, t.StatusID, nullIfEmpty(t.ParentID), t.CreatedBy, t.Title,
 		nullIfEmpty(t.Description), t.Position, dueDate, now, now,
 	)
 	if err != nil {
@@ -88,6 +109,7 @@ func (*TaskRepository) ListUpcoming(ctx context.Context, q database.DBTX, worksp
 		 WHERE ta.workspace_id = ? AND ta.membership_id = ? AND ta.removed_at IS NULL
 		   AND t.deleted_at IS NULL AND p.deleted_at IS NULL AND s.deleted_at IS NULL
 		   AND s.category <> ?
+		   AND `+notNestedSubtask+`
 		 ORDER BY t.due_date IS NULL, t.due_date, t.id
 		 LIMIT ?`,
 		workspaceID, membershipID, string(model.StatusDone), limit,
@@ -126,11 +148,12 @@ func (*TaskRepository) ListUpcoming(ctx context.Context, q database.DBTX, worksp
 func (*TaskRepository) ListByPlan(ctx context.Context, q database.DBTX, workspaceID, planID string) ([]model.Task, error) {
 	rows, err := q.QueryContext(ctx,
 		`SELECT t.id, t.project_id, t.status_id, t.created_by, t.title, t.description,
-			t.position, t.due_date, s.category
+			t.position, t.due_date, s.category, `+taskCounts+`
 		 FROM tasks t
 		 JOIN statuses s ON s.id = t.status_id AND s.plan_id = t.plan_id
 		 WHERE t.workspace_id = ? AND t.plan_id = ?
 		   AND t.deleted_at IS NULL AND s.deleted_at IS NULL
+		   AND `+notNestedSubtask+`
 		 ORDER BY s.position, s.id, t.position, t.id`,
 		workspaceID, planID,
 	)
@@ -145,7 +168,7 @@ func (*TaskRepository) ListByPlan(ctx context.Context, q database.DBTX, workspac
 		var description, dueDate sql.NullString
 		var category string
 		if err := rows.Scan(&t.ID, &t.ProjectID, &t.StatusID, &t.CreatedBy, &t.Title, &description,
-			&t.Position, &dueDate, &category); err != nil {
+			&t.Position, &dueDate, &category, &t.SubtaskCount, &t.DoneSubtaskCount, &t.CommentCount); err != nil {
 			return nil, fmt.Errorf("scan task: %w", err)
 		}
 		t.Description = description.String
@@ -234,7 +257,7 @@ func (*TaskRepository) UpdatePlacement(ctx context.Context, q database.DBTX, wor
 }
 
 // SoftDeleteTree marks the task and all of its non-deleted descendants as
-// deleted and closes their open assignments.
+// deleted, together with their comments, and closes their open assignments.
 func (*TaskRepository) SoftDeleteTree(ctx context.Context, q database.DBTX, workspaceID, taskID, now string) error {
 	const tree = `WITH RECURSIVE tree(id) AS (
 			SELECT id FROM tasks WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL
@@ -251,6 +274,14 @@ func (*TaskRepository) SoftDeleteTree(ctx context.Context, q database.DBTX, work
 		return fmt.Errorf("close task assignees: %w", err)
 	}
 	_, err = q.ExecContext(ctx,
+		tree+` UPDATE task_comments SET deleted_at = ?, updated_at = ?
+		 WHERE workspace_id = ? AND deleted_at IS NULL AND task_id IN (SELECT id FROM tree)`,
+		taskID, workspaceID, workspaceID, now, now, workspaceID,
+	)
+	if err != nil {
+		return fmt.Errorf("delete task comments: %w", err)
+	}
+	_, err = q.ExecContext(ctx,
 		tree+` UPDATE tasks SET deleted_at = ?, updated_at = ?
 		 WHERE workspace_id = ? AND id IN (SELECT id FROM tree)`,
 		taskID, workspaceID, workspaceID, now, now, workspaceID,
@@ -264,21 +295,22 @@ func (*TaskRepository) SoftDeleteTree(ctx context.Context, q database.DBTX, work
 // Get returns a non-deleted task with its project name and status category.
 func (*TaskRepository) Get(ctx context.Context, q database.DBTX, workspaceID, taskID string) (model.Task, error) {
 	t := model.Task{ID: taskID, WorkspaceID: workspaceID}
-	var description, dueDate sql.NullString
+	var description, dueDate, parentID sql.NullString
 	var category string
 	err := q.QueryRowContext(ctx,
-		`SELECT t.project_id, p.name, t.plan_id, t.status_id, t.created_by, t.title,
-			t.description, t.position, t.due_date, s.category
+		`SELECT t.project_id, p.name, t.plan_id, t.status_id, t.parent_id, t.created_by, t.title,
+			t.description, t.position, t.due_date, s.category, `+taskCounts+`
 		 FROM tasks t
 		 JOIN projects p ON p.id = t.project_id AND p.workspace_id = t.workspace_id
 		 JOIN statuses s ON s.id = t.status_id AND s.plan_id = t.plan_id
 		 WHERE t.id = ? AND t.workspace_id = ? AND t.deleted_at IS NULL`,
 		taskID, workspaceID,
-	).Scan(&t.ProjectID, &t.ProjectName, &t.PlanID, &t.StatusID, &t.CreatedBy, &t.Title,
-		&description, &t.Position, &dueDate, &category)
+	).Scan(&t.ProjectID, &t.ProjectName, &t.PlanID, &t.StatusID, &parentID, &t.CreatedBy, &t.Title,
+		&description, &t.Position, &dueDate, &category, &t.SubtaskCount, &t.DoneSubtaskCount, &t.CommentCount)
 	if err != nil {
 		return model.Task{}, fmt.Errorf("get task: %w", err)
 	}
+	t.ParentID = parentID.String
 	t.Description = description.String
 	t.StatusCategory = model.StatusCategory(category)
 	if dueDate.Valid {
@@ -306,4 +338,47 @@ func (*TaskRepository) Update(ctx context.Context, q database.DBTX, workspaceID,
 		return fmt.Errorf("update task: %w", err)
 	}
 	return nil
+}
+
+// ListSubtasks returns the non-deleted direct subtasks of a task, oldest first.
+func (*TaskRepository) ListSubtasks(ctx context.Context, q database.DBTX, workspaceID, parentID string) ([]model.Task, error) {
+	rows, err := q.QueryContext(ctx,
+		`SELECT t.id, t.project_id, t.plan_id, t.status_id, t.created_by, t.title, t.description,
+			t.position, t.due_date, s.category
+		 FROM tasks t
+		 JOIN statuses s ON s.id = t.status_id AND s.plan_id = t.plan_id
+		 WHERE t.workspace_id = ? AND t.parent_id = ?
+		   AND t.deleted_at IS NULL AND s.deleted_at IS NULL
+		 ORDER BY t.created_at, t.id`,
+		workspaceID, parentID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list subtasks: %w", err)
+	}
+	defer rows.Close()
+
+	tasks := []model.Task{}
+	for rows.Next() {
+		t := model.Task{WorkspaceID: workspaceID, ParentID: parentID}
+		var description, dueDate sql.NullString
+		var category string
+		if err := rows.Scan(&t.ID, &t.ProjectID, &t.PlanID, &t.StatusID, &t.CreatedBy, &t.Title, &description,
+			&t.Position, &dueDate, &category); err != nil {
+			return nil, fmt.Errorf("scan subtask: %w", err)
+		}
+		t.Description = description.String
+		t.StatusCategory = model.StatusCategory(category)
+		if dueDate.Valid {
+			parsed, err := time.Parse(time.RFC3339, dueDate.String)
+			if err != nil {
+				return nil, fmt.Errorf("parse due date: %w", err)
+			}
+			t.DueDate = &parsed
+		}
+		tasks = append(tasks, t)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list subtasks: %w", err)
+	}
+	return tasks, nil
 }

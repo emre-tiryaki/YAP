@@ -10,7 +10,7 @@ import { Modal } from "../components/Modal";
 import { PlanBoard } from "../components/PlanBoard";
 import { PlanHeader, PlanHeaderSkeleton } from "../components/PlanHeader";
 import { TaskDialogs } from "../components/TaskDialogs";
-import { TaskDrawer } from "../components/TaskDrawer";
+import { TaskDetailModal } from "../components/TaskDetailModal";
 import { TopBar } from "../components/TopBar";
 import type { BreadcrumbItem } from "../types/breadcrumb";
 import { ViewToggle, type BoardView } from "../components/ViewToggle";
@@ -54,7 +54,7 @@ export default function PlanDetailPage() {
         task: PlanTask;
         action: CardAction;
     } | null>(null);
-    // Looked up in the query data so the drawer always shows fresh values
+    // Looked up in the query data so the dialog always shows fresh values
     // and closes by itself once the task is gone.
     const [openTaskId, setOpenTaskId] = useState<string | null>(null);
     const openTask = tasks.data?.find((task) => task.id === openTaskId);
@@ -258,7 +258,7 @@ export default function PlanDetailPage() {
             />
 
             {openTask && statuses.data && tasks.data && (
-                <TaskDrawer
+                <TaskDetailModal
                     projectId={projectId}
                     planId={planId}
                     task={openTask}

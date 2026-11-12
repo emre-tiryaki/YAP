@@ -1,21 +1,23 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
-import { FiCalendar, FiCheckCircle, FiTrash2, FiX } from "react-icons/fi";
+import { FiCalendar, FiCheck, FiTrash2, FiX } from "react-icons/fi";
 import { ApiError } from "../api/client";
 import { useMoveTask, useUpdateTask } from "../hooks/useTasks";
 import { useTranslate } from "../hooks/useTranslate";
 import type { Status } from "../types/status";
 import type { PlanTask, UpdateTaskInput } from "../types/task";
 import { fromDateInputValue, toDateInputValue } from "../util/date";
+import { CommentSection } from "./CommentSection";
 import { FormError } from "./FormError";
+import { SubtaskList } from "./SubtaskList";
 
-// The editor pulls in TipTap, so it loads only once a drawer opens.
+// The editor pulls in TipTap, so it loads only once the dialog opens.
 const MarkdownEditor = lazy(() =>
     import("./MarkdownEditor").then((module) => ({
         default: module.MarkdownEditor,
     })),
 );
 
-type TaskDrawerProps = {
+type TaskDetailModalProps = {
     projectId: string;
     planId: string;
     task: PlanTask;
@@ -25,10 +27,10 @@ type TaskDrawerProps = {
     onClose: () => void;
 };
 
-// Side panel that slides in from the right with every detail of a plan task.
-// The wide left side edits the content; the right side holds the properties.
-// Changes are saved as soon as a field is left or changed.
-export function TaskDrawer({
+// Centered dialog with every detail of a plan task. The wide left column holds
+// the content (title, description, subtasks, comments); the right column holds
+// the properties. Fields are saved as soon as they are left or changed.
+export function TaskDetailModal({
     projectId,
     planId,
     task,
@@ -36,9 +38,9 @@ export function TaskDrawer({
     tasks,
     onDelete,
     onClose,
-}: TaskDrawerProps) {
+}: TaskDetailModalProps) {
     const t = useTranslate();
-    // Set while the slide-out animation runs; onClose fires when it ends.
+    // Set while the closing animation runs; onClose fires when it ends.
     const [isClosing, setIsClosing] = useState(false);
 
     useEffect(() => {
@@ -53,14 +55,16 @@ export function TaskDrawer({
         return () => document.removeEventListener("keydown", handleKeyDown);
     }, []);
 
+    const status = statuses.find((s) => s.id === task.statusId);
+
     return (
-        <div className="fixed inset-0 z-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6">
             <div
                 aria-hidden
                 onClick={() => setIsClosing(true)}
-                className={`absolute inset-0 bg-black/30 ${isClosing ? "animate-fade-out" : "animate-fade-in"}`}
+                className={`absolute inset-0 bg-black/40 ${isClosing ? "animate-fade-out" : "animate-fade-in"}`}
             />
-            <aside
+            <div
                 role="dialog"
                 aria-modal="true"
                 aria-label={t("task.detail.label")}
@@ -68,14 +72,29 @@ export function TaskDrawer({
                     if (isClosing && event.target === event.currentTarget)
                         onClose();
                 }}
-                className={`absolute inset-y-0 right-0 flex w-full max-w-4xl flex-col bg-white shadow-2xl sm:w-[85vw] ${
-                    isClosing ? "animate-drawer-out" : "animate-drawer-in"
+                className={`relative flex h-full max-h-[52rem] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl ${
+                    isClosing ? "animate-modal-out" : "animate-modal-in"
                 }`}
             >
-                <header className="flex items-center justify-between border-b border-gray-200 px-6 py-3">
-                    <span className="text-sm text-gray-500">
-                        {t("task.detail.label")}
-                    </span>
+                <header className="flex items-center justify-between gap-4 border-b border-gray-200 px-5 py-3">
+                    <div className="flex min-w-0 items-center gap-2 text-sm text-gray-500">
+                        <span>{t("task.detail.label")}</span>
+                        {status && (
+                            <>
+                                <span aria-hidden>·</span>
+                                <span className="flex items-center gap-1.5 rounded-full border border-gray-200 px-2 py-0.5 text-xs text-gray-700">
+                                    <span
+                                        aria-hidden
+                                        className="size-2 rounded-full"
+                                        style={{
+                                            backgroundColor: status.color,
+                                        }}
+                                    />
+                                    {status.title}
+                                </span>
+                            </>
+                        )}
+                    </div>
                     <button
                         type="button"
                         onClick={() => setIsClosing(true)}
@@ -87,7 +106,7 @@ export function TaskDrawer({
                     </button>
                 </header>
                 {/* Keyed so local field state resets when another task opens. */}
-                <TaskDrawerBody
+                <TaskDetailBody
                     key={task.id}
                     projectId={projectId}
                     planId={planId}
@@ -96,21 +115,21 @@ export function TaskDrawer({
                     tasks={tasks}
                     onDelete={onDelete}
                 />
-            </aside>
+            </div>
         </div>
     );
 }
 
-type TaskDrawerBodyProps = Omit<TaskDrawerProps, "onClose">;
+type TaskDetailBodyProps = Omit<TaskDetailModalProps, "onClose">;
 
-function TaskDrawerBody({
+function TaskDetailBody({
     projectId,
     planId,
     task,
     statuses,
     tasks,
     onDelete,
-}: TaskDrawerBodyProps) {
+}: TaskDetailBodyProps) {
     const t = useTranslate();
     const update = useUpdateTask();
     const move = useMoveTask(projectId, planId);
@@ -119,6 +138,10 @@ function TaskDrawerBody({
 
     const status = statuses.find((s) => s.id === task.statusId);
     const isDone = task.statusCategory === "done";
+    // The status the round check button moves the task to.
+    const toggleTarget = statuses.find((s) =>
+        isDone ? s.category === "todo" : s.category === "done",
+    );
 
     function save(input: UpdateTaskInput) {
         update.mutate({ taskId: task.id, input });
@@ -162,14 +185,34 @@ function TaskDrawerBody({
 
     return (
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto md:flex-row md:overflow-hidden">
-            <section className="flex min-w-0 flex-1 flex-col gap-4 p-6 md:overflow-y-auto md:p-8">
-                <div className="flex items-start gap-2">
-                    {isDone && (
-                        <FiCheckCircle
-                            aria-hidden
-                            className="mt-2 shrink-0 text-xl text-green-600"
-                        />
-                    )}
+            <section className="flex min-w-0 flex-1 flex-col gap-6 px-5 py-6 md:overflow-y-auto md:px-8">
+                <div className="flex items-start gap-3">
+                    <button
+                        type="button"
+                        role="checkbox"
+                        aria-checked={isDone}
+                        aria-label={
+                            isDone
+                                ? t("task.detail.markOpen")
+                                : t("task.detail.markDone")
+                        }
+                        title={
+                            isDone
+                                ? t("task.detail.markOpen")
+                                : t("task.detail.markDone")
+                        }
+                        disabled={!toggleTarget || move.isPending}
+                        onClick={() =>
+                            toggleTarget && changeStatus(toggleTarget.id)
+                        }
+                        className={`mt-2.5 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full border-2 transition-colors disabled:cursor-not-allowed ${
+                            isDone
+                                ? "border-green-600 bg-green-600 text-white"
+                                : "border-gray-300 text-transparent hover:border-green-600 hover:text-green-600"
+                        }`}
+                    >
+                        <FiCheck aria-hidden className="size-3.5" />
+                    </button>
                     <textarea
                         aria-label={t("form.title")}
                         placeholder={t("task.detail.titlePlaceholder")}
@@ -185,19 +228,22 @@ function TaskDrawerBody({
                                 event.currentTarget.blur();
                             }
                         }}
-                        className="field-sizing-content w-full resize-none rounded-md border border-transparent px-2 py-1 text-2xl font-semibold wrap-break-words hover:border-gray-200 focus:border-gray-300 focus:outline-none"
+                        className={`field-sizing-content w-full resize-none rounded-md border border-transparent px-2 py-1 text-2xl font-semibold wrap-break-word hover:border-gray-200 focus:border-gray-300 focus:outline-none ${
+                            isDone ? "text-gray-500" : "text-gray-900"
+                        }`}
                     />
                 </div>
-                <div className="flex flex-1 flex-col gap-1">
+
+                <div className="flex flex-col gap-1.5">
                     <label
                         htmlFor="task-detail-description"
-                        className="px-2 text-sm font-medium text-gray-700"
+                        className="text-sm font-semibold text-gray-800"
                     >
                         {t("form.description")}
                     </label>
                     <Suspense
                         fallback={
-                            <div className="min-h-72 flex-1 animate-pulse rounded-md border border-gray-200 bg-gray-50" />
+                            <div className="min-h-40 animate-pulse rounded-md border border-gray-200 bg-gray-50" />
                         }
                     >
                         <MarkdownEditor
@@ -210,9 +256,15 @@ function TaskDrawerBody({
                     </Suspense>
                 </div>
                 <FormError message={errorMessage} />
+
+                <hr className="border-gray-100" />
+                <SubtaskList taskId={task.id} />
+
+                <hr className="border-gray-100" />
+                <CommentSection taskId={task.id} />
             </section>
 
-            <aside className="flex w-full shrink-0 flex-col gap-5 border-t border-gray-200 bg-gray-50 p-6 md:w-72 md:overflow-y-auto md:border-t-0 md:border-l">
+            <aside className="flex w-full shrink-0 flex-col gap-5 border-t border-gray-200 bg-gray-50 p-5 md:w-72 md:overflow-y-auto md:border-t-0 md:border-l">
                 <h3 className="text-xs font-semibold tracking-wide text-gray-500 uppercase">
                     {t("task.detail.properties")}
                 </h3>

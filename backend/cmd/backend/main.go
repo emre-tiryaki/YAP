@@ -33,6 +33,7 @@ func main() {
 	sessionRepo := repository.NewSessionRepository()
 	projectRepo := repository.NewProjectRepository()
 	taskRepo := repository.NewTaskRepository()
+	commentRepo := repository.NewCommentRepository()
 
 	session, err := service.NewSessionService(db, sessionRepo).Bootstrap(ctx, cfg.DisplayName)
 	if err != nil {
@@ -41,12 +42,14 @@ func main() {
 
 	projectSvc := service.NewProjectService(db, projectRepo)
 	taskSvc := service.NewTaskService(db, projectRepo, taskRepo)
+	commentSvc := service.NewCommentService(db, taskRepo, commentRepo)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/hello-world", handler.HelloWorld)
 	handler.NewWorkspaceHandler(session).Register(mux)
 	handler.NewProjectHandler(session, projectSvc).Register(mux)
 	handler.NewTaskHandler(session, taskSvc).Register(mux)
+	handler.NewCommentHandler(session, commentSvc).Register(mux)
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,

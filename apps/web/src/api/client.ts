@@ -1,3 +1,4 @@
+import type { Comment } from "../types/comment";
 import type { CreatePlanInput, Plan, UpdatePlanInput } from "../types/plan";
 import type {
     CreateProjectInput,
@@ -14,6 +15,7 @@ import type {
     MoveTaskInput,
     PlanTask,
     StatusCategory,
+    Subtask,
     Task,
     UpdateTaskInput,
 } from "../types/task";
@@ -76,6 +78,30 @@ type PlanTaskDto = {
     status_category: StatusCategory;
     position: string;
     due_date: string | null;
+    // Sent for plan tasks; the upcoming list leaves them out.
+    subtask_count?: number;
+    done_subtask_count?: number;
+    comment_count?: number;
+};
+
+type SubtaskDto = {
+    id: string;
+    parent_id: string;
+    title: string;
+    plan_id: string;
+    status_id: string;
+    status_category: StatusCategory;
+};
+
+type CommentDto = {
+    id: string;
+    task_id: string;
+    author_id: string;
+    author_name: string;
+    body: string;
+    created_at: string;
+    updated_at: string;
+    is_own: boolean;
 };
 
 export class ApiError extends Error {
@@ -161,6 +187,33 @@ function toPlanTask(dto: PlanTaskDto): PlanTask {
         statusCategory: dto.status_category,
         position: dto.position,
         dueDate: dto.due_date ? new Date(dto.due_date) : null,
+        subtaskCount: dto.subtask_count ?? 0,
+        doneSubtaskCount: dto.done_subtask_count ?? 0,
+        commentCount: dto.comment_count ?? 0,
+    };
+}
+
+function toSubtask(dto: SubtaskDto): Subtask {
+    return {
+        id: dto.id,
+        parentId: dto.parent_id,
+        title: dto.title,
+        planId: dto.plan_id,
+        statusId: dto.status_id,
+        statusCategory: dto.status_category,
+    };
+}
+
+function toComment(dto: CommentDto): Comment {
+    return {
+        id: dto.id,
+        taskId: dto.task_id,
+        authorId: dto.author_id,
+        authorName: dto.author_name,
+        body: dto.body,
+        createdAt: new Date(dto.created_at),
+        updatedAt: new Date(dto.updated_at),
+        isOwn: dto.is_own,
     };
 }
 
@@ -368,4 +421,63 @@ export async function updateTask(
         body: JSON.stringify(body),
     });
     return toPlanTask(dto);
+}
+
+export async function listSubtasks(taskId: string): Promise<Subtask[]> {
+    const dtos = await request<SubtaskDto[]>(`/api/tasks/${taskId}/subtasks`);
+    return dtos.map(toSubtask);
+}
+
+export async function createSubtask(
+    parentId: string,
+    title: string,
+): Promise<Subtask> {
+    const dto = await request<SubtaskDto>(`/api/tasks/${parentId}/subtasks`, {
+        method: "POST",
+        body: JSON.stringify({ title }),
+    });
+    return toSubtask(dto);
+}
+
+// Moves the task to its plan's first done status, or back to the first todo one.
+export async function setTaskDone(
+    taskId: string,
+    done: boolean,
+): Promise<Subtask> {
+    const dto = await request<SubtaskDto>(`/api/tasks/${taskId}/done`, {
+        method: "POST",
+        body: JSON.stringify({ done }),
+    });
+    return toSubtask(dto);
+}
+
+export async function listComments(taskId: string): Promise<Comment[]> {
+    const dtos = await request<CommentDto[]>(`/api/tasks/${taskId}/comments`);
+    return dtos.map(toComment);
+}
+
+export async function createComment(
+    taskId: string,
+    body: string,
+): Promise<Comment> {
+    const dto = await request<CommentDto>(`/api/tasks/${taskId}/comments`, {
+        method: "POST",
+        body: JSON.stringify({ body }),
+    });
+    return toComment(dto);
+}
+
+export async function updateComment(
+    commentId: string,
+    body: string,
+): Promise<Comment> {
+    const dto = await request<CommentDto>(`/api/comments/${commentId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ body }),
+    });
+    return toComment(dto);
+}
+
+export async function deleteComment(commentId: string): Promise<void> {
+    await request<void>(`/api/comments/${commentId}`, { method: "DELETE" });
 }

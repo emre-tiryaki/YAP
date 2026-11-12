@@ -29,6 +29,7 @@ type TaskRepository interface {
 	SoftDeleteTree(ctx context.Context, q database.DBTX, workspaceID, taskID, now string) error
 	Get(ctx context.Context, q database.DBTX, workspaceID, taskID string) (model.Task, error)
 	Update(ctx context.Context, q database.DBTX, workspaceID, taskID, title, description string, dueDate *time.Time, now string) error
+	ListSubtasks(ctx context.Context, q database.DBTX, workspaceID, parentID string) ([]model.Task, error)
 }
 
 type CreateTaskInput struct {
@@ -260,6 +261,121 @@ func (s *TaskService) Update(ctx context.Context, session model.Session, taskID 
 		return s.tasks.Update(ctx, tx, session.WorkspaceID, taskID, task.Title, task.Description, task.DueDate, nowUTC())
 	})
 	if err != nil {
+		return model.Task{}, err
+	}
+	return task, nil
+}
+
+// CreateSubtask adds a subtask to a top-level task. It goes into the parent's
+// plan, in the plan's first todo status. Subtasks are one level deep: a
+// subtask cannot have subtasks of its own, which also rules out cycles.
+func (s *TaskService) CreateSubtask(ctx context.Context, session model.Session, parentID, title string) (model.Task, error) {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return model.Task{}, fmt.Errorf("%w: title is required", ErrInvalidInput)
+	}
+
+	task := model.Task{
+		ID:          model.NewID(),
+		WorkspaceID: session.WorkspaceID,
+		ParentID:    parentID,
+		CreatedBy:   session.MembershipID,
+		Title:       title,
+	}
+	err := database.WithTx(ctx, s.db, func(tx *sql.Tx) error {
+		parent, err := s.getTask(ctx, tx, session.WorkspaceID, parentID)
+		if err != nil {
+			return err
+		}
+		if parent.ParentID != "" {
+			return fmt.Errorf("%w: a subtask cannot have subtasks", ErrInvalidInput)
+		}
+
+		statusID, category, err := s.resolveStatus(ctx, tx, session.WorkspaceID, parent.PlanID, "")
+		if err != nil {
+			return err
+		}
+		last, err := s.tasks.LastPosition(ctx, tx, session.WorkspaceID, parent.PlanID, statusID)
+		if err != nil {
+			return err
+		}
+
+		task.ProjectID = parent.ProjectID
+		task.ProjectName = parent.ProjectName
+		task.PlanID = parent.PlanID
+		task.StatusID = statusID
+		task.StatusCategory = category
+		task.Position = position.After(last)
+
+		now := nowUTC()
+		if err := s.tasks.Insert(ctx, tx, task, now); err != nil {
+			return err
+		}
+		return s.tasks.InsertAssignee(ctx, tx, session.WorkspaceID, task.ID, session.MembershipID, now)
+	})
+	if err != nil {
+		return model.Task{}, err
+	}
+	return task, nil
+}
+
+// Subtasks lists the direct subtasks of a task, oldest first.
+func (s *TaskService) Subtasks(ctx context.Context, session model.Session, parentID string) ([]model.Task, error) {
+	if _, err := s.getTask(ctx, s.db, session.WorkspaceID, parentID); err != nil {
+		return nil, err
+	}
+	return s.tasks.ListSubtasks(ctx, s.db, session.WorkspaceID, parentID)
+}
+
+// SetDone marks a task finished by moving it to the end of its plan's first
+// done status, or reopens it by moving it to the first todo status. A task
+// already in the wanted state is left where it is.
+func (s *TaskService) SetDone(ctx context.Context, session model.Session, taskID string, done bool) (model.Task, error) {
+	var task model.Task
+	err := database.WithTx(ctx, s.db, func(tx *sql.Tx) error {
+		var err error
+		task, err = s.getTask(ctx, tx, session.WorkspaceID, taskID)
+		if err != nil {
+			return err
+		}
+		if (task.StatusCategory == model.StatusDone) == done {
+			return nil
+		}
+
+		category := model.StatusToDo
+		if done {
+			category = model.StatusDone
+		}
+		statusID, err := s.tasks.FirstStatusID(ctx, tx, session.WorkspaceID, task.PlanID, category)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("%w: plan has no %s status", ErrConflict, category)
+			}
+			return err
+		}
+		last, err := s.tasks.LastPosition(ctx, tx, session.WorkspaceID, task.PlanID, statusID)
+		if err != nil {
+			return err
+		}
+		pos := position.After(last)
+		if err := s.tasks.UpdatePlacement(ctx, tx, session.WorkspaceID, taskID, statusID, pos, nowUTC()); err != nil {
+			return err
+		}
+		task.StatusID, task.StatusCategory, task.Position = statusID, category, pos
+		return nil
+	})
+	if err != nil {
+		return model.Task{}, err
+	}
+	return task, nil
+}
+
+func (s *TaskService) getTask(ctx context.Context, q database.DBTX, workspaceID, taskID string) (model.Task, error) {
+	task, err := s.tasks.Get(ctx, q, workspaceID, taskID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return model.Task{}, fmt.Errorf("%w: task", ErrNotFound)
+		}
 		return model.Task{}, err
 	}
 	return task, nil

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"reflect"
 	"testing"
 )
 
@@ -215,7 +216,7 @@ func TestTaskUpdate(t *testing.T) {
 			}
 
 			listed := decode[[]planTaskResponse](t, env.do(t, http.MethodGet, board.path("/tasks"), ""))
-			if len(listed) != 1 || listed[0] != got {
+			if len(listed) != 1 || !reflect.DeepEqual(listed[0], got) {
 				t.Errorf("listed = %+v, want [%+v]", listed, got)
 			}
 		})

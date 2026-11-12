@@ -31,6 +31,7 @@ The same logical schema exists in two physical databases:
 | Project | A unit of work belonging to a workspace, associated with one or more teams. |
 | Status | A Kanban column of a project, categorized as `todo`, `in_progress` or `done`. |
 | Task | A unit of work in a project and status. It can have one owning team, assignees and subtasks. |
+| Comment | A note a member leaves on a task. Only its author can edit or delete it. |
 
 ## Design Decisions
 

@@ -8,6 +8,9 @@ export type PlanTask = {
   statusCategory: StatusCategory;
   position: string;
   dueDate: Date | null;
+  subtaskCount: number;
+  doneSubtaskCount: number;
+  commentCount: number;
 };
 
 // A task outside its plan page (e.g. the upcoming list) also names where it lives.
@@ -36,4 +39,14 @@ export type UpdateTaskInput = {
   title?: string
   description?: string
   dueDate?: Date | null
+}
+
+// A direct child of a task, shown as a checklist item inside its parent.
+export type Subtask = {
+  id: string
+  parentId: string
+  title: string
+  planId: string
+  statusId: string
+  statusCategory: StatusCategory
 }

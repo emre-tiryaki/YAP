@@ -102,6 +102,7 @@ func TestSchemaTablesExistAndAreStrict(t *testing.T) {
 	want := []string{
 		"users", "workspaces", "memberships", "teams", "projects", "plans",
 		"statuses", "project_teams", "team_members", "tasks", "task_assignees",
+		"task_comments",
 	}
 	for _, name := range want {
 		t.Run(name, func(t *testing.T) {
@@ -302,6 +303,8 @@ func TestSchemaIndexesExist(t *testing.T) {
 		"idx_tasks_plan_id_status_id_position",
 		"idx_tasks_workspace_id_updated_at",
 		"idx_task_assignees_membership_id",
+		"idx_task_comments_task_id",
+		"idx_task_comments_workspace_id_updated_at",
 	}
 	for _, name := range want {
 		t.Run(name, func(t *testing.T) {
@@ -314,4 +317,15 @@ func TestSchemaIndexesExist(t *testing.T) {
 			}
 		})
 	}
+}
+func TestSchemaCommentWorkspaceIsolation(t *testing.T) {
+	db := newSchemaDB(t)
+	seedBase(t, db)
+	mustExec(t, db, insertTask, idK1, idW1, idP1, idL1, idS1, nil, idM1, ts, ts)
+	const insertComment = `INSERT INTO task_comments (id, workspace_id, task_id, author_id, body, created_at, updated_at)
+	                       VALUES (?, ?, ?, ?, ?, ?, ?)`
+	mustExec(t, db, insertComment, idK2, idW1, idK1, idM1, "hi", ts, ts)
+	// The task and author belong to w1, so a w2 comment cannot point at them.
+	wantExecError(t, db, insertComment, idK3, idW2, idK1, idM1, "hi", ts, ts)
+	wantExecError(t, db, insertComment, idK3, idW1, idK1, idM1, "", ts, ts)
 }

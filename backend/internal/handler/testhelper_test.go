@@ -37,13 +37,16 @@ func newTestEnv(t *testing.T) testEnv {
 
 	projectRepo := repository.NewProjectRepository()
 	projectSvc := service.NewProjectService(db, projectRepo)
-	taskSvc := service.NewTaskService(db, projectRepo, repository.NewTaskRepository())
+	taskRepo := repository.NewTaskRepository()
+	taskSvc := service.NewTaskService(db, projectRepo, taskRepo)
+	commentSvc := service.NewCommentService(db, taskRepo, repository.NewCommentRepository())
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/hello-world", HelloWorld)
 	NewWorkspaceHandler(session).Register(mux)
 	NewProjectHandler(session, projectSvc).Register(mux)
 	NewTaskHandler(session, taskSvc).Register(mux)
+	NewCommentHandler(session, commentSvc).Register(mux)
 
 	return testEnv{mux: mux, session: session}
 }

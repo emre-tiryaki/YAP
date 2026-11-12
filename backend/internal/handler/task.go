@@ -26,6 +26,9 @@ func (h *TaskHandler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/tasks/{id}/move", h.move)
 	mux.HandleFunc("PATCH /api/tasks/{id}", h.update)
 	mux.HandleFunc("DELETE /api/tasks/{id}", h.delete)
+	mux.HandleFunc("GET /api/tasks/{id}/subtasks", h.listSubtasks)
+	mux.HandleFunc("POST /api/tasks/{id}/subtasks", h.createSubtask)
+	mux.HandleFunc("POST /api/tasks/{id}/done", h.setDone)
 }
 
 type taskResponse struct {
@@ -50,13 +53,33 @@ type createTaskRequest struct {
 }
 
 type planTaskResponse struct {
-	ID             string  `json:"id"`
-	Title          string  `json:"title"`
-	Description    string  `json:"description"`
-	StatusID       string  `json:"status_id"`
-	StatusCategory string  `json:"status_category"`
-	Position       string  `json:"position"`
-	DueDate        *string `json:"due_date"`
+	ID               string  `json:"id"`
+	Title            string  `json:"title"`
+	Description      string  `json:"description"`
+	StatusID         string  `json:"status_id"`
+	StatusCategory   string  `json:"status_category"`
+	Position         string  `json:"position"`
+	DueDate          *string `json:"due_date"`
+	SubtaskCount     int     `json:"subtask_count"`
+	DoneSubtaskCount int     `json:"done_subtask_count"`
+	CommentCount     int     `json:"comment_count"`
+}
+
+type subtaskResponse struct {
+	ID             string `json:"id"`
+	ParentID       string `json:"parent_id"`
+	Title          string `json:"title"`
+	PlanID         string `json:"plan_id"`
+	StatusID       string `json:"status_id"`
+	StatusCategory string `json:"status_category"`
+}
+
+type createSubtaskRequest struct {
+	Title string `json:"title"`
+}
+
+type setDoneRequest struct {
+	Done bool `json:"done"`
 }
 
 type moveTaskRequest struct {
@@ -89,13 +112,27 @@ func toTaskResponse(t model.Task) taskResponse {
 
 func toPlanTaskResponse(t model.Task) planTaskResponse {
 	return planTaskResponse{
+		ID:               t.ID,
+		Title:            t.Title,
+		Description:      t.Description,
+		StatusID:         t.StatusID,
+		StatusCategory:   string(t.StatusCategory),
+		Position:         t.Position,
+		DueDate:          formatDueDate(t.DueDate),
+		SubtaskCount:     t.SubtaskCount,
+		DoneSubtaskCount: t.DoneSubtaskCount,
+		CommentCount:     t.CommentCount,
+	}
+}
+
+func toSubtaskResponse(t model.Task) subtaskResponse {
+	return subtaskResponse{
 		ID:             t.ID,
+		ParentID:       t.ParentID,
 		Title:          t.Title,
-		Description:    t.Description,
+		PlanID:         t.PlanID,
 		StatusID:       t.StatusID,
 		StatusCategory: string(t.StatusCategory),
-		Position:       t.Position,
-		DueDate:        formatDueDate(t.DueDate),
 	}
 }
 
@@ -233,4 +270,45 @@ func (h *TaskHandler) update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, toPlanTaskResponse(task))
+}
+
+func (h *TaskHandler) listSubtasks(w http.ResponseWriter, r *http.Request) {
+	tasks, err := h.svc.Subtasks(r.Context(), h.session, r.PathValue("id"))
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	res := make([]subtaskResponse, 0, len(tasks))
+	for _, t := range tasks {
+		res = append(res, toSubtaskResponse(t))
+	}
+	writeJSON(w, http.StatusOK, res)
+}
+
+func (h *TaskHandler) createSubtask(w http.ResponseWriter, r *http.Request) {
+	var req createSubtaskRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	task, err := h.svc.CreateSubtask(r.Context(), h.session, r.PathValue("id"), req.Title)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, toSubtaskResponse(task))
+}
+
+func (h *TaskHandler) setDone(w http.ResponseWriter, r *http.Request) {
+	var req setDoneRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	task, err := h.svc.SetDone(r.Context(), h.session, r.PathValue("id"), req.Done)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, toSubtaskResponse(task))
 }

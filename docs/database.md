@@ -129,6 +129,17 @@ erDiagram
         DATETIME removed_at
     }
 
+    task_comments {
+        TEXT id PK
+        TEXT workspace_id FK
+        TEXT task_id FK
+        TEXT author_id FK
+        TEXT body
+        DATETIME created_at
+        DATETIME updated_at
+        DATETIME deleted_at
+    }
+
     plans {
         TEXT id FK
         TEXT workspace_id FK
@@ -169,6 +180,8 @@ erDiagram
     tasks ||--o{ task_assignees : "has assignees"
 
     tasks o|--o{ tasks : "parent-child"
+    tasks ||--o{ task_comments : "has comments"
+    memberships ||--o{ task_comments : "writes"
 ```
 
 ## 1. General Structure
@@ -179,7 +192,7 @@ The same logical schema exists in two physical databases.
 | -------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
 | Engine   | SQLite (`modernc.org/sqlite`, `database/sql`, no ORM (Object-Relational Mapping))                          | PostgreSQL                                               |
 | Scope    | The user's own device                                                                                      | Team workspaces, accounts, invitations, synchronization |
-| Tables   | users, workspaces, memberships, teams, team_members, projects, project_teams, plans, statuses, tasks, task_assignees | All local tables, plus accounts and invitations         |
+| Tables   | users, workspaces, memberships, teams, team_members, projects, project_teams, plans, statuses, tasks, task_assignees, task_comments | All local tables, plus accounts and invitations         |
 
 DDL (Data Definition Language) is maintained in two separate directories: `migrations/sqlite` and `migrations/postgres`. The logical schema is the same; only type mappings and language-specific differences vary.
 
@@ -198,6 +211,8 @@ Assumption: For workspaces where `kind = team`, the server is the source of trut
 | Plan       | A board inside a project. `team_id IS NULL` means the plan covers the whole project; otherwise it belongs to one team of that project. Statuses and tasks belong to a plan. |
 | Status     | A Kanban column belonging to a plan. The `category` field defines the column's meaning: `todo`, `in_progress`, or `done`. |
 | Task       | A unit of work within a plan and a status. The owning team is derived from the plan. |
+| Subtask    | A task with `parent_id` set. Subtasks are one level deep. A subtask in its parent's plan is shown inside the parent (as a checklist item) rather than on the board; a subtask in another plan is that plan's share of the work and stays on that plan's board. |
+| Comment    | A plain-text note a member leaves on a task. Only its author may edit or delete it. |
 
 ### 2.1 Team Model
 
@@ -245,6 +260,8 @@ Rules:
 | A task's status must be in the task's plan. | `tasks (status_id, plan_id)` → `statuses (id, plan_id)`. |
 | A task's plan must be in the task's project. | `tasks (plan_id, project_id)` → `plans (id, project_id)`. |
 | A subtask and its parent are in the same project. | `tasks (parent_id, project_id)` → `tasks (id, project_id)`. The plan may differ. |
+| A comment belongs to a task and an author of the same workspace. | `task_comments (task_id, workspace_id)` → `tasks (id, workspace_id)`, `task_comments (author_id, workspace_id)` → `memberships (id, workspace_id)`. |
+| A comment body is not empty. | `CHECK (length(body) > 0)`. |
 | Plan names are unique within a project and team scope. | Partial unique index on `(project_id, COALESCE(team_id, ''), name) WHERE deleted_at IS NULL`. |
 | Team names are unique within a workspace. | Partial unique index: `WHERE deleted_at IS NULL`. |
 | A user can have only one membership in a given workspace. | Unique constraint on `(workspace_id, user_id)`. |
@@ -259,23 +276,28 @@ All of these rules are protected by unit tests.
 | Each user can have one `personal` workspace. | Teams cannot be created in a `personal` workspace. |
 | The last `owner` cannot leave or have their role downgraded. | |
 | A member who has left (`left_at` is set) cannot be assigned to a team or a task. | When a member leaves, the corresponding `team_members` and `task_assignees` rows are closed within the same transaction. |
-| A subtask cannot create a cycle. | |
+| A subtask cannot create a cycle. | Subtasks are one level deep: a subtask cannot get subtasks of its own (rejected as invalid input), which also rules out cycles on creation. |
+| Creating a subtask. | It goes into the parent's plan, in the plan's first `todo` status, and the creator is assigned, like any new task. The parent must exist and not be deleted. |
+| Board and upcoming lists leave out nested subtasks. | A subtask whose non-deleted parent is in the same plan is listed only under its parent. Each board task reports its direct subtask count, finished subtask count and comment count. |
+| Completing or reopening a task (`done` toggle). | Moves it to the end of its plan's first `done` status, or of its first `todo` status when reopened. A task already in the wanted state is left untouched. |
+| Comment body. | Trimmed; empty is rejected; at most 10 000 code points. |
+| Only the author edits or deletes a comment. | Others get `forbidden`. Deleting is soft (`deleted_at`). |
 | Creating a project creates a default whole-project plan with the default statuses. | Done in one transaction. |
 | Creating a plan creates the default statuses for it. | Done in one transaction; a name already used by a non-deleted plan in the same project and team scope (archived included) is rejected with a conflict before the unique index is hit. |
 | A task created without an explicit plan goes into the project's default plan. | The default plan is the oldest non-deleted, non-archived plan with `team_id IS NULL`. |
 | When a team is removed from a project or deleted. | The plans of that team within the affected project are archived (`archived_at`) within the same transaction. The foreign key cannot see soft removal. |
-| When a plan is deleted. | Its `statuses` and `tasks` rows are individually marked with `deleted_at` within the same transaction. |
+| When a plan is deleted. | Its `statuses`, `tasks` and their `task_comments` rows are individually marked with `deleted_at` within the same transaction. |
 | A project keeps at least one whole-project plan. | Deleting the project's last non-deleted, non-archived plan with `team_id IS NULL` is rejected with a conflict, so tasks created without an explicit plan always have a default plan. |
 | Renaming a plan keeps plan names unique. | Same check as plan creation, scoped to the plan's own project and team and excluding the plan itself. |
 | A project or plan icon is a single emoji. | Trimmed; empty means no icon and is stored as `NULL`. At most 8 code points, with no letters, digits, ASCII characters or whitespace, so an emoji with skin tone, ZWJ sequence or flag fits but text does not. |
-| When a project is deleted. | Its `plans`, `statuses`, `tasks`, and `project_teams` rows are individually marked with `deleted_at` / `removed_at` within the same transaction. The system does not rely on the parent being hidden, because each row needs its own deletion record for synchronization. |
+| When a project is deleted. | Its `plans`, `statuses`, `tasks`, `task_comments` and `project_teams` rows are individually marked with `deleted_at` / `removed_at` within the same transaction. The system does not rely on the parent being hidden, because each row needs its own deletion record for synchronization. |
 | Moving a task to another plan. | The status is mapped to a status of the target plan, because status IDs belong to a single plan. |
 | Every plan has at least one `done`-category status. | Plan creation always inserts the default `Done` status. A task counts as finished exactly while its status has `category = 'done'`; there is no separate flag. Deleting the plan's last `done` status is rejected with a conflict; any future category change must reject it too. |
 | Reordering or moving a task within its plan. | Only the moved row is written: its `position` becomes the midpoint (`position.Between`) of its new neighbours in the target status. The target status must belong to the task's plan. |
 | Reordering a status within its plan. | Only the moved row is written: its `position` becomes the midpoint (`position.Between`) of its new neighbours among the plan's non-deleted statuses. Tasks keep their `status_id` and `position`. |
 | Editing a status. | Only `title`, `description` and `color` can be changed (`#rrggbb`, stored lowercase); the status must belong to the plan in the URL. `category` and `position` are left untouched, so the "at least one `done` status" rule cannot be broken by an edit. |
-| Deleting a status. | The status, its tasks and all of their subtasks (even those in other statuses) are individually marked with `deleted_at`, and their open `task_assignees` rows get `removed_at`, within the same transaction. The status must belong to the plan in the URL, and the plan's last `done`-category status cannot be deleted. |
-| When a task is deleted. | The task and all of its subtasks are marked with `deleted_at`, and their open `task_assignees` rows get `removed_at`, within the same transaction. |
+| Deleting a status. | The status, its tasks and all of their subtasks (even those in other statuses) and their comments are individually marked with `deleted_at`, and their open `task_assignees` rows get `removed_at`, within the same transaction. The status must belong to the plan in the URL, and the plan's last `done`-category status cannot be deleted. |
+| When a task is deleted. | The task, all of its subtasks and their comments are marked with `deleted_at`, and their open `task_assignees` rows get `removed_at`, within the same transaction. |
 
 ## 5. Table Reference
 
@@ -293,6 +315,7 @@ All of these rules are protected by unit tests.
 | statuses       | Both     | Kanban columns belonging to a plan | The meaning of `done` is defined by `category`. |
 | tasks          | Both     | Tasks | `plan_id` and `project_id` are both stored; `parent_id` identifies a subtask. |
 | task_assignees | Both     | Person assignments to tasks | |
+| task_comments  | Both     | Comments on tasks | `author_id` is a membership; soft-deleted with `deleted_at`. |
 | invitations    | Server   | Workspace invitations | The token is never stored in plaintext; only its hash is stored. |
 
 ## 6. Indexes
@@ -310,6 +333,8 @@ All of these rules are protected by unit tests.
 | `tasks (project_id) WHERE deleted_at IS NULL` | Count and list the tasks of a project across plans. |
 | `tasks (plan_id, status_id, position)` | Order tasks on a plan's board. |
 | `tasks (workspace_id, updated_at)` | Retrieve changed records during synchronization. |
+| `task_comments (task_id, created_at) WHERE deleted_at IS NULL` | List a task's comments in order and count them. |
+| `task_comments (workspace_id, updated_at)` | Retrieve changed comments during synchronization. |
 | `projects (workspace_id) WHERE deleted_at IS NULL` | non-deleted projects of a workspace |
 
 ## 7. Synchronization Notes

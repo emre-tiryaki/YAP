@@ -4,14 +4,18 @@ import type {
     MoveTaskInput,
     PlanTask,
     StatusCategory,
+    Subtask,
     UpdateTaskInput,
 } from "../types/task";
 import {
+    createSubtask,
     createTask,
     deleteTask,
     listPlanTasks,
     listUpcomingTasks,
+    listSubtasks,
     moveTask,
+    setTaskDone,
     updateTask,
 } from "../api/client";
 import { planKey } from "./usePlans";
@@ -146,5 +150,57 @@ export function useUpdateTask() {
             relabelPin("task", task.id, task.title);
             return invalidateTaskViews(queryClient);
         },
+    });
+}
+
+function subtasksKey(taskId: string) {
+    return ["tasks", taskId, "subtasks"];
+}
+
+export function useSubtasks(taskId: string) {
+    return useQuery({
+        queryKey: subtasksKey(taskId),
+        queryFn: () => listSubtasks(taskId),
+        enabled: taskId !== "",
+    });
+}
+
+export function useCreateSubtask(parentId: string) {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (title: string) => createSubtask(parentId, title),
+        onSuccess: () => invalidateTaskViews(queryClient),
+    });
+}
+
+type SetDoneVariables = {
+    taskId: string;
+    done: boolean;
+};
+
+// Checks a subtask off (or back on). The checkbox flips at once; the refetch
+// afterwards brings the real status and the parent's counts.
+export function useSetSubtaskDone(parentId: string) {
+    const queryClient = useQueryClient();
+    const key = subtasksKey(parentId);
+
+    return useMutation({
+        mutationFn: ({ taskId, done }: SetDoneVariables) =>
+            setTaskDone(taskId, done),
+        onMutate: async ({ taskId, done }) => {
+            await queryClient.cancelQueries({ queryKey: key });
+            queryClient.setQueryData<Subtask[]>(key, (old) =>
+                old?.map((sub) =>
+                    sub.id === taskId
+                        ? {
+                              ...sub,
+                              statusCategory: done ? "done" : "todo",
+                          }
+                        : sub,
+                ),
+            );
+        },
+        onSettled: () => invalidateTaskViews(queryClient),
     });
 }

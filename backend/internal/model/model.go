@@ -74,4 +74,20 @@ type Task struct {
 	Position       string
 	StatusCategory StatusCategory
 	DueDate        *time.Time
+	// ParentID is empty for a top-level task.
+	ParentID         string
+	SubtaskCount     int
+	DoneSubtaskCount int
+	CommentCount     int
+}
+
+type Comment struct {
+	ID          string
+	WorkspaceID string
+	TaskID      string
+	AuthorID    string
+	AuthorName  string
+	Body        string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }

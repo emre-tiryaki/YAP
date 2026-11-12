@@ -17,3 +17,20 @@ export function daysFromToday(date: Date, now: Date = new Date()): number {
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     return Math.round((day.getTime() - today.getTime()) / 86_400_000);
 }
+
+// "5 minutes ago", "yesterday"... for the last week; older dates show the
+// calendar date. Returns null under a minute so the caller can say "just now".
+export function formatRelativeTime(
+    date: Date,
+    now: Date = new Date(),
+): string | null {
+    const seconds = Math.round((date.getTime() - now.getTime()) / 1000);
+    const elapsed = Math.abs(seconds);
+    if (elapsed < 60) return null;
+    const format = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+    if (elapsed < 3600) return format.format(Math.round(seconds / 60), "minute");
+    if (elapsed < 86_400) return format.format(Math.round(seconds / 3600), "hour");
+    if (elapsed < 7 * 86_400)
+        return format.format(daysFromToday(date, now), "day");
+    return date.toLocaleDateString();
+}

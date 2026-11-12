@@ -1,5 +1,11 @@
-import { FiCalendar, FiCheckCircle } from "react-icons/fi";
+import {
+    FiCalendar,
+    FiCheckCircle,
+    FiCheckSquare,
+    FiMessageSquare,
+} from "react-icons/fi";
 import { useParams } from "react-router";
+import { useTranslate } from "../hooks/useTranslate";
 import type { CardAction } from "../types/cardAction";
 import type { PlanTask } from "../types/task";
 import { markdownToPlainText } from "../util/markdown";
@@ -28,10 +34,15 @@ export function PlanTaskCard({
 }: PlanTaskCardProps) {
     // On the plan page the route names the project and plan the task belongs
     // to; elsewhere the caller passes them.
+    const t = useTranslate();
     const params = useParams();
     const projectId = location.projectId ?? params.projectId ?? "";
     const planId = location.planId ?? params.planId ?? "";
     const isDone = task.statusCategory === "done";
+    const hasSubtasks = task.subtaskCount > 0;
+    const allSubtasksDone =
+        hasSubtasks && task.doneSubtaskCount === task.subtaskCount;
+    const hasBadges = task.dueDate || hasSubtasks || task.commentCount > 0;
     const description = task.description
         ? markdownToPlainText(task.description)
         : "";
@@ -83,11 +94,42 @@ export function PlanTaskCard({
                     </div>
                 )}
             </div>
-            {task.dueDate && (
-                <p className="flex items-center gap-1 text-xs text-gray-500">
-                    <FiCalendar aria-hidden />
-                    {task.dueDate.toLocaleDateString()}
-                </p>
+            {hasBadges && (
+                <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
+                    {task.dueDate && (
+                        <span className="flex items-center gap-1">
+                            <FiCalendar aria-hidden />
+                            {task.dueDate.toLocaleDateString()}
+                        </span>
+                    )}
+                    {hasSubtasks && (
+                        <span
+                            title={t("task.card.subtasks")
+                                .replace("{done}", String(task.doneSubtaskCount))
+                                .replace("{total}", String(task.subtaskCount))}
+                            className={`flex items-center gap-1 rounded px-1 ${
+                                allSubtasksDone
+                                    ? "bg-green-50 text-green-700"
+                                    : ""
+                            }`}
+                        >
+                            <FiCheckSquare aria-hidden />
+                            {task.doneSubtaskCount}/{task.subtaskCount}
+                        </span>
+                    )}
+                    {task.commentCount > 0 && (
+                        <span
+                            title={t("task.card.comments").replace(
+                                "{count}",
+                                String(task.commentCount),
+                            )}
+                            className="flex items-center gap-1"
+                        >
+                            <FiMessageSquare aria-hidden />
+                            {task.commentCount}
+                        </span>
+                    )}
+                </div>
             )}
         </div>
     );
