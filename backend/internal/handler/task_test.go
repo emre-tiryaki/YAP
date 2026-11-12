@@ -109,8 +109,14 @@ func TestTaskUpcomingOrderingAndShape(t *testing.T) {
 	wantStatus(t, rec, http.StatusOK)
 	got := decode[[]taskResponse](t, rec)
 
-	if len(got) != 2 || got[0].Title != "sooner" || got[1].Title != "later" {
-		t.Fatalf("upcoming = %+v, want [sooner, later]", got)
+	if len(got) != 3 || got[0].Title != "sooner" || got[1].Title != "later" || got[2].Title != "undated" {
+		t.Fatalf("upcoming = %+v, want [sooner, later, undated]", got)
+	}
+	if got[2].DueDate != nil {
+		t.Errorf("undated DueDate = %v, want nil", got[2].DueDate)
+	}
+	if got[0].PlanID == "" || got[0].StatusID == "" || got[0].Position == "" {
+		t.Errorf("got[0] placement = %+v", got[0])
 	}
 	if got[0].ProjectName != "Alpha" || got[0].ProjectID != project.ID {
 		t.Errorf("got[0] = %+v", got[0])

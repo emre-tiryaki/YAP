@@ -13,7 +13,7 @@ import (
 	"github.com/emre-tiryaki/YAP/backend/internal/position"
 )
 
-const upcomingTaskLimit = 10
+const upcomingTaskLimit = 50
 
 type TaskRepository interface {
 	FirstStatusID(ctx context.Context, q database.DBTX, workspaceID, planID string, category model.StatusCategory) (string, error)

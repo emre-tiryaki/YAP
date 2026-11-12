@@ -312,7 +312,7 @@ func TestTaskListUpcoming(t *testing.T) {
 		t.Fatalf("ListUpcoming() error = %v", err)
 	}
 
-	wantTitles := []string{"first", "second", "third"}
+	wantTitles := []string{"first", "second", "third", "undated"}
 	if len(got) != len(wantTitles) {
 		t.Fatalf("ListUpcoming() returned %d tasks (%+v), want %d", len(got), got, len(wantTitles))
 	}
@@ -336,6 +336,12 @@ func TestTaskListUpcoming(t *testing.T) {
 	}
 	if got[0].DueDate == nil || !got[0].DueDate.Equal(d1) {
 		t.Errorf("DueDate = %v, want %v", got[0].DueDate, d1)
+	}
+	if got[0].StatusID != todo || got[0].Position != "a2" {
+		t.Errorf("got[0] status/position = %q %q, want %q a2", got[0].StatusID, got[0].Position, todo)
+	}
+	if got[3].DueDate != nil {
+		t.Errorf("undated DueDate = %v, want nil", got[3].DueDate)
 	}
 
 	limited, err := repo.ListUpcoming(ctx, db, s.WorkspaceID, s.MembershipID, 2)

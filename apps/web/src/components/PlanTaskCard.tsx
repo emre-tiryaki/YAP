@@ -11,6 +11,11 @@ type PlanTaskCardProps = {
     layout: BoardView;
     onAction?: (action: CardAction) => void;
     isOverlay?: boolean;
+    // Off when the card is shown outside a sortable board (plain click to open).
+    isDraggable?: boolean;
+    // Where the task lives; defaults to the plan named by the route.
+    projectId?: string;
+    planId?: string;
 };
 
 export function PlanTaskCard({
@@ -18,17 +23,25 @@ export function PlanTaskCard({
     layout,
     onAction,
     isOverlay = false,
+    isDraggable = true,
+    ...location
 }: PlanTaskCardProps) {
-    // Plan task cards only render on the plan page, so the route names the
-    // project and plan the task belongs to.
-    const { projectId = "", planId = "" } = useParams();
+    // On the plan page the route names the project and plan the task belongs
+    // to; elsewhere the caller passes them.
+    const params = useParams();
+    const projectId = location.projectId ?? params.projectId ?? "";
+    const planId = location.planId ?? params.planId ?? "";
     const isDone = task.statusCategory === "done";
 
     return (
         <div
             className={`flex gap-2 rounded-md border border-gray-200 bg-white p-3 ${
                 layout === "board" ? "flex-col" : "items-center"
-            } ${isOverlay ? "cursor-grabbing shadow-lg" : "cursor-grab shadow-sm hover:border-gray-400"}`}
+            } ${
+                isOverlay
+                    ? "cursor-grabbing shadow-lg"
+                    : `${isDraggable ? "cursor-grab" : "cursor-pointer"} shadow-sm hover:border-gray-400`
+            }`}
         >
             <div className="flex min-w-0 flex-1 items-start gap-2">
                 {isDone && (

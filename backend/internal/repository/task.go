@@ -75,17 +75,20 @@ func (*TaskRepository) InsertAssignee(ctx context.Context, q database.DBTX, work
 	return nil
 }
 
+// ListUpcoming returns the member's open (not done) tasks: dated ones first by
+// due date, then the undated ones.
 func (*TaskRepository) ListUpcoming(ctx context.Context, q database.DBTX, workspaceID, membershipID string, limit int) ([]model.Task, error) {
 	rows, err := q.QueryContext(ctx,
-		`SELECT t.id, t.title, t.project_id, t.plan_id, p.name, t.due_date, s.category
+		`SELECT t.id, t.title, t.description, t.project_id, t.plan_id, t.status_id, t.position,
+			p.name, t.due_date, s.category
 		 FROM task_assignees ta
 		 JOIN tasks t ON t.id = ta.task_id AND t.workspace_id = ta.workspace_id
 		 JOIN projects p ON p.id = t.project_id AND p.workspace_id = t.workspace_id
 		 JOIN statuses s ON s.id = t.status_id AND s.plan_id = t.plan_id
 		 WHERE ta.workspace_id = ? AND ta.membership_id = ? AND ta.removed_at IS NULL
-		   AND t.deleted_at IS NULL AND p.deleted_at IS NULL
-		   AND t.due_date IS NOT NULL AND s.category <> ?
-		 ORDER BY t.due_date, t.id
+		   AND t.deleted_at IS NULL AND p.deleted_at IS NULL AND s.deleted_at IS NULL
+		   AND s.category <> ?
+		 ORDER BY t.due_date IS NULL, t.due_date, t.id
 		 LIMIT ?`,
 		workspaceID, membershipID, string(model.StatusDone), limit,
 	)
@@ -97,16 +100,21 @@ func (*TaskRepository) ListUpcoming(ctx context.Context, q database.DBTX, worksp
 	tasks := []model.Task{}
 	for rows.Next() {
 		t := model.Task{WorkspaceID: workspaceID}
-		var dueDate, category string
-		if err := rows.Scan(&t.ID, &t.Title, &t.ProjectID, &t.PlanID, &t.ProjectName, &dueDate, &category); err != nil {
+		var description, dueDate sql.NullString
+		var category string
+		if err := rows.Scan(&t.ID, &t.Title, &description, &t.ProjectID, &t.PlanID, &t.StatusID, &t.Position,
+			&t.ProjectName, &dueDate, &category); err != nil {
 			return nil, fmt.Errorf("scan task: %w", err)
 		}
-		parsed, err := time.Parse(time.RFC3339, dueDate)
-		if err != nil {
-			return nil, fmt.Errorf("parse due date: %w", err)
-		}
-		t.DueDate = &parsed
+		t.Description = description.String
 		t.StatusCategory = model.StatusCategory(category)
+		if dueDate.Valid {
+			parsed, err := time.Parse(time.RFC3339, dueDate.String)
+			if err != nil {
+				return nil, fmt.Errorf("parse due date: %w", err)
+			}
+			t.DueDate = &parsed
+		}
 		tasks = append(tasks, t)
 	}
 	if err := rows.Err(); err != nil {
@@ -114,6 +122,7 @@ func (*TaskRepository) ListUpcoming(ctx context.Context, q database.DBTX, worksp
 	}
 	return tasks, nil
 }
+
 func (*TaskRepository) ListByPlan(ctx context.Context, q database.DBTX, workspaceID, planID string) ([]model.Task, error) {
 	rows, err := q.QueryContext(ctx,
 		`SELECT t.id, t.project_id, t.status_id, t.created_by, t.title, t.description,

@@ -31,8 +31,12 @@ func (h *TaskHandler) Register(mux *http.ServeMux) {
 type taskResponse struct {
 	ID             string  `json:"id"`
 	Title          string  `json:"title"`
+	Description    string  `json:"description"`
 	ProjectID      string  `json:"project_id"`
 	ProjectName    string  `json:"project_name"`
+	PlanID         string  `json:"plan_id"`
+	StatusID       string  `json:"status_id"`
+	Position       string  `json:"position"`
 	DueDate        *string `json:"due_date"`
 	StatusCategory string  `json:"status_category"`
 }
@@ -72,8 +76,12 @@ func toTaskResponse(t model.Task) taskResponse {
 	return taskResponse{
 		ID:             t.ID,
 		Title:          t.Title,
+		Description:    t.Description,
 		ProjectID:      t.ProjectID,
 		ProjectName:    t.ProjectName,
+		PlanID:         t.PlanID,
+		StatusID:       t.StatusID,
+		Position:       t.Position,
 		StatusCategory: string(t.StatusCategory),
 		DueDate:        formatDueDate(t.DueDate),
 	}

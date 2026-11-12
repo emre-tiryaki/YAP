@@ -41,7 +41,7 @@ func TestTaskCreateErrors(t *testing.T) {
 	}
 }
 
-func TestTaskUpcomingOrdersByDueDateAndSkipsUndated(t *testing.T) {
+func TestTaskUpcomingOrdersByDueDateWithUndatedLast(t *testing.T) {
 	ctx := context.Background()
 	db, session := newTestDB(t)
 	projectRepo := repository.NewProjectRepository()
@@ -71,7 +71,7 @@ func TestTaskUpcomingOrdersByDueDateAndSkipsUndated(t *testing.T) {
 		t.Fatalf("Upcoming() error = %v", err)
 	}
 
-	want := []string{"soon", "later"}
+	want := []string{"soon", "later", "undated"}
 	if len(got) != len(want) {
 		t.Fatalf("Upcoming() returned %d tasks, want %d", len(got), len(want))
 	}

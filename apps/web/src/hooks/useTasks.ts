@@ -105,11 +105,17 @@ export function useMoveTask(projectId: string, planId: string) {
                 (old) => old && applyMove(old, move),
             );
         },
-        // On failure the refetch restores the server's order.
+        // On failure the refetch restores the server's order. A status
+        // change can move the task in or out of the upcoming list too.
         onSettled: () =>
-            queryClient.invalidateQueries({
-                queryKey: planKey(projectId, planId),
-            }),
+            Promise.all([
+                queryClient.invalidateQueries({
+                    queryKey: planKey(projectId, planId),
+                }),
+                queryClient.invalidateQueries({
+                    queryKey: ["tasks", "upcoming"],
+                }),
+            ]),
     });
 }
 

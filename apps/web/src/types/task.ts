@@ -1,14 +1,5 @@
 export type StatusCategory = "todo" | "in_progress" | "done";
 
-export type Task = {
-  id: string;
-  title: string;
-  projectId: string;
-  projectName: string;
-  dueDate: Date | null;
-  statusCategory: StatusCategory;
-};
-
 export type PlanTask = {
   id: string;
   title: string;
@@ -17,6 +8,13 @@ export type PlanTask = {
   statusCategory: StatusCategory;
   position: string;
   dueDate: Date | null;
+};
+
+// A task outside its plan page (e.g. the upcoming list) also names where it lives.
+export type Task = PlanTask & {
+  projectId: string;
+  projectName: string;
+  planId: string;
 };
 
 export type CreateTaskInput = {

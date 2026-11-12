@@ -185,7 +185,7 @@ function TaskDrawerBody({
                                 event.currentTarget.blur();
                             }
                         }}
-                        className="field-sizing-content w-full resize-none rounded-md border border-transparent px-2 py-1 text-2xl font-semibold break-words hover:border-gray-200 focus:border-gray-300 focus:outline-none"
+                        className="field-sizing-content w-full resize-none rounded-md border border-transparent px-2 py-1 text-2xl font-semibold wrap-break-words hover:border-gray-200 focus:border-gray-300 focus:outline-none"
                     />
                 </div>
                 <div className="flex flex-1 flex-col gap-1">

@@ -35,8 +35,12 @@ type ProjectDto = {
 type TaskDto = {
     id: string;
     title: string;
+    description: string;
     project_id: string;
     project_name: string;
+    plan_id: string;
+    status_id: string;
+    position: string;
     due_date: string | null;
     status_category: StatusCategory;
 };
@@ -114,12 +118,10 @@ function toProject(dto: ProjectDto): Project {
 
 function toTask(dto: TaskDto): Task {
     return {
-        id: dto.id,
+        ...toPlanTask(dto),
         projectId: dto.project_id,
         projectName: dto.project_name,
-        title: dto.title,
-        dueDate: dto.due_date ? new Date(dto.due_date) : null,
-        statusCategory: dto.status_category,
+        planId: dto.plan_id,
     };
 }
 

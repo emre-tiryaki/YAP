@@ -10,3 +10,10 @@ export function toDateInputValue(date: Date | null): string {
 export function fromDateInputValue(value: string): Date | null {
     return value ? new Date(`${value}T00:00:00`) : null;
 }
+
+// Local calendar day of `date` relative to today: 0 today, 1 tomorrow, -1 yesterday.
+export function daysFromToday(date: Date, now: Date = new Date()): number {
+    const day = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return Math.round((day.getTime() - today.getTime()) / 86_400_000);
+}
