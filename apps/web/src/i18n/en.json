@@ -185,5 +185,7 @@
     "task.detail.deleteCommentConfirm": "Delete this comment?",
     "task.detail.justNow": "just now",
     "task.card.subtasks": "{done} of {total} subtasks done",
-    "task.card.comments": "{count} comments"
+    "task.card.comments": "{count} comments",
+    "common.showAll": "Show all",
+    "common.showLess": "Show less"
 }

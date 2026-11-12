@@ -185,5 +185,7 @@
     "task.detail.deleteCommentConfirm": "Bu yorum silinsin mi?",
     "task.detail.justNow": "az önce",
     "task.card.subtasks": "{total} alt görevden {done} tamamlandı",
-    "task.card.comments": "{count} yorum"
+    "task.card.comments": "{count} yorum",
+    "common.showAll": "Hepsini göster",
+    "common.showLess": "Daha az göster"
 }

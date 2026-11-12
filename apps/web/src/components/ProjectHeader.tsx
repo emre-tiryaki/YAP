@@ -3,6 +3,7 @@ import { useTranslate } from "../hooks/useTranslate";
 import type { CardAction } from "../types/cardAction";
 import type { Project } from "../types/project";
 import { CardMenu } from "./CardMenu";
+import { ExpandableText } from "./ExpandableText";
 import { ProjectDialogs } from "./ProjectDialogs";
 import { ProjectIconButton } from "./ProjectIconButton";
 
@@ -40,9 +41,12 @@ export function ProjectHeader({
                 />
             </div>
             {project.description ? (
-                <p className="mt-2 text-sm text-gray-600">
-                    {project.description}
-                </p>
+                <div className="mt-2">
+                    <ExpandableText
+                        text={project.description}
+                        className="text-sm text-gray-600"
+                    />
+                </div>
             ) : (
                 <p className="mt-2 text-sm text-gray-400 italic">
                     {t("project.noDescription")}

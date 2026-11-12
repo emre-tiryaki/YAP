@@ -3,6 +3,7 @@ import { useTranslate } from "../hooks/useTranslate";
 import type { CardAction } from "../types/cardAction";
 import type { Plan } from "../types/plan";
 import { CardMenu } from "./CardMenu";
+import { ExpandableText } from "./ExpandableText";
 import { PlanDialogs } from "./PlanDialogs";
 import { PlanIconButton } from "./PlanIconButton";
 
@@ -36,7 +37,12 @@ export function PlanHeader({ plan, onDeleted }: PlanHeaderProps) {
                 <CardMenu onSelect={setAction} />
             </div>
             {plan.description ? (
-                <p className="mt-2 text-sm text-gray-600">{plan.description}</p>
+                <div className="mt-2">
+                    <ExpandableText
+                        text={plan.description}
+                        className="text-sm text-gray-600"
+                    />
+                </div>
             ) : (
                 <p className="mt-2 text-sm text-gray-400 italic">
                     {t("project.noDescription")}
