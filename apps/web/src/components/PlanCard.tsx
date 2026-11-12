@@ -31,9 +31,11 @@ export function PlanCard({ plan }: PlanCardProps) {
                 <div className="flex items-start gap-3 pr-8">
                     <span
                         aria-hidden
-                        className={`grid size-10 shrink-0 place-items-center rounded-lg text-sm font-semibold ${accent.tile}`}
+                        className={`grid size-10 shrink-0 place-items-center rounded-lg font-semibold ${
+                            plan.icon ? "text-2xl" : `text-sm ${accent.tile}`
+                        }`}
                     >
-                        {initials(plan.name)}
+                        {plan.icon || initials(plan.name)}
                     </span>
                     <div className="min-w-0 flex-1">
                         <h3
@@ -52,7 +54,8 @@ export function PlanCard({ plan }: PlanCardProps) {
                 </div>
 
                 <p
-                    className={`mt-3 line-clamp-2 flex-1 text-sm ${
+                    title={plan.description || undefined}
+                    className={`mt-3 line-clamp-2 min-h-10 flex-1 text-sm break-words ${
                         plan.description
                             ? "text-gray-600"
                             : "text-gray-400 italic"

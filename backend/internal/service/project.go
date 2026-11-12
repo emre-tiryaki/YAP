@@ -35,7 +35,7 @@ type ProjectRepository interface {
 	UpdateStatus(ctx context.Context, q database.DBTX, workspaceID, statusID, title, description, color, now string) error
 	Update(ctx context.Context, q database.DBTX, p model.Project, now string) error
 	SoftDelete(ctx context.Context, q database.DBTX, workspaceID, projectID, now string) error
-	UpdatePlan(ctx context.Context, q database.DBTX, workspaceID, planID, name, description, now string) error
+	UpdatePlan(ctx context.Context, q database.DBTX, p model.Plan, now string) error
 	SoftDeletePlan(ctx context.Context, q database.DBTX, workspaceID, planID, now string) error
 	SoftDeleteStatus(ctx context.Context, q database.DBTX, workspaceID, statusID, now string) error
 	PlanNameTaken(ctx context.Context, q database.DBTX, workspaceID, projectID, teamID, name, excludePlanID string) (bool, error)
@@ -64,6 +64,7 @@ type CreateProjectInput struct {
 type CreatePlanInput struct {
 	Name        string
 	Description string
+	Icon        string
 }
 
 type CreateStatusInput struct {
@@ -156,6 +157,10 @@ func (s *ProjectService) CreatePlan(ctx context.Context, workspaceID, projectID 
 	if name == "" {
 		return model.Plan{}, fmt.Errorf("%w: name is required", ErrInvalidInput)
 	}
+	icon, err := normalizeIcon(in.Icon)
+	if err != nil {
+		return model.Plan{}, err
+	}
 
 	plan := model.Plan{
 		ID:          model.NewID(),
@@ -163,9 +168,10 @@ func (s *ProjectService) CreatePlan(ctx context.Context, workspaceID, projectID 
 		ProjectID:   projectID,
 		Name:        name,
 		Description: strings.TrimSpace(in.Description),
+		Icon:        icon,
 	}
 
-	err := database.WithTx(ctx, s.db, func(tx *sql.Tx) error {
+	err = database.WithTx(ctx, s.db, func(tx *sql.Tx) error {
 		if _, err := s.repo.Name(ctx, tx, workspaceID, projectID); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return fmt.Errorf("%w: project", ErrNotFound)
@@ -431,6 +437,8 @@ type UpdateProjectInput struct {
 type UpdatePlanInput struct {
 	Name        *string
 	Description *string
+	// Icon set to "" removes the icon.
+	Icon *string
 }
 
 // Update changes the name, description and/or icon of a project.
@@ -490,14 +498,21 @@ func (s *ProjectService) Delete(ctx context.Context, workspaceID, projectID stri
 	})
 }
 
-// UpdatePlan changes the name and/or description of a plan. The new name must
-// stay unique among the non-deleted plans of the same project and team scope.
+// UpdatePlan changes the name, description and/or icon of a plan. The new name
+// must stay unique among the non-deleted plans of the same project and team scope.
 func (s *ProjectService) UpdatePlan(ctx context.Context, workspaceID, projectID, planID string, in UpdatePlanInput) (model.Plan, error) {
-	if in.Name == nil && in.Description == nil {
+	if in.Name == nil && in.Description == nil && in.Icon == nil {
 		return model.Plan{}, fmt.Errorf("%w: nothing to update", ErrInvalidInput)
 	}
 	if in.Name != nil && strings.TrimSpace(*in.Name) == "" {
 		return model.Plan{}, fmt.Errorf("%w: name is required", ErrInvalidInput)
+	}
+	var icon string
+	if in.Icon != nil {
+		var err error
+		if icon, err = normalizeIcon(*in.Icon); err != nil {
+			return model.Plan{}, err
+		}
 	}
 
 	var plan model.Plan
@@ -523,7 +538,10 @@ func (s *ProjectService) UpdatePlan(ctx context.Context, workspaceID, projectID,
 		if in.Description != nil {
 			plan.Description = strings.TrimSpace(*in.Description)
 		}
-		return s.repo.UpdatePlan(ctx, tx, workspaceID, planID, plan.Name, plan.Description, nowUTC())
+		if in.Icon != nil {
+			plan.Icon = icon
+		}
+		return s.repo.UpdatePlan(ctx, tx, plan, nowUTC())
 	})
 	if err != nil {
 		return model.Plan{}, err
@@ -556,7 +574,7 @@ func (s *ProjectService) DeletePlan(ctx context.Context, workspaceID, projectID,
 	})
 }
 
-// maxIconRunes bounds a project icon. A single emoji can span several code
+// maxIconRunes bounds a project or plan icon. A single emoji can span several code
 // points (skin tones, ZWJ sequences, flags), so the limit is generous, but it
 // keeps the icon from turning into a second name.
 const maxIconRunes = 8

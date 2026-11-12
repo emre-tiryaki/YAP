@@ -63,9 +63,9 @@ func (*ProjectRepository) Insert(ctx context.Context, q database.DBTX, p model.P
 
 func (*ProjectRepository) InsertPlan(ctx context.Context, q database.DBTX, p model.Plan, now string) error {
 	_, err := q.ExecContext(ctx,
-		`INSERT INTO plans (id, workspace_id, project_id, team_id, name, description, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		p.ID, p.WorkspaceID, p.ProjectID, nullIfEmpty(p.TeamID), p.Name, nullIfEmpty(p.Description), now, now,
+		`INSERT INTO plans (id, workspace_id, project_id, team_id, name, description, icon, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		p.ID, p.WorkspaceID, p.ProjectID, nullIfEmpty(p.TeamID), p.Name, nullIfEmpty(p.Description), nullIfEmpty(p.Icon), now, now,
 	)
 	if err != nil {
 		return fmt.Errorf("insert plan: %w", err)
@@ -150,7 +150,7 @@ func (*ProjectRepository) Get(ctx context.Context, q database.DBTX, workspaceID,
 
 func (*ProjectRepository) ListPlans(ctx context.Context, q database.DBTX, workspace_id, project_id string) ([]model.Plan, error) {
 	rows, err := q.QueryContext(ctx,
-		`SELECT pl.id, pl.team_id, tm.name, pl.name, pl.description,
+		`SELECT pl.id, pl.team_id, tm.name, pl.name, pl.description, pl.icon,
 			(SELECT COUNT(*) FROM tasks t
 				WHERE t.plan_id = pl.id
 				AND t.workspace_id = pl.workspace_id
@@ -176,13 +176,14 @@ func (*ProjectRepository) ListPlans(ctx context.Context, q database.DBTX, worksp
 	plans := []model.Plan{}
 	for rows.Next() {
 		pl := model.Plan{WorkspaceID: workspace_id, ProjectID: project_id}
-		var teamID, teamName, description sql.NullString
-		if err := rows.Scan(&pl.ID, &teamID, &teamName, &pl.Name, &description, &pl.TaskCount, &pl.DoneCount); err != nil {
+		var teamID, teamName, description, icon sql.NullString
+		if err := rows.Scan(&pl.ID, &teamID, &teamName, &pl.Name, &description, &icon, &pl.TaskCount, &pl.DoneCount); err != nil {
 			return nil, fmt.Errorf("scan plan: %w", err)
 		}
 		pl.TeamID = teamID.String
 		pl.TeamName = teamName.String
 		pl.Description = description.String
+		pl.Icon = icon.String
 		plans = append(plans, pl)
 	}
 	if err := rows.Err(); err != nil {
@@ -213,9 +214,9 @@ func (*ProjectRepository) PlanNameExists(ctx context.Context, q database.DBTX, w
 // with its task and done-task counts.
 func (*ProjectRepository) GetPlan(ctx context.Context, q database.DBTX, workspaceID, projectID, planID string) (model.Plan, error) {
 	pl := model.Plan{ID: planID, WorkspaceID: workspaceID, ProjectID: projectID}
-	var teamID, teamName, description sql.NullString
+	var teamID, teamName, description, icon sql.NullString
 	err := q.QueryRowContext(ctx,
-		`SELECT pl.team_id, tm.name, pl.name, pl.description,
+		`SELECT pl.team_id, tm.name, pl.name, pl.description, pl.icon,
 			(SELECT COUNT(*) FROM tasks t
 				WHERE t.plan_id = pl.id
 				AND t.workspace_id = pl.workspace_id
@@ -231,13 +232,14 @@ func (*ProjectRepository) GetPlan(ctx context.Context, q database.DBTX, workspac
 		 WHERE pl.id = ? AND pl.workspace_id = ? AND pl.project_id = ?
 		   AND pl.deleted_at IS NULL AND pl.archived_at IS NULL`,
 		planID, workspaceID, projectID,
-	).Scan(&teamID, &teamName, &pl.Name, &description, &pl.TaskCount, &pl.DoneCount)
+	).Scan(&teamID, &teamName, &pl.Name, &description, &icon, &pl.TaskCount, &pl.DoneCount)
 	if err != nil {
 		return model.Plan{}, fmt.Errorf("get plan: %w", err)
 	}
 	pl.TeamID = teamID.String
 	pl.TeamName = teamName.String
 	pl.Description = description.String
+	pl.Icon = icon.String
 	return pl, nil
 }
 
@@ -348,12 +350,12 @@ func (*ProjectRepository) SoftDelete(ctx context.Context, q database.DBTX, works
 	return nil
 }
 
-// UpdatePlan overwrites the name and description of a non-deleted plan.
-func (*ProjectRepository) UpdatePlan(ctx context.Context, q database.DBTX, workspaceID, planID, name, description, now string) error {
+// UpdatePlan overwrites the name, description and icon of a non-deleted plan.
+func (*ProjectRepository) UpdatePlan(ctx context.Context, q database.DBTX, p model.Plan, now string) error {
 	_, err := q.ExecContext(ctx,
-		`UPDATE plans SET name = ?, description = ?, updated_at = ?
+		`UPDATE plans SET name = ?, description = ?, icon = ?, updated_at = ?
 		 WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`,
-		name, nullIfEmpty(description), now, planID, workspaceID,
+		p.Name, nullIfEmpty(p.Description), nullIfEmpty(p.Icon), now, p.ID, p.WorkspaceID,
 	)
 	if err != nil {
 		return fmt.Errorf("update plan: %w", err)

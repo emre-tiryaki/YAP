@@ -32,6 +32,9 @@ export function PlanTaskCard({
     const projectId = location.projectId ?? params.projectId ?? "";
     const planId = location.planId ?? params.planId ?? "";
     const isDone = task.statusCategory === "done";
+    const description = task.description
+        ? markdownToPlainText(task.description)
+        : "";
 
     return (
         <div
@@ -56,9 +59,12 @@ export function PlanTaskCard({
                     >
                         {task.title}
                     </p>
-                    {layout === "board" && task.description && (
-                        <p className="mt-1 line-clamp-2 text-xs text-gray-500">
-                            {markdownToPlainText(task.description)}
+                    {layout === "board" && description && (
+                        <p
+                            title={description}
+                            className="mt-1 line-clamp-2 text-xs break-words text-gray-500"
+                        >
+                            {description}
                         </p>
                     )}
                 </div>

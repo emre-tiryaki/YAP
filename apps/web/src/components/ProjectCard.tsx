@@ -38,6 +38,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
                         {project.name}
                     </h3>
                     <p
+                        title={project.description || undefined}
                         className={`mt-0.5 truncate text-sm ${
                             project.description
                                 ? "text-gray-600"

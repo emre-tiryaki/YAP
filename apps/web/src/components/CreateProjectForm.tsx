@@ -4,7 +4,7 @@ import { useCreateProjects } from "../hooks/useProjects";
 import { useTranslate } from "../hooks/useTranslate";
 import { TextInput } from "./TextInput";
 import { SubmitButton } from "./SubmitButton";
-import { ProjectIconPicker } from "./ProjectIconPicker";
+import { IconPicker } from "./IconPicker";
 import { useNavigate } from "react-router";
 
 type CreateProjectFormProps = {
@@ -46,7 +46,7 @@ export function CreateProjectForm({ onDone }: CreateProjectFormProps) {
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
             />
-            <ProjectIconPicker value={icon} onChange={setIcon} />
+            <IconPicker value={icon} onChange={setIcon} />
             {createProject.isError && (
                 <p className="text-sm text-red-600">
                     {createProject.error instanceof ApiError &&

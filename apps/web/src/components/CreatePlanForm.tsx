@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { ApiError } from "../api/client";
 import { useCreatePlan } from "../hooks/useProjects";
 import { useTranslate, type TranslationKey } from "../hooks/useTranslate";
+import { IconPicker } from "./IconPicker";
 import { SubmitButton } from "./SubmitButton";
 import { TextInput } from "./TextInput";
 
@@ -29,10 +30,11 @@ export function CreatePlanForm({ projectId, onDone }: CreatePlanFormProps) {
     const createPlan = useCreatePlan(projectId);
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
+    const [icon, setIcon] = useState("");
 
     function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
-        createPlan.mutate({ name, description }, { onSuccess: onDone });
+        createPlan.mutate({ name, description, icon }, { onSuccess: onDone });
     }
 
     return (
@@ -51,6 +53,13 @@ export function CreatePlanForm({ projectId, onDone }: CreatePlanFormProps) {
                 label={t("project.plans.create.description")}
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
+            />
+            <IconPicker
+                value={icon}
+                onChange={(next) => {
+                    setIcon(next);
+                    if (createPlan.isError) createPlan.reset();
+                }}
             />
             {createPlan.error && (
                 <p role="alert" className="text-sm text-red-600">

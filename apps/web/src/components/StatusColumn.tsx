@@ -120,7 +120,7 @@ export function StatusColumn({
             {status.description && (
                 <p
                     title={status.description}
-                    className="line-clamp-2 px-3 pb-2 text-xs text-gray-600"
+                    className="line-clamp-2 px-3 pb-2 text-xs break-words text-gray-600"
                 >
                     {status.description}
                 </p>

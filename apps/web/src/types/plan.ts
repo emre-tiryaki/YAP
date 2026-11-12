@@ -3,6 +3,8 @@ export type Plan = {
     projectId: string;
     name: string;
     description: string;
+    // A single emoji, or "" for none.
+    icon: string;
     teamName: string | null;
     taskCount: number;
     doneTaskCount: number;
@@ -11,9 +13,12 @@ export type Plan = {
 export type CreatePlanInput = {
     name: string;
     description: string;
+    icon: string;
 };
 
 export type UpdatePlanInput = {
     name?: string;
     description?: string;
+    // "" removes the icon.
+    icon?: string;
 };

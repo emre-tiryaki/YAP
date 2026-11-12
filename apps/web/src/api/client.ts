@@ -53,6 +53,7 @@ type PlanDto = {
     team_name: string | null;
     name: string;
     description: string;
+    icon: string;
     task_count: number;
     done_task_count: number;
 };
@@ -133,6 +134,7 @@ function toPlan(dto: PlanDto): Plan {
         projectId: dto.project_id,
         name: dto.name,
         description: dto.description,
+        icon: dto.icon,
         teamName: dto.team_name,
         taskCount: dto.task_count,
         doneTaskCount: dto.done_task_count,

@@ -87,6 +87,7 @@ func (h *ProjectHandler) create(w http.ResponseWriter, r *http.Request) {
 type createPlanRequest struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	Icon        string `json:"icon"`
 }
 
 type planResponse struct {
@@ -96,6 +97,7 @@ type planResponse struct {
 	TeamName    *string `json:"team_name"`
 	Name        string  `json:"name"`
 	Description string  `json:"description"`
+	Icon        string  `json:"icon"`
 	TaskCount   int     `json:"task_count"`
 	DoneCount   int     `json:"done_task_count"`
 }
@@ -106,6 +108,7 @@ func toPlanResponse(p model.Plan) planResponse {
 		ProjectID:   p.ProjectID,
 		Name:        p.Name,
 		Description: p.Description,
+		Icon:        p.Icon,
 		TaskCount:   p.TaskCount,
 		DoneCount:   p.DoneCount,
 	}
@@ -147,6 +150,7 @@ func (h *ProjectHandler) createPlan(w http.ResponseWriter, r *http.Request) {
 	plan, err := h.svc.CreatePlan(r.Context(), h.session.WorkspaceID, r.PathValue("id"), service.CreatePlanInput{
 		Name:        req.Name,
 		Description: req.Description,
+		Icon:        req.Icon,
 	})
 	if err != nil {
 		writeError(w, r, err)
@@ -324,9 +328,11 @@ func (h *ProjectHandler) delete(w http.ResponseWriter, r *http.Request) {
 }
 
 // updatePlanRequest is a partial update: omitted (or null) fields are kept.
+// An empty icon removes it.
 type updatePlanRequest struct {
 	Name        *string `json:"name"`
 	Description *string `json:"description"`
+	Icon        *string `json:"icon"`
 }
 
 func (h *ProjectHandler) updatePlan(w http.ResponseWriter, r *http.Request) {
@@ -338,6 +344,7 @@ func (h *ProjectHandler) updatePlan(w http.ResponseWriter, r *http.Request) {
 	plan, err := h.svc.UpdatePlan(r.Context(), h.session.WorkspaceID, r.PathValue("id"), r.PathValue("planId"), service.UpdatePlanInput{
 		Name:        req.Name,
 		Description: req.Description,
+		Icon:        req.Icon,
 	})
 	if err != nil {
 		writeError(w, r, err)

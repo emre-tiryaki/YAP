@@ -1,9 +1,9 @@
 import { useId, useState, type KeyboardEvent } from "react";
 import { FiSlash } from "react-icons/fi";
 import { useTranslate } from "../hooks/useTranslate";
-import { projectIcons } from "../util/projectIcons";
+import { iconChoices } from "../util/icons";
 
-type ProjectIconPickerProps = {
+type IconPickerProps = {
     // A single emoji, or "" for none.
     value: string;
     onChange: (icon: string) => void;
@@ -12,10 +12,10 @@ type ProjectIconPickerProps = {
 const optionClass =
     "grid size-9 cursor-pointer place-items-center rounded-md text-xl hover:bg-gray-100 has-checked:bg-gray-100 has-checked:ring-2 has-checked:ring-gray-900 has-focus-visible:ring-2 has-focus-visible:ring-gray-500";
 
-export function ProjectIconPicker({ value, onChange }: ProjectIconPickerProps) {
+export function IconPicker({ value, onChange }: IconPickerProps) {
     const t = useTranslate();
     const name = useId();
-    const isCustom = value !== "" && !projectIcons.includes(value);
+    const isCustom = value !== "" && !iconChoices.includes(value);
     // The custom field is committed on Enter or blur, not on every keystroke,
     // so a half-typed value is never reported.
     const [draft, setDraft] = useState(isCustom ? value : "");
@@ -47,7 +47,7 @@ export function ProjectIconPicker({ value, onChange }: ProjectIconPickerProps) {
                     />
                     <FiSlash aria-hidden className="text-base text-gray-400" />
                 </label>
-                {projectIcons.map((icon) => (
+                {iconChoices.map((icon) => (
                     <label key={icon} className={optionClass}>
                         <input
                             type="radio"

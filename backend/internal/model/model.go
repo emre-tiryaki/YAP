@@ -45,6 +45,7 @@ type Plan struct {
 	TeamName    string
 	Name        string
 	Description string
+	Icon        string
 	TaskCount   int
 	DoneCount   int
 }

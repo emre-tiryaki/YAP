@@ -2,14 +2,14 @@ import { useState, type FormEvent } from "react";
 import { useTranslate } from "../hooks/useTranslate";
 import { FormError } from "./FormError";
 import { Modal } from "./Modal";
-import { ProjectIconPicker } from "./ProjectIconPicker";
+import { IconPicker } from "./IconPicker";
 import { SubmitButton } from "./SubmitButton";
 import { TextInput } from "./TextInput";
 
 export type DetailsValue = {
     name: string;
     description: string;
-    // Only set when the dialog edits an icon (projects).
+    // Only set when the dialog edits an icon.
     icon?: string;
 };
 
@@ -25,7 +25,7 @@ type EditDetailsDialogProps = {
     onClose: () => void;
 };
 
-// Edits the name and description of a project or plan, plus a project's icon.
+// Edits the name, description and icon of a project or plan.
 export function EditDetailsDialog({
     isOpen,
     title,
@@ -75,7 +75,7 @@ function EditDetailsForm({
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
             />
-            {withIcon && <ProjectIconPicker value={icon} onChange={setIcon} />}
+            {withIcon && <IconPicker value={icon} onChange={setIcon} />}
             <FormError message={errorMessage} />
             <div>
                 <SubmitButton disabled={isPending || name.trim() === ""}>

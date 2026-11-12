@@ -67,6 +67,7 @@ export function PlanDialogs({
                 isOpen={action === "edit"}
                 title={t("plan.edit.title")}
                 initial={plan}
+                withIcon
                 isPending={update.isPending}
                 errorMessage={updateError}
                 onSubmit={(input) =>
