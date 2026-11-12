@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
-import { FiCalendar, FiCheck, FiTrash2, FiX } from "react-icons/fi";
+import { FiCheck, FiTrash2, FiX } from "react-icons/fi";
 import { ApiError } from "../api/client";
 import { useMoveTask, useUpdateTask } from "../hooks/useTasks";
 import { useTranslate } from "../hooks/useTranslate";
@@ -7,6 +7,7 @@ import type { Status } from "../types/status";
 import type { PlanTask, UpdateTaskInput } from "../types/task";
 import { fromDateInputValue, toDateInputValue } from "../util/date";
 import { CommentSection } from "./CommentSection";
+import { DatePicker } from "./DatePicker";
 import { FormError } from "./FormError";
 import { SubtaskList } from "./SubtaskList";
 
@@ -55,8 +56,6 @@ export function TaskDetailModal({
         return () => document.removeEventListener("keydown", handleKeyDown);
     }, []);
 
-    const status = statuses.find((s) => s.id === task.statusId);
-
     return (
         <div className="fixed inset-0 z-50">
             <div
@@ -72,39 +71,20 @@ export function TaskDetailModal({
                     if (isClosing && event.target === event.currentTarget)
                         onClose();
                 }}
-                className={`absolute inset-y-0 right-0 flex w-full max-w-5xl flex-col overflow-hidden bg-white shadow-2xl sm:w-[85vw] ${
+                className={`absolute inset-y-0 right-0 flex w-full max-w-5xl flex-col bg-white shadow-2xl sm:w-[85vw] ${
                     isClosing ? "animate-drawer-out" : "animate-drawer-in"
                 }`}
             >
-                <header className="flex items-center justify-between gap-4 border-b border-gray-200 px-5 py-3">
-                    <div className="flex min-w-0 items-center gap-2 text-sm text-gray-500">
-                        <span>{t("task.detail.label")}</span>
-                        {status && (
-                            <>
-                                <span aria-hidden>·</span>
-                                <span className="flex items-center gap-1.5 rounded-full border border-gray-200 px-2 py-0.5 text-xs text-gray-700">
-                                    <span
-                                        aria-hidden
-                                        className="size-2 rounded-full"
-                                        style={{
-                                            backgroundColor: status.color,
-                                        }}
-                                    />
-                                    {status.title}
-                                </span>
-                            </>
-                        )}
-                    </div>
-                    <button
-                        type="button"
-                        onClick={() => setIsClosing(true)}
-                        aria-label={t("common.close")}
-                        title={t("common.close")}
-                        className="cursor-pointer rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
-                    >
-                        <FiX aria-hidden />
-                    </button>
-                </header>
+                {/* A tab sticking out of the drawer's left edge, vertically centred; moves with the slide animation. */}
+                <button
+                    type="button"
+                    onClick={() => setIsClosing(true)}
+                    aria-label={t("common.close")}
+                    title={t("common.close")}
+                    className="absolute top-3 right-3 z-10 cursor-pointer rounded-full bg-white p-2 text-gray-600 shadow-md hover:text-gray-900 sm:top-1/2 sm:right-full sm:-translate-y-1/2 sm:rounded-none sm:rounded-l-xl sm:py-4 sm:pr-1.5 sm:pl-2.5 sm:shadow-[-6px_0_12px_-4px_rgb(0_0_0/0.2)]"
+                >
+                    <FiX aria-hidden className="size-5" />
+                </button>
                 {/* Keyed so local field state resets when another task opens. */}
                 <TaskDetailBody
                     key={task.id}
@@ -301,22 +281,13 @@ function TaskDetailBody({
                 </Property>
 
                 <Property label={t("form.dueDate")}>
-                    <div className="flex items-center gap-2">
-                        <FiCalendar aria-hidden className="text-gray-500" />
-                        <input
-                            type="date"
-                            aria-label={t("form.dueDate")}
-                            value={toDateInputValue(task.dueDate)}
-                            onChange={(event) =>
-                                save({
-                                    dueDate: fromDateInputValue(
-                                        event.target.value,
-                                    ),
-                                })
-                            }
-                            className="w-full rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm"
-                        />
-                    </div>
+                    <DatePicker
+                        label={t("form.dueDate")}
+                        value={toDateInputValue(task.dueDate)}
+                        onChange={(value) =>
+                            save({ dueDate: fromDateInputValue(value) })
+                        }
+                    />
                     {!task.dueDate && (
                         <p className="mt-1 text-xs text-gray-500">
                             {t("task.detail.noDueDate")}

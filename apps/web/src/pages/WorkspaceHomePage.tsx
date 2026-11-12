@@ -2,6 +2,7 @@ import { useState } from "react";
 import { TopBar } from "../components/TopBar";
 import type { BreadcrumbItem } from "../types/breadcrumb";
 import { Modal } from "../components/Modal";
+import { useShortcut } from "../hooks/useShortcut";
 import { useTranslate } from "../hooks/useTranslate";
 import { useWorkspace } from "../hooks/useWorkspace";
 import { useUpcomingTasks } from "../hooks/useTasks";
@@ -18,6 +19,7 @@ export default function WorkspaceHomePage() {
     const tasks = useUpcomingTasks();
     const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
     const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+    useShortcut({ key: "n" }, () => setIsTaskModalOpen(true));
 
     const projectItems = projects.data ?? [];
     const path: BreadcrumbItem[] = [

@@ -4,6 +4,7 @@ import { useTranslate } from "../hooks/useTranslate";
 import type { Project } from "../types/project";
 import { TextInput } from "./TextInput";
 import { SelectInput } from "./SelectInput";
+import { DatePicker } from "./DatePicker";
 import { SubmitButton } from "./SubmitButton";
 
 type CreateTaskFormProps = {
@@ -52,11 +53,11 @@ export function CreateTaskForm({ projects, onDone }: CreateTaskFormProps) {
                     label: project.name,
                 }))}
             />
-            <TextInput
+            <DatePicker
                 label={t("workspace.tasks.create.dueDate")}
-                type="date"
+                showLabel
                 value={dueDate}
-                onChange={(event) => setDueDate(event.target.value)}
+                onChange={setDueDate}
             />
             {createTask.isError && (
                 <p className="text-sm text-red-600">{t("common.error")}</p>

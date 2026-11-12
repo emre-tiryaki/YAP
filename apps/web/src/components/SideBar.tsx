@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -28,8 +29,11 @@ import {
 import { useTranslate, type TranslationKey } from "../hooks/useTranslate";
 import { unpinWhere, usePins } from "../hooks/usePins";
 import { useProjects } from "../hooks/useProjects";
+import { useShortcut } from "../hooks/useShortcut";
 import { useWorkspace } from "../hooks/useWorkspace";
 import type { Pin } from "../types/pin";
+import type { SettingsSection } from "../types/settings";
+import { SettingsModal } from "./SettingsModal";
 
 type IconType = ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
 
@@ -47,6 +51,8 @@ export function Sidebar() {
   useEffect(() => {
     localStorage.setItem(COLLAPSED_KEY, String(isCollapsed));
   }, [isCollapsed]);
+
+  useShortcut({ key: "b", mod: true }, () => setIsCollapsed((c) => !c));
 
   const projectItems = projects.data ?? [];
   // Show the live project name and icon, so an edit elsewhere is picked up at once.
@@ -220,7 +226,10 @@ function NavLink({
             {emoji}
           </span>
         ) : (
-          <Icon aria-hidden className="shrink-0 text-base text-gray-500" />
+          <Icon
+            aria-hidden
+            className={`shrink-0 text-base ${isActive ? "text-accent" : "text-gray-500"}`}
+          />
         )}
         {isCollapsed ? (
           <span className="sr-only">{label}</span>
@@ -243,13 +252,22 @@ function NavLink({
   );
 }
 
-// Placeholder entries only: none of them does anything yet.
-const profileItems: { label: TranslationKey; Icon: IconType }[] = [
-  { label: "sidebar.profile.profile", Icon: FiUser },
-  { label: "sidebar.profile.settings", Icon: FiSettings },
-  { label: "sidebar.profile.appearance", Icon: FiMoon },
-  { label: "sidebar.profile.notifications", Icon: FiBell },
-  { label: "sidebar.profile.shortcuts", Icon: FiCommand },
+// Entries with a section open the settings modal there; the rest are
+// placeholders that do nothing yet.
+const profileItems: {
+  label: TranslationKey;
+  Icon: IconType;
+  section?: SettingsSection;
+}[] = [
+  { label: "sidebar.profile.profile", Icon: FiUser, section: "account" },
+  { label: "sidebar.profile.settings", Icon: FiSettings, section: "general" },
+  { label: "sidebar.profile.appearance", Icon: FiMoon, section: "appearance" },
+  {
+    label: "sidebar.profile.notifications",
+    Icon: FiBell,
+    section: "notifications",
+  },
+  { label: "sidebar.profile.shortcuts", Icon: FiCommand, section: "shortcuts" },
   { label: "sidebar.profile.help", Icon: FiHelpCircle },
 ];
 
@@ -257,6 +275,8 @@ function ProfileMenu({ isCollapsed }: { isCollapsed: boolean }) {
   const t = useTranslate();
   const workspace = useWorkspace();
   const [isOpen, setIsOpen] = useState(false);
+  const [settingsSection, setSettingsSection] =
+    useState<SettingsSection | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -277,6 +297,12 @@ function ProfileMenu({ isCollapsed }: { isCollapsed: boolean }) {
 
   const username = workspace.data?.username ?? "";
   const close = () => setIsOpen(false);
+  const closeSettings = useCallback(() => setSettingsSection(null), []);
+
+  useShortcut({ key: ",", mod: true }, () => {
+    setIsOpen(false);
+    setSettingsSection("general");
+  });
 
   return (
     <div ref={ref} className="relative shrink-0 border-t border-gray-200 p-3">
@@ -322,12 +348,15 @@ function ProfileMenu({ isCollapsed }: { isCollapsed: boolean }) {
             isCollapsed ? "bottom-3 left-full ml-2" : "right-3 bottom-full left-3 mb-1 w-auto"
           }`}
         >
-          {profileItems.map(({ label, Icon }) => (
+          {profileItems.map(({ label, Icon, section }) => (
             <li key={label} role="none">
               <button
                 type="button"
                 role="menuitem"
-                onClick={close}
+                onClick={() => {
+                  close();
+                  if (section) setSettingsSection(section);
+                }}
                 className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-gray-700 hover:bg-gray-100"
               >
                 <Icon aria-hidden />
@@ -349,6 +378,12 @@ function ProfileMenu({ isCollapsed }: { isCollapsed: boolean }) {
           </li>
         </ul>
       )}
+
+      <SettingsModal
+        isOpen={settingsSection !== null}
+        initialSection={settingsSection ?? undefined}
+        onClose={closeSettings}
+      />
     </div>
   );
 }

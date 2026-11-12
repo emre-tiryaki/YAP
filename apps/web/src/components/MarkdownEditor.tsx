@@ -207,7 +207,7 @@ function RichEditor({
         editorProps: {
             attributes: {
                 ...(id && { id }),
-                class: "markdown-body prose prose-sm max-w-none min-h-60 px-3 py-2 focus:outline-none",
+                class: "markdown-body prose prose-sm dark:prose-invert max-w-none min-h-60 px-3 py-2 focus:outline-none",
             },
         },
     });
@@ -349,7 +349,7 @@ function Toolbar({ active, onCommand, mode, changeMode }: ToolbarProps) {
                         onClick={() => changeMode(option)}
                         className={`cursor-pointer rounded px-2 py-1 ${
                             mode === option
-                                ? "bg-gray-900 text-white"
+                                ? "bg-accent text-accent-fg"
                                 : "text-gray-600 hover:text-gray-900"
                         }`}
                     >

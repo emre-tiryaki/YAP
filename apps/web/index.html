@@ -4,6 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>YAP</title>
+    <script>
+      // Apply the theme and accent before first paint (no light flash in dark
+      // mode). Mirrors hooks/useTheme.ts; preferences live under "yap.preferences".
+      try {
+        var prefs = JSON.parse(localStorage.getItem("yap.preferences") || "{}");
+        if (typeof prefs.accent === "string") document.documentElement.dataset.accent = prefs.accent;
+        var theme = prefs.theme;
+        if (theme !== "light" && theme !== "dark") theme = "system";
+        if (theme === "dark" || (theme === "system" && matchMedia("(prefers-color-scheme: dark)").matches)) {
+          document.documentElement.classList.add("dark");
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

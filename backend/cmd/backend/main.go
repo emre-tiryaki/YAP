@@ -43,10 +43,11 @@ func main() {
 	projectSvc := service.NewProjectService(db, projectRepo)
 	taskSvc := service.NewTaskService(db, projectRepo, taskRepo)
 	commentSvc := service.NewCommentService(db, taskRepo, commentRepo)
+	workspaceSvc := service.NewWorkspaceService(db, repository.NewWorkspaceRepository())
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/hello-world", handler.HelloWorld)
-	handler.NewWorkspaceHandler(session).Register(mux)
+	handler.NewWorkspaceHandler(session, workspaceSvc).Register(mux)
 	handler.NewProjectHandler(session, projectSvc).Register(mux)
 	handler.NewTaskHandler(session, taskSvc).Register(mux)
 	handler.NewCommentHandler(session, commentSvc).Register(mux)

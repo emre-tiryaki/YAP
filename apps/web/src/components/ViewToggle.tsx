@@ -30,7 +30,7 @@ export function ViewToggle({ value, onChange }: ViewToggleProps) {
                     onClick={() => onChange(view)}
                     className={`flex cursor-pointer items-center gap-1.5 rounded px-3 py-1 text-sm ${
                         value === view
-                            ? "bg-gray-900 text-white"
+                            ? "bg-accent text-accent-fg"
                             : "text-gray-600 hover:bg-gray-100"
                     }`}
                 >

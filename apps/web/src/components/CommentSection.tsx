@@ -8,7 +8,8 @@ import {
 } from "../hooks/useComments";
 import { useTranslate } from "../hooks/useTranslate";
 import type { Comment } from "../types/comment";
-import { formatRelativeTime } from "../util/date";
+import { useDateFormat } from "../hooks/useDateFormat";
+import { isWithinLastMinute } from "../util/date";
 import { ExpandableText } from "./ExpandableText";
 import { FormError } from "./FormError";
 import { InlineError } from "./InlineError";
@@ -110,7 +111,7 @@ export function CommentSection({ taskId }: CommentSectionProps) {
                     <button
                         type="submit"
                         disabled={create.isPending || draft.trim() === ""}
-                        className="cursor-pointer rounded-md bg-gray-900 px-3 py-1.5 text-sm text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="cursor-pointer rounded-md bg-accent px-3 py-1.5 text-sm text-accent-fg hover:bg-accent/85 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         {t("task.detail.commentSubmit")}
                     </button>
@@ -136,8 +137,12 @@ function CommentItem({ taskId, comment }: CommentItemProps) {
     const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
     const [draft, setDraft] = useState(comment.body);
 
+    const format = useDateFormat();
     const when =
-        formatRelativeTime(comment.createdAt) ?? t("task.detail.justNow");
+        format.relative(comment.createdAt) ??
+        (isWithinLastMinute(comment.createdAt)
+            ? t("task.detail.justNow")
+            : format.dateTime(comment.createdAt));
     const isEdited = comment.updatedAt.getTime() > comment.createdAt.getTime();
 
     function cancelEdit() {
@@ -175,14 +180,14 @@ function CommentItem({ taskId, comment }: CommentItemProps) {
                     </span>
                     <time
                         dateTime={comment.createdAt.toISOString()}
-                        title={comment.createdAt.toLocaleString()}
+                        title={format.dateTime(comment.createdAt)}
                         className="text-xs text-gray-500"
                     >
                         {when}
                     </time>
                     {isEdited && (
                         <span
-                            title={comment.updatedAt.toLocaleString()}
+                            title={format.dateTime(comment.updatedAt)}
                             className="text-xs text-gray-400"
                         >
                             ({t("task.detail.commentEdited")})
@@ -235,7 +240,7 @@ function CommentItem({ taskId, comment }: CommentItemProps) {
                             <button
                                 type="submit"
                                 disabled={update.isPending || draft.trim() === ""}
-                                className="cursor-pointer rounded-md bg-gray-900 px-3 py-1 text-sm text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="cursor-pointer rounded-md bg-accent px-3 py-1 text-sm text-accent-fg hover:bg-accent/85 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 {t("common.save")}
                             </button>

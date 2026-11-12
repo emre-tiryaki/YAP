@@ -20,7 +20,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
         <div className="relative">
             <Link
                 to={`/projects/${project.id}`}
-                className={`flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 pr-12 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-gray-900 ${accent.hoverBorder}`}
+                className={`flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 pr-12 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-accent ${accent.hoverBorder}`}
             >
                 <span
                     aria-hidden

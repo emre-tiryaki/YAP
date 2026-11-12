@@ -28,6 +28,14 @@ type Session struct {
 	MembershipID  string
 }
 
+// Profile is the editable identity shown for a session: the user's display
+// name and the workspace name.
+type Profile struct {
+	WorkspaceID   string
+	DisplayName   string
+	WorkspaceName string
+}
+
 type Project struct {
 	ID          string
 	WorkspaceID string

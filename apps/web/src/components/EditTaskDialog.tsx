@@ -4,6 +4,7 @@ import type { UpdateTaskInput } from "../types/task";
 import { fromDateInputValue, toDateInputValue } from "../util/date";
 import { FormError } from "./FormError";
 import { Modal } from "./Modal";
+import { DatePicker } from "./DatePicker";
 import { SubmitButton } from "./SubmitButton";
 import { TextInput } from "./TextInput";
 
@@ -75,11 +76,11 @@ function EditTaskForm({
                     onChange={(event) => setDescription(event.target.value)}
                 />
             )}
-            <TextInput
+            <DatePicker
                 label={t("form.dueDate")}
-                type="date"
+                showLabel
                 value={dueDate}
-                onChange={(event) => setDueDate(event.target.value)}
+                onChange={setDueDate}
             />
             <FormError message={errorMessage} />
             <div>

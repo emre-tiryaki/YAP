@@ -158,7 +158,7 @@ export function SubtaskList({ taskId }: SubtaskListProps) {
                     <button
                         type="submit"
                         disabled={create.isPending || draft.trim() === ""}
-                        className="cursor-pointer rounded-md bg-gray-900 px-3 py-1.5 text-sm text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="cursor-pointer rounded-md bg-accent px-3 py-1.5 text-sm text-accent-fg hover:bg-accent/85 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         {t("common.save")}
                     </button>

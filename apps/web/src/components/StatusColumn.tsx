@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import {
     SortableContext,
     useSortable,
@@ -53,16 +54,23 @@ export function StatusColumn({
         <section
             ref={setNodeRef}
             aria-label={status.title}
-            style={{
-                transform: CSS.Translate.toString(transform),
-                transition,
-                // Tint the whole column with the status color; color-mix
-                // works for any CSS color string the backend stores.
-                backgroundColor: `color-mix(in srgb, ${status.color} 8%, white)`,
-                borderColor: `color-mix(in srgb, ${status.color} ${isTaskOver ? 70 : 30}%, white)`,
-                borderTopColor: status.color,
-            }}
-            className={`flex flex-col rounded-lg border border-t-4 ${
+            style={
+                {
+                    transform: CSS.Translate.toString(transform),
+                    transition,
+                    // Read by the tint classes below; any CSS color string
+                    // the backend stores works with color-mix.
+                    "--status": status.color,
+                } as CSSProperties
+            }
+            // Tint the column by mixing the status color into the theme
+            // surface (`--color-white` is the dark surface in dark mode), a
+            // little stronger in dark mode so the tint stays visible.
+            className={`flex flex-col rounded-lg border border-t-4 border-t-(--status) bg-[color-mix(in_srgb,var(--status)_8%,var(--color-white))] dark:bg-[color-mix(in_srgb,var(--status)_12%,var(--color-white))] ${
+                isTaskOver
+                    ? "border-[color-mix(in_srgb,var(--status)_70%,var(--color-white))]"
+                    : "border-[color-mix(in_srgb,var(--status)_30%,var(--color-white))] dark:border-[color-mix(in_srgb,var(--status)_40%,var(--color-white))]"
+            } ${
                 isBoard ? "max-h-full w-72 shrink-0" : "w-full"
             } ${isDragging ? "relative z-10 opacity-80 shadow-lg" : ""}`}
         >

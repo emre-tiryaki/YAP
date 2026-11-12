@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useDateFormat } from "../hooks/useDateFormat";
 import { useTranslate } from "../hooks/useTranslate";
 import type { CardAction } from "../types/cardAction";
 import type { Task } from "../types/task";
@@ -42,6 +43,7 @@ export function TaskList({
     onCreate,
 }: TaskListProps) {
     const t = useTranslate();
+    const format = useDateFormat();
     const [openTask, setOpenTask] = useState<Task | null>(null);
     const [taskAction, setTaskAction] = useState<{
         task: Task;
@@ -53,7 +55,7 @@ export function TaskList({
         const days = daysFromToday(date);
         if (days === 0) return t("workspace.tasks.today");
         if (days === 1) return t("workspace.tasks.tomorrow");
-        return date.toLocaleDateString(undefined, {
+        return date.toLocaleDateString(format.locale, {
             weekday: "long",
             day: "numeric",
             month: "long",

@@ -56,7 +56,7 @@ export function PlanList({
                     <button
                         type="button"
                         onClick={onCreate}
-                        className="cursor-pointer rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700"
+                        className="cursor-pointer rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg hover:bg-accent/85"
                     >
                         + {t("project.plans.create.title")}
                     </button>

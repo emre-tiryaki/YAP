@@ -84,7 +84,7 @@ export function IconButton({
                 title={t("icon.change")}
                 aria-haspopup="dialog"
                 aria-expanded={isOpen}
-                className={`grid size-12 cursor-pointer place-items-center rounded-lg font-semibold transition hover:ring-2 hover:ring-gray-300 focus-visible:outline-2 focus-visible:outline-gray-900 ${
+                className={`grid size-12 cursor-pointer place-items-center rounded-lg font-semibold transition hover:ring-2 hover:ring-gray-300 focus-visible:outline-2 focus-visible:outline-accent ${
                     icon ? "text-3xl" : `text-base ${accent.tile}`
                 }`}
             >

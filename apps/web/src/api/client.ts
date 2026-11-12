@@ -19,7 +19,7 @@ import type {
     Task,
     UpdateTaskInput,
 } from "../types/task";
-import type { Workspace } from "../types/workspace";
+import type { UpdateWorkspaceInput, Workspace } from "../types/workspace";
 
 type WorkspaceDto = {
     id: string;
@@ -480,4 +480,14 @@ export async function updateComment(
 
 export async function deleteComment(commentId: string): Promise<void> {
     await request<void>(`/api/comments/${commentId}`, { method: "DELETE" });
+}
+
+export async function updateWorkspace(
+    input: UpdateWorkspaceInput,
+): Promise<Workspace> {
+    const dto = await request<WorkspaceDto>("/api/workspace", {
+        method: "PATCH",
+        body: JSON.stringify({ name: input.name, user_name: input.username }),
+    });
+    return { id: dto.id, name: dto.name, username: dto.user_name };
 }

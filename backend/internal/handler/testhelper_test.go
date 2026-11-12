@@ -43,7 +43,7 @@ func newTestEnv(t *testing.T) testEnv {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/hello-world", HelloWorld)
-	NewWorkspaceHandler(session).Register(mux)
+	NewWorkspaceHandler(session, service.NewWorkspaceService(db, repository.NewWorkspaceRepository())).Register(mux)
 	NewProjectHandler(session, projectSvc).Register(mux)
 	NewTaskHandler(session, taskSvc).Register(mux)
 	NewCommentHandler(session, commentSvc).Register(mux)

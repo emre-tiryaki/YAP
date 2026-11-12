@@ -3,7 +3,10 @@ import WorkspaceHomePage from "./pages/WorkspaceHomePage"
 import NotFoundPage from "./pages/NotFoundPage";
 import ProjectDetailPage from "./pages/ProjectDetailPage";
 import PlanDetailPage from "./pages/PlanDetailPage";
+import { useEffect } from "react";
 import { Sidebar } from "./components/SideBar";
+import { usePreferences } from "./hooks/usePreferences";
+import { useTheme } from "./hooks/useTheme";
 
 // Shared shell: the sidebar stays mounted across page navigations.
 function AppLayout() {
@@ -16,6 +19,11 @@ function AppLayout() {
 }
 
 function App() {
+    const { language } = usePreferences();
+    useEffect(() => {
+        document.documentElement.lang = language;
+    }, [language]);
+    useTheme();
 
   return (
       <BrowserRouter>

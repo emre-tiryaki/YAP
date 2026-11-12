@@ -26,7 +26,7 @@ export function PlanCard({ plan }: PlanCardProps) {
         <div className="relative h-full">
             <Link
                 to={`/projects/${plan.projectId}/plans/${plan.id}`}
-                className={`flex h-full flex-col rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-gray-900 ${accent.hoverBorder}`}
+                className={`flex h-full flex-col rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-accent ${accent.hoverBorder}`}
             >
                 <div className="flex items-start gap-3 pr-8">
                     <span

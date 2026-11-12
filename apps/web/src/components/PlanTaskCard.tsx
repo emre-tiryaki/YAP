@@ -5,6 +5,7 @@ import {
     FiMessageSquare,
 } from "react-icons/fi";
 import { useParams } from "react-router";
+import { useDateFormat } from "../hooks/useDateFormat";
 import { useTranslate } from "../hooks/useTranslate";
 import type { CardAction } from "../types/cardAction";
 import type { PlanTask } from "../types/task";
@@ -35,6 +36,7 @@ export function PlanTaskCard({
     // On the plan page the route names the project and plan the task belongs
     // to; elsewhere the caller passes them.
     const t = useTranslate();
+    const format = useDateFormat();
     const params = useParams();
     const projectId = location.projectId ?? params.projectId ?? "";
     const planId = location.planId ?? params.planId ?? "";
@@ -99,7 +101,7 @@ export function PlanTaskCard({
                     {task.dueDate && (
                         <span className="flex items-center gap-1">
                             <FiCalendar aria-hidden />
-                            {task.dueDate.toLocaleDateString()}
+                            {format.date(task.dueDate)}
                         </span>
                     )}
                     {hasSubtasks && (

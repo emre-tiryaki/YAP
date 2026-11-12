@@ -17,7 +17,7 @@ export function StatusColorPicker({ value, onChange }: StatusColorPickerProps) {
                 {statusColors.map((c) => (
                     <label
                         key={c}
-                        className="cursor-pointer rounded-full has-checked:ring-2 has-checked:ring-gray-900 has-checked:ring-offset-2 has-focus-visible:ring-2 has-focus-visible:ring-gray-500"
+                        className="cursor-pointer rounded-full has-checked:ring-2 has-checked:ring-gray-900 has-checked:ring-offset-2 ring-offset-white has-focus-visible:ring-2 has-focus-visible:ring-gray-500"
                     >
                         <input
                             type="radio"
@@ -38,7 +38,7 @@ export function StatusColorPicker({ value, onChange }: StatusColorPickerProps) {
                 <label
                     title={t("plan.status.color.custom")}
                     className={`relative block h-6 w-6 cursor-pointer overflow-hidden rounded-full border border-gray-300 has-focus-visible:ring-2 has-focus-visible:ring-gray-500 ${
-                        isCustom ? "ring-2 ring-gray-900 ring-offset-2" : ""
+                        isCustom ? "ring-2 ring-gray-900 ring-offset-2 ring-offset-white" : ""
                     }`}
                     style={{
                         background: isCustom

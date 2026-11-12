@@ -4,6 +4,7 @@ import { useCreateTask } from "../hooks/useTasks";
 import { useTranslate } from "../hooks/useTranslate";
 import type { Status } from "../types/status";
 import { SelectInput } from "./SelectInput";
+import { DatePicker } from "./DatePicker";
 import { SubmitButton } from "./SubmitButton";
 import { TextInput } from "./TextInput";
 
@@ -69,11 +70,11 @@ export function CreatePlanTaskForm({
                     label: status.title,
                 }))}
             />
-            <TextInput
+            <DatePicker
                 label={t("plan.task.create.dueDate")}
-                type="date"
+                showLabel
                 value={dueDate}
-                onChange={(event) => setDueDate(event.target.value)}
+                onChange={setDueDate}
             />
             {createTask.error && (
                 <p role="alert" className="text-sm text-red-600">

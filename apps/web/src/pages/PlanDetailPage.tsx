@@ -22,6 +22,7 @@ import {
 } from "../hooks/usePlans";
 import { useProject } from "../hooks/useProjects";
 import { useMoveTask, usePlanTasks } from "../hooks/useTasks";
+import { useShortcut } from "../hooks/useShortcut";
 import { useTranslate } from "../hooks/useTranslate";
 import type { CardAction } from "../types/cardAction";
 import type { Status } from "../types/status";
@@ -48,6 +49,15 @@ export default function PlanDetailPage() {
         null,
     );
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+    // New tasks from the keyboard go to the first status.
+    const firstStatusId = statuses.data?.[0]?.id;
+    useShortcut(
+        { key: "n" },
+        () => {
+            if (firstStatusId) setNewTaskStatusId(firstStatusId);
+        },
+        firstStatusId !== undefined,
+    );
     const [editingStatus, setEditingStatus] = useState<Status | null>(null);
     const [deletingStatus, setDeletingStatus] = useState<Status | null>(null);
     const [taskAction, setTaskAction] = useState<{
