@@ -32,6 +32,9 @@ The same logical schema exists in two physical databases:
 | Status | A Kanban column of a project, categorized as `todo`, `in_progress` or `done`. |
 | Task | A unit of work in a project and status. It can have one owning team, assignees and subtasks. It is finished when explicitly marked done, independent of its status column. |
 | Comment | A note a member leaves on a task. Only its author can edit or delete it. |
+| Resource | A folder or file in the workspace's single resource tree. Files can be previewed, text files edited in place. Resources can be linked to tasks (many-to-many). Deleting moves an item to a trash, from which it is restored or purged for good. |
+| Resource event | One entry of the resource activity log: who created, uploaded, edited, renamed, moved, copied, trashed, restored, purged, linked or unlinked which resource, and when. It records that a file changed, not what changed; file contents have no version history. |
+| User setting | A preference that follows the user to every device (for now: autosave on/off and delay for the resource editor). Interface-only preferences stay per device. |
 
 ## Design Decisions
 

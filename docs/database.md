@@ -183,6 +183,14 @@ erDiagram
     tasks o|--o{ tasks : "parent-child"
     tasks ||--o{ task_comments : "has comments"
     memberships ||--o{ task_comments : "writes"
+
+    workspaces ||--o{ resources : "contains"
+    resources o|--o{ resources : "parent-child"
+    tasks ||--o{ task_resources : "links"
+    resources ||--o{ task_resources : "linked to"
+    resources ||--o{ resource_events : "has activity"
+    memberships ||--o{ resource_events : "acts"
+    users ||--o{ user_settings : "has"
 ```
 
 ## 1. General Structure
@@ -263,6 +271,10 @@ Rules:
 | A subtask and its parent are in the same project. | `tasks (parent_id, project_id)` → `tasks (id, project_id)`. The plan may differ. |
 | A comment belongs to a task and an author of the same workspace. | `task_comments (task_id, workspace_id)` → `tasks (id, workspace_id)`, `task_comments (author_id, workspace_id)` → `memberships (id, workspace_id)`. |
 | A comment body is not empty. | `CHECK (length(body) > 0)`. |
+| A resource, its parent, its task links and its events belong to the same workspace. | Composite foreign keys on `(resource_id / parent_id, workspace_id)`. |
+| Live sibling resource names are unique case-insensitively. | Partial unique index on `(workspace_id, COALESCE(parent_id, ''), name_key) WHERE trashed_at IS NULL AND deleted_at IS NULL`; `name_key` is the lowercased name. |
+| A trashed resource knows what it was trashed with. | `CHECK ((trashed_at IS NULL) = (trashed_root_id IS NULL))`. |
+| A folder has no content fields. | `CHECK (kind = 'file' OR (mime_type IS NULL AND size = 0 AND is_text = 0))`. |
 | Plan names are unique within a project and team scope. | Partial unique index on `(project_id, COALESCE(team_id, ''), name) WHERE deleted_at IS NULL`. |
 | Team names are unique within a workspace. | Partial unique index: `WHERE deleted_at IS NULL`. |
 | A user can have only one membership in a given workspace. | Unique constraint on `(workspace_id, user_id)`. |
@@ -299,7 +311,15 @@ All of these rules are protected by unit tests.
 | Reordering a status within its plan. | Only the moved row is written: its `position` becomes the midpoint (`position.Between`) of its new neighbours among the plan's non-deleted statuses. Tasks keep their `status_id` and `position`. |
 | Editing a status. | Only `title`, `description` and `color` can be changed (`#rrggbb`, stored lowercase); the status must belong to the plan in the URL. `category` and `position` are left untouched, so the "at least one `done` status" rule cannot be broken by an edit. |
 | Deleting a status. | The status, its tasks and all of their subtasks (even those in other statuses) and their comments are individually marked with `deleted_at`, and their open `task_assignees` rows get `removed_at`, within the same transaction. The status must belong to the plan in the URL, and the plan's last `done`-category status cannot be deleted. |
-| When a task is deleted. | The task, all of its subtasks and their comments are marked with `deleted_at`, and their open `task_assignees` rows get `removed_at`, within the same transaction. |
+| When a task is deleted. | The task, all of its subtasks and their comments are marked with `deleted_at`, and their open `task_assignees` and `task_resources` rows get `removed_at`, within the same transaction. Deleting a plan, status or project closes the `task_resources` rows of its tasks the same way. |
+| Resource names. | Trimmed; 1–255 bytes of UTF-8; no `/ \ : * ? " < > \|` or control characters; not `.` or `..`. `.yap-trash` is reserved at the top of the tree (it is the trash directory on disk). |
+| Name conflicts on create, upload, move and copy. | `fail` (409), `keep_both` (first free `name (n).ext`) or `replace`. Replace is only file over file: an upload gives the existing file the new content (it keeps its id and task links); a move or copy moves the existing file to the trash. Restoring from the trash always uses `keep_both`. |
+| A folder cannot be moved or copied into itself or its descendants. | Rejected as invalid input. |
+| Trash. | Trashing marks the item and its live descendants with `trashed_at` and `trashed_root_id` = the item. Only items with `trashed_root_id = id` are listed in the trash. Restoring brings back exactly that group, into the original folder, or to the top when that folder is no longer live. Task links stay while an item is trashed and are shown as trashed. |
+| Purge (permanent delete). | Only for trash roots, one by one or by emptying the trash. The bytes are removed from the disk; the rows get `deleted_at` and stay as tombstones so the activity log and synchronization still see them; their open `task_resources` rows get `removed_at`. |
+| Editing a text file. | The save carries the revision it was based on; a different stored revision is rejected as `stale` (409). Every content change bumps `revision`. Content must be valid UTF-8 without NUL bytes and at most 20 MiB. Uploads are at most 100 MiB. |
+| Activity log. | Every change to a resource writes a `resource_events` row in the same transaction. Saves of the same file by the same member less than 10 minutes after the previous one extend that member's last `edited` event (`updated_at`, `details`) instead of adding a row. Link and unlink events carry `task_id`. |
+| Autosave settings. | `resources.autosave_delay_ms` is between 300 and 10 000; unknown or unreadable stored values fall back to the defaults (on, 1000 ms). |
 
 ## 5. Table Reference
 
@@ -318,6 +338,10 @@ All of these rules are protected by unit tests.
 | tasks          | Both     | Tasks | `plan_id` and `project_id` are both stored; `parent_id` identifies a subtask; `completed_at` is set while the task is finished. |
 | task_assignees | Both     | Person assignments to tasks | |
 | task_comments  | Both     | Comments on tasks | `author_id` is a membership; soft-deleted with `deleted_at`. |
+| resources      | Both     | Folders and files of a workspace | The bytes live on disk under `RESOURCES_PATH/<workspace_id>/<path>` (trashed items under `.yap-trash/<trash root id>/`); the rows are the source of truth for the tree. `revision` counts content changes. `deleted_at` marks a purged tombstone. |
+| task_resources | Both     | Links between tasks and resources | Re-linking clears `removed_at`. |
+| resource_events | Both    | Resource activity log | Append-only apart from extending an open `edited` event. `details` is a JSON object (name, from/to paths, size, task title). |
+| user_settings  | Both     | Per-user settings, synchronized to all of the user's devices | Not workspace-scoped. Key/value with a JSON value. |
 | invitations    | Server   | Workspace invitations | The token is never stored in plaintext; only its hash is stored. |
 
 ## 6. Indexes
@@ -338,6 +362,12 @@ All of these rules are protected by unit tests.
 | `task_comments (task_id, created_at) WHERE deleted_at IS NULL` | List a task's comments in order and count them. |
 | `task_comments (workspace_id, updated_at)` | Retrieve changed comments during synchronization. |
 | `projects (workspace_id) WHERE deleted_at IS NULL` | non-deleted projects of a workspace |
+| `resources (workspace_id, COALESCE(parent_id, ''), name_key) WHERE trashed_at IS NULL AND deleted_at IS NULL` (unique) | Sibling name uniqueness. |
+| `resources (parent_id)` | Walk a folder's subtree. |
+| `resources (trashed_root_id) WHERE trashed_root_id IS NOT NULL` | Restore or purge a trashed group. |
+| `task_resources (resource_id) WHERE removed_at IS NULL` | Tasks a resource is linked to. |
+| `resource_events (workspace_id, id)`, `(resource_id, id)`, `(task_id)` | Page the activity log of a workspace, a resource or a project. |
+| `resources`, `task_resources`, `resource_events (workspace_id, updated_at)` | Retrieve changed records during synchronization. |
 
 ## 7. Synchronization Notes
 
@@ -346,6 +376,8 @@ Synchronization is not implemented at this stage; the schema has been designed w
 - `updated_at` is based on the client clock. Last-Write-Wins (LWW) conflict resolution may select the wrong winner when clocks are skewed. A monotonically increasing version number (sequence) will be maintained on the server and used as the synchronization cursor.
 - `accounts` and `invitations` are not synchronized.
 - AI chat tables are not synchronized. API keys are not stored in the database; they are stored in the operating system's keychain.
+- Resource bytes are not in the database. Synchronizing them needs a blob transfer next to the row sync (the server stores the bytes and hands them only to members allowed to see them).
+- `user_settings` is synchronized per user across all of their devices, not per workspace.
 
 ## 8. Out of Scope
 
@@ -357,6 +389,11 @@ Synchronization is not implemented at this stage; the schema has been designed w
 | Multiple email addresses | Since `accounts.user_id` is unique, a user can have only one account. If needed, the `accounts` table can be split. |
 | Multiple owning teams | Handled through subtasks in separate team plans. |
 | Labels, priority, task numbers | Product features to be added at the relevant stage. |
+| Per-resource access control | Would be a security boundary below the workspace: the server must not even send such rows or bytes to members without access. To add later as a `resource_permissions` table and a sync filter; resource bytes are only ever served through the API, so the disk layout can change without clients noticing. |
+| Resource content history (versions, diffs, restoring an older content) | The activity log records that a file changed and by whom, not what changed. |
+| A separate (NoSQL) store for the activity log | The log is low-volume thanks to edit merging; an append-only SQLite table is enough. Old events can be archived on the server if it ever grows too large. |
+| Watching the resources folder for outside changes | Changes made outside the app are not detected or logged; the database is the source of truth and a missing file is reported as such. |
+| Link resources (URLs), folder upload, automatic trash cleanup | Not needed for the first version. |
 
 ## 9. Open Decisions
 

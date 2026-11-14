@@ -11,7 +11,7 @@ Read before non-trivial changes:
 
 ## Commands
 
-A `.env` at the repo root is required (`DB_PATH`, `BACKEND_PORT`, `COOKIE_SECURE`). The backend finds it by walking up from cwd (stopping at `.git`) and resolves relative `DB_PATH` against the `.env` directory. The Vite config throws if `../../.env` or `BACKEND_PORT` is missing.
+A `.env` at the repo root is required (`DB_PATH`, `BACKEND_PORT`, `COOKIE_SECURE`; optional `RESOURCES_PATH`, default `resources/` next to the DB, where resource files are stored). The backend finds it by walking up from cwd (stopping at `.git`) and resolves relative `DB_PATH` against the `.env` directory. The Vite config throws if `../../.env` or `BACKEND_PORT` is missing.
 
 ```bash
 make dev                                  # start backend, wait for /hello-world, then start Vite

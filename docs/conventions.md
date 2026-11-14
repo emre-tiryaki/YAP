@@ -35,7 +35,7 @@ Dependency direction is one-way: `handler -> service -> repository -> database`.
 - Every query is parameterized. String concatenation into SQL is forbidden.
 - Every query on a synchronized table filters by `workspace_id`.
 - Reads exclude soft-deleted rows: `deleted_at IS NULL` for entities, `removed_at IS NULL` for relationship rows, `left_at IS NULL` for memberships.
-- Deletion is soft only. Physical `DELETE` appears only in the purge job. **(DB)**
+- Deletion is soft only. Physical `DELETE` appears only in the purge job. **(DB)** Purging a resource deletes its bytes from the disk but keeps its rows as tombstones (`deleted_at`).
 - Re-adding a removed relationship clears `removed_at` instead of inserting a new row. **(DB)**
 - Every write sets `updated_at`.
 - A rule that touches several rows (member leaves, team removed, project deleted) runs inside a single transaction. **(DB)**
