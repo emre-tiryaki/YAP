@@ -58,6 +58,9 @@ type resourceResponse struct {
 	CreatedAt string  `json:"created_at"`
 	UpdatedAt string  `json:"updated_at"`
 	TrashedAt *string `json:"trashed_at"`
+	// TrashedRootID is the item that was moved to the trash, taking this one
+	// with it. Only an item that is its own trash root can be restored.
+	TrashedRootID *string `json:"trashed_root_id"`
 }
 
 func rfc3339(t time.Time) string {
@@ -85,6 +88,7 @@ func toResourceResponse(r model.Resource) resourceResponse {
 		UpdatedAt: rfc3339(r.UpdatedAt),
 	}
 	res.TrashedAt = formatTime(r.TrashedAt)
+	res.TrashedRootID = optionalString(r.TrashedRootID)
 	return res
 }
 
