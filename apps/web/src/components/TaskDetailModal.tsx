@@ -14,6 +14,7 @@ import { CommentSection } from "./CommentSection";
 import { DatePicker } from "./DatePicker";
 import { FormError } from "./FormError";
 import { SubtaskList } from "./SubtaskList";
+import { TaskResourceSection } from "./TaskResourceSection";
 
 // The editor pulls in TipTap, so it loads only once the dialog opens.
 const MarkdownEditor = lazy(() =>
@@ -240,6 +241,9 @@ function TaskDetailBody({
 
                 <hr className="border-gray-100" />
                 <SubtaskList taskId={task.id} />
+
+                <hr className="border-gray-100" />
+                <TaskResourceSection taskId={task.id} />
 
                 <hr className="border-gray-100" />
                 <CommentSection taskId={task.id} />

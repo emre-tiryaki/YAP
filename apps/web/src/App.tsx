@@ -3,6 +3,7 @@ import WorkspaceHomePage from "./pages/WorkspaceHomePage"
 import NotFoundPage from "./pages/NotFoundPage";
 import ProjectDetailPage from "./pages/ProjectDetailPage";
 import PlanDetailPage from "./pages/PlanDetailPage";
+import ResourcesPage from "./pages/ResourcesPage";
 import { useEffect } from "react";
 import { Sidebar } from "./components/SideBar";
 import { usePreferences } from "./hooks/usePreferences";
@@ -33,6 +34,9 @@ function App() {
                   <Route path="/home" element={<WorkspaceHomePage />} />
                   <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
                   <Route path="/projects/:projectId/plans/:planId" element={<PlanDetailPage />} />
+                  <Route path="/resources" element={<ResourcesPage />} />
+                  <Route path="/resources/trash" element={<ResourcesPage view="trash" />} />
+                  <Route path="/resources/:resourceId" element={<ResourcesPage />} />
               </Route>
               <Route path="*" element={<NotFoundPage />} />
           </Routes>

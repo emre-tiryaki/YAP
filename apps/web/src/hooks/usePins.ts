@@ -13,7 +13,7 @@ function isPin(value: unknown): value is Pin {
   if (typeof value !== "object" || value === null) return false;
   const pin = value as Record<string, unknown>;
   return (
-    (pin.kind === "project" || pin.kind === "task") &&
+    (pin.kind === "project" || pin.kind === "task" || pin.kind === "resource") &&
     typeof pin.id === "string" &&
     typeof pin.label === "string" &&
     typeof pin.href === "string"

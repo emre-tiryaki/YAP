@@ -12,7 +12,9 @@ import {
   FiCheckSquare,
   FiChevronUp,
   FiCommand,
+  FiFile,
   FiFolder,
+  FiHardDrive,
   FiHelpCircle,
   FiHome,
   FiLogOut,
@@ -103,6 +105,13 @@ export function Sidebar() {
             isActive={pathname === "/home"}
             isCollapsed={isCollapsed}
           />
+          <NavLink
+            href="/resources"
+            label={t("sidebar.resources")}
+            Icon={FiHardDrive}
+            isActive={pathname === "/resources" || pathname.startsWith("/resources/")}
+            isCollapsed={isCollapsed}
+          />
         </ul>
 
         <Section title={t("sidebar.pinned")} isCollapsed={isCollapsed}>
@@ -117,7 +126,13 @@ export function Sidebar() {
               key={`${pin.kind}-${pin.id}`}
               href={pin.href}
               label={pinLabel(pin)}
-              Icon={pin.kind === "project" ? FiFolder : FiCheckSquare}
+              Icon={
+                pin.kind === "project"
+                  ? FiFolder
+                  : pin.kind === "resource"
+                    ? FiFile
+                    : FiCheckSquare
+              }
               emoji={pinEmoji(pin)}
               isActive={false}
               isCollapsed={isCollapsed}

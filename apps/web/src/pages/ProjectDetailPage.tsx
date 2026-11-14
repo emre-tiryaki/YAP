@@ -14,6 +14,7 @@ import { PlanList } from "../components/PlanList";
 import { InlineError } from "../components/InlineError";
 import { Modal } from "../components/Modal";
 import { CreatePlanForm } from "../components/CreatePlanForm";
+import { ResourceActivity } from "../components/ResourceActivity";
 
 export default function ProjectDetailPage() {
     const t = useTranslate();
@@ -51,13 +52,29 @@ export default function ProjectDetailPage() {
                                 void navigate("/home", { replace: true })
                             }
                         />
-                        <PlanList
-                            plans={plans.data ?? []}
-                            isLoading={plans.isLoading}
-                            isError={plans.isError}
-                            onRetry={() => void plans.refetch()}
-                            onCreate={() => setIsPlanModalOpen(true)}
-                        />
+                        <div className="flex flex-col gap-8 xl:flex-row xl:items-start">
+                            <div className="min-w-0 flex-1">
+                                <PlanList
+                                    plans={plans.data ?? []}
+                                    isLoading={plans.isLoading}
+                                    isError={plans.isError}
+                                    onRetry={() => void plans.refetch()}
+                                    onCreate={() => setIsPlanModalOpen(true)}
+                                />
+                            </div>
+                            <aside
+                                aria-labelledby="project-activity"
+                                className="w-full shrink-0 rounded-lg border border-gray-200 bg-white p-5 xl:sticky xl:top-8 xl:w-80"
+                            >
+                                <h2 id="project-activity" className="mb-4 text-sm font-semibold text-gray-900">
+                                    {t("project.activity.title")}
+                                </h2>
+                                <ResourceActivity
+                                    scope={{ kind: "project", id: projectId }}
+                                    emptyText={t("project.activity.empty")}
+                                />
+                            </aside>
+                        </div>
                     </>
                 )}
             </main>

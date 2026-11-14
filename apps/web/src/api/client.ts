@@ -20,6 +20,19 @@ import type {
     UpdateTaskInput,
 } from "../types/task";
 import type { UpdateWorkspaceInput, Workspace } from "../types/workspace";
+import type {
+    LinkedTask,
+    OnConflict,
+    Resource,
+    ResourceAction,
+    ResourceEvent,
+    ResourceEventScope,
+    ResourceKind,
+} from "../types/resource";
+import type {
+    UpdateUserSettingsInput,
+    UserSettings,
+} from "../types/userSettings";
 
 type WorkspaceDto = {
     id: string;
@@ -107,6 +120,55 @@ type CommentDto = {
     is_own: boolean;
 };
 
+type ResourceDto = {
+    id: string;
+    parent_id: string | null;
+    kind: ResourceKind;
+    name: string;
+    mime_type: string;
+    size: number;
+    is_text: boolean;
+    revision: number;
+    created_at: string;
+    updated_at: string;
+    trashed_at: string | null;
+    trashed_root_id: string | null;
+};
+
+type ResourceEventDto = {
+    id: string;
+    resource_id: string;
+    resource_kind: ResourceKind;
+    actor_id: string;
+    actor_name: string;
+    action: ResourceAction;
+    task_id: string | null;
+    details: {
+        name?: string;
+        from?: string;
+        to?: string;
+        size?: number;
+        replaced?: boolean;
+        task_title?: string;
+    };
+    created_at: string;
+    updated_at: string;
+};
+
+type LinkedTaskDto = {
+    id: string;
+    title: string;
+    project_id: string;
+    project_name: string;
+    plan_id: string;
+    completed_at: string | null;
+};
+
+type UserSettingsDto = {
+    autosave_enabled: boolean;
+    autosave_delay_ms: number;
+};
+
 export class ApiError extends Error {
     status: number;
 
@@ -117,10 +179,14 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-    const response = await fetch(path, {
+    return send<T>(path, {
         ...init,
         headers: { "Content-Type": "application/json" },
     });
+}
+
+async function send<T>(path: string, init: RequestInit): Promise<T> {
+    const response = await fetch(path, init);
 
     if (!response.ok) {
         const body: unknown = await response.json().catch(() => null);
@@ -495,4 +561,290 @@ export async function updateWorkspace(
         body: JSON.stringify({ name: input.name, user_name: input.username }),
     });
     return { id: dto.id, name: dto.name, username: dto.user_name };
+}
+
+function toResource(dto: ResourceDto): Resource {
+    return {
+        id: dto.id,
+        parentId: dto.parent_id,
+        kind: dto.kind,
+        name: dto.name,
+        mimeType: dto.mime_type,
+        size: dto.size,
+        isText: dto.is_text,
+        revision: dto.revision,
+        createdAt: new Date(dto.created_at),
+        updatedAt: new Date(dto.updated_at),
+        trashedAt: dto.trashed_at ? new Date(dto.trashed_at) : null,
+        trashedRootId: dto.trashed_root_id,
+    };
+}
+
+function toResourceEvent(dto: ResourceEventDto): ResourceEvent {
+    return {
+        id: dto.id,
+        resourceId: dto.resource_id,
+        resourceKind: dto.resource_kind,
+        actorName: dto.actor_name,
+        action: dto.action,
+        taskId: dto.task_id,
+        details: {
+            name: dto.details.name ?? "",
+            from: dto.details.from,
+            to: dto.details.to,
+            size: dto.details.size,
+            replaced: dto.details.replaced,
+            taskTitle: dto.details.task_title,
+        },
+        createdAt: new Date(dto.created_at),
+        updatedAt: new Date(dto.updated_at),
+    };
+}
+
+function toLinkedTask(dto: LinkedTaskDto): LinkedTask {
+    return {
+        id: dto.id,
+        title: dto.title,
+        projectId: dto.project_id,
+        projectName: dto.project_name,
+        planId: dto.plan_id,
+        completedAt: dto.completed_at ? new Date(dto.completed_at) : null,
+    };
+}
+
+// Every live resource of the workspace; the tree is built from parentId.
+export async function listResources(): Promise<Resource[]> {
+    const dtos = await request<ResourceDto[]>("/api/resources");
+    return dtos.map(toResource);
+}
+
+export async function getResource(id: string): Promise<Resource> {
+    return toResource(await request<ResourceDto>(`/api/resources/${id}`));
+}
+
+export async function listTrash(): Promise<Resource[]> {
+    const dtos = await request<ResourceDto[]>("/api/resources/trash");
+    return dtos.map(toResource);
+}
+
+export async function emptyTrash(): Promise<void> {
+    await request<void>("/api/resources/trash", { method: "DELETE" });
+}
+
+export async function createFolder(
+    parentId: string | null,
+    name: string,
+): Promise<Resource> {
+    const dto = await request<ResourceDto>("/api/resources/folders", {
+        method: "POST",
+        body: JSON.stringify({ parent_id: parentId, name }),
+    });
+    return toResource(dto);
+}
+
+// Creates an empty file, ready to be edited.
+export async function createFile(
+    parentId: string | null,
+    name: string,
+): Promise<Resource> {
+    const dto = await request<ResourceDto>("/api/resources/files", {
+        method: "POST",
+        body: JSON.stringify({ parent_id: parentId, name }),
+    });
+    return toResource(dto);
+}
+
+export async function uploadFile(
+    parentId: string | null,
+    file: File,
+    onConflict: OnConflict,
+    name = file.name,
+): Promise<Resource> {
+    const query = new URLSearchParams({ name, on_conflict: onConflict });
+    if (parentId) query.set("parent_id", parentId);
+    const dto = await send<ResourceDto>(`/api/resources/upload?${query}`, {
+        method: "POST",
+        headers: file.type ? { "Content-Type": file.type } : undefined,
+        body: file,
+    });
+    return toResource(dto);
+}
+
+// URL of a file's bytes, for previews (inline) and downloads. The revision
+// busts the browser cache once the content changes.
+export function resourceContentUrl(
+    resource: Pick<Resource, "id" | "revision">,
+    download = false,
+): string {
+    const query = new URLSearchParams({ v: String(resource.revision) });
+    if (download) query.set("download", "1");
+    return `/api/resources/${resource.id}/content?${query}`;
+}
+
+export async function readResourceText(
+    resource: Pick<Resource, "id" | "revision">,
+): Promise<string> {
+    const response = await fetch(resourceContentUrl(resource));
+    if (!response.ok) {
+        const body: unknown = await response.json().catch(() => null);
+        const code =
+            typeof body === "object" &&
+            body !== null &&
+            "error" in body &&
+            typeof body.error === "string"
+                ? body.error
+                : "unknown";
+        throw new ApiError(response.status, code);
+    }
+    return response.text();
+}
+
+// Saves the text of a file. Rejected with 409 "stale" when the file changed
+// since `revision` was read.
+export async function saveResourceText(
+    id: string,
+    revision: number,
+    text: string,
+): Promise<Resource> {
+    const dto = await send<ResourceDto>(
+        `/api/resources/${id}/content?revision=${revision}`,
+        {
+            method: "PUT",
+            headers: { "Content-Type": "text/plain; charset=utf-8" },
+            body: text,
+        },
+    );
+    return toResource(dto);
+}
+
+export async function renameResource(
+    id: string,
+    name: string,
+): Promise<Resource> {
+    const dto = await request<ResourceDto>(`/api/resources/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name }),
+    });
+    return toResource(dto);
+}
+
+export async function moveResource(
+    id: string,
+    parentId: string | null,
+    onConflict: OnConflict,
+): Promise<Resource> {
+    const dto = await request<ResourceDto>(`/api/resources/${id}/move`, {
+        method: "POST",
+        body: JSON.stringify({ parent_id: parentId, on_conflict: onConflict }),
+    });
+    return toResource(dto);
+}
+
+export async function copyResource(
+    id: string,
+    parentId: string | null,
+    onConflict: OnConflict,
+): Promise<Resource> {
+    const dto = await request<ResourceDto>(`/api/resources/${id}/copy`, {
+        method: "POST",
+        body: JSON.stringify({ parent_id: parentId, on_conflict: onConflict }),
+    });
+    return toResource(dto);
+}
+
+export async function trashResource(id: string): Promise<void> {
+    await request<void>(`/api/resources/${id}/trash`, { method: "POST" });
+}
+
+export async function restoreResource(id: string): Promise<Resource> {
+    const dto = await request<ResourceDto>(`/api/resources/${id}/restore`, {
+        method: "POST",
+    });
+    return toResource(dto);
+}
+
+// Deletes a trashed item for good.
+export async function purgeResource(id: string): Promise<void> {
+    await request<void>(`/api/resources/${id}`, { method: "DELETE" });
+}
+
+function eventsPath(scope: ResourceEventScope): string {
+    switch (scope.kind) {
+        case "workspace":
+            return "/api/resources/events";
+        case "resource":
+            return `/api/resources/${scope.id}/events`;
+        case "project":
+            return `/api/projects/${scope.id}/resource-events`;
+    }
+}
+
+// A page of the activity log, newest first; `before` is the id of the oldest
+// event already shown.
+export async function listResourceEvents(
+    scope: ResourceEventScope,
+    before: string | null,
+    limit: number,
+): Promise<ResourceEvent[]> {
+    const query = new URLSearchParams({ limit: String(limit) });
+    if (before) query.set("before", before);
+    const dtos = await request<ResourceEventDto[]>(
+        `${eventsPath(scope)}?${query}`,
+    );
+    return dtos.map(toResourceEvent);
+}
+
+export async function listResourceTasks(id: string): Promise<LinkedTask[]> {
+    const dtos = await request<LinkedTaskDto[]>(`/api/resources/${id}/tasks`);
+    return dtos.map(toLinkedTask);
+}
+
+// Resources linked to a task; trashed ones included (trashedAt is set).
+export async function listTaskResources(taskId: string): Promise<Resource[]> {
+    const dtos = await request<ResourceDto[]>(`/api/tasks/${taskId}/resources`);
+    return dtos.map(toResource);
+}
+
+export async function linkResource(
+    taskId: string,
+    resourceId: string,
+): Promise<void> {
+    await request<void>(`/api/tasks/${taskId}/resources/${resourceId}`, {
+        method: "PUT",
+    });
+}
+
+export async function unlinkResource(
+    taskId: string,
+    resourceId: string,
+): Promise<void> {
+    await request<void>(`/api/tasks/${taskId}/resources/${resourceId}`, {
+        method: "DELETE",
+    });
+}
+
+function toUserSettings(dto: UserSettingsDto): UserSettings {
+    return {
+        autosaveEnabled: dto.autosave_enabled,
+        autosaveDelayMs: dto.autosave_delay_ms,
+    };
+}
+
+export async function getUserSettings(): Promise<UserSettings> {
+    return toUserSettings(await request<UserSettingsDto>("/api/settings"));
+}
+
+export async function updateUserSettings(
+    input: UpdateUserSettingsInput,
+): Promise<UserSettings> {
+    const body: Partial<UserSettingsDto> = {};
+    if (input.autosaveEnabled !== undefined)
+        body.autosave_enabled = input.autosaveEnabled;
+    if (input.autosaveDelayMs !== undefined)
+        body.autosave_delay_ms = input.autosaveDelayMs;
+    const dto = await request<UserSettingsDto>("/api/settings", {
+        method: "PATCH",
+        body: JSON.stringify(body),
+    });
+    return toUserSettings(dto);
 }

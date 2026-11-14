@@ -25,6 +25,11 @@ import {
 } from "../hooks/usePreferences";
 import { useTranslate, type TranslationKey } from "../hooks/useTranslate";
 import { useUpdateWorkspace, useWorkspace } from "../hooks/useWorkspace";
+import {
+  defaultUserSettings,
+  useUpdateUserSettings,
+  useUserSettings,
+} from "../hooks/useUserSettings";
 import type {
   Accent,
   DateFormat,
@@ -251,7 +256,60 @@ function GeneralSettings() {
           />
         </SettingRow>
       </SettingsGroup>
+
+      <EditorSettings />
     </div>
+  );
+}
+
+const autosaveDelays = [500, 1000, 2000, 5000];
+
+// Stored in the database, so they follow the user to every device.
+function EditorSettings() {
+  const t = useTranslate();
+  const settings = useUserSettings();
+  const update = useUpdateUserSettings();
+  const current = settings.data ?? defaultUserSettings;
+  const delays = autosaveDelays.includes(current.autosaveDelayMs)
+    ? autosaveDelays
+    : [...autosaveDelays, current.autosaveDelayMs].sort((a, b) => a - b);
+
+  return (
+    <SettingsGroup title={t("settings.editor.title")}>
+      <SettingRow
+        label={t("settings.editor.autosave")}
+        hint={
+          update.isError
+            ? t("common.error")
+            : t("settings.editor.autosave.hint")
+        }
+        hintTone={update.isError ? "error" : "default"}
+      >
+        <Toggle
+          label={t("settings.editor.autosave")}
+          checked={current.autosaveEnabled}
+          onChange={(autosaveEnabled) => update.mutate({ autosaveEnabled })}
+        />
+      </SettingRow>
+      <SettingRow
+        label={t("settings.editor.delay")}
+        hint={t("settings.editor.delay.hint")}
+      >
+        <div className={current.autosaveEnabled ? "" : "opacity-40"}>
+          <Select
+            label={t("settings.editor.delay")}
+            value={String(current.autosaveDelayMs)}
+            onChange={(value) =>
+              update.mutate({ autosaveDelayMs: Number(value) })
+            }
+            options={delays.map((ms) => ({
+              value: String(ms),
+              label: `${ms / 1000} ${t("settings.editor.seconds")}`,
+            }))}
+          />
+        </div>
+      </SettingRow>
+    </SettingsGroup>
   );
 }
 
@@ -611,6 +669,12 @@ const shortcuts: { label: TranslationKey; keys: string[]; global: boolean }[] = 
   { label: "settings.shortcuts.newTask", keys: ["N"], global: true },
   { label: "settings.shortcuts.toggleSidebar", keys: [mod, "B"], global: true },
   { label: "settings.shortcuts.openSettings", keys: [mod, ","], global: true },
+  { label: "settings.shortcuts.resourceRename", keys: ["F2"], global: true },
+  { label: "settings.shortcuts.resourceTrash", keys: ["Delete"], global: true },
+  { label: "settings.shortcuts.resourceCut", keys: [mod, "X"], global: true },
+  { label: "settings.shortcuts.resourceCopy", keys: [mod, "C"], global: true },
+  { label: "settings.shortcuts.resourcePaste", keys: [mod, "V"], global: true },
+  { label: "settings.shortcuts.saveFile", keys: [mod, "S"], global: false },
   { label: "settings.shortcuts.sendComment", keys: [mod, "Enter"], global: false },
   { label: "settings.shortcuts.closeDialog", keys: ["Esc"], global: false },
 ];

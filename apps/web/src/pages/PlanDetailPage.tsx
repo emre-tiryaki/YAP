@@ -66,7 +66,10 @@ export default function PlanDetailPage() {
     } | null>(null);
     // Looked up in the query data so the dialog always shows fresh values
     // and closes by itself once the task is gone.
-    const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+    // A link may open a task directly (?task=<id>), e.g. from a resource.
+    const [openTaskId, setOpenTaskId] = useState<string | null>(() =>
+        searchParams.get("task"),
+    );
     const openTask = tasks.data?.find((task) => task.id === openTaskId);
 
     if (plan.error instanceof ApiError && plan.error.status === 404)
@@ -278,7 +281,17 @@ export default function PlanDetailPage() {
                         setOpenTaskId(null);
                         setTaskAction({ task: openTask, action: "delete" });
                     }}
-                    onClose={() => setOpenTaskId(null)}
+                    onClose={() => {
+                        setOpenTaskId(null);
+                        if (searchParams.has("task"))
+                            setSearchParams(
+                                (params) => {
+                                    params.delete("task");
+                                    return params;
+                                },
+                                { replace: true },
+                            );
+                    }}
                 />
             )}
 

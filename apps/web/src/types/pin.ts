@@ -1,4 +1,4 @@
-export type PinKind = "project" | "task";
+export type PinKind = "project" | "task" | "resource";
 
 // A shortcut shown in the sidebar. The label is a snapshot taken when pinning
 // and refreshed on rename, so the sidebar can render it without a request.
