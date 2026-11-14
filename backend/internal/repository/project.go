@@ -328,6 +328,9 @@ func (*ProjectRepository) Update(ctx context.Context, q database.DBTX, p model.P
 // and closes its team links, so every row carries its own deletion record.
 func (*ProjectRepository) SoftDelete(ctx context.Context, q database.DBTX, workspaceID, projectID, now string) error {
 	steps := []struct{ name, query string }{
+		{"task resource links", `UPDATE task_resources SET removed_at = ?, updated_at = ?
+			 WHERE workspace_id = ? AND removed_at IS NULL
+			   AND task_id IN (SELECT id FROM tasks WHERE workspace_id = task_resources.workspace_id AND project_id = ?)`},
 		{"task comments", `UPDATE task_comments SET deleted_at = ?, updated_at = ?
 			 WHERE workspace_id = ? AND deleted_at IS NULL
 			   AND task_id IN (SELECT id FROM tasks WHERE workspace_id = task_comments.workspace_id AND project_id = ?)`},
@@ -367,6 +370,9 @@ func (*ProjectRepository) UpdatePlan(ctx context.Context, q database.DBTX, p mod
 // SoftDeletePlan marks the plan and its statuses and tasks as deleted.
 func (*ProjectRepository) SoftDeletePlan(ctx context.Context, q database.DBTX, workspaceID, planID, now string) error {
 	steps := []struct{ name, query string }{
+		{"task resource links", `UPDATE task_resources SET removed_at = ?, updated_at = ?
+			 WHERE workspace_id = ? AND removed_at IS NULL
+			   AND task_id IN (SELECT id FROM tasks WHERE workspace_id = task_resources.workspace_id AND plan_id = ? AND deleted_at IS NULL)`},
 		{"task comments", `UPDATE task_comments SET deleted_at = ?, updated_at = ?
 			 WHERE workspace_id = ? AND deleted_at IS NULL
 			   AND task_id IN (SELECT id FROM tasks WHERE workspace_id = task_comments.workspace_id AND plan_id = ? AND deleted_at IS NULL)`},
@@ -397,6 +403,8 @@ func (*ProjectRepository) SoftDeleteStatus(ctx context.Context, q database.DBTX,
 		)`
 	steps := []struct{ name, query string }{
 		{"task assignees", tree + ` UPDATE task_assignees SET removed_at = ?, updated_at = ?
+			 WHERE workspace_id = ? AND removed_at IS NULL AND task_id IN (SELECT id FROM tree)`},
+		{"task resource links", tree + ` UPDATE task_resources SET removed_at = ?, updated_at = ?
 			 WHERE workspace_id = ? AND removed_at IS NULL AND task_id IN (SELECT id FROM tree)`},
 		{"task comments", tree + ` UPDATE task_comments SET deleted_at = ?, updated_at = ?
 			 WHERE workspace_id = ? AND deleted_at IS NULL AND task_id IN (SELECT id FROM tree)`},

@@ -11,8 +11,10 @@ import (
 
 type Config struct {
 	DBPath string
-	Port   string
-	DisplayName string
+	// ResourcesPath is where resource files are kept on disk.
+	ResourcesPath string
+	Port          string
+	DisplayName   string
 }
 
 func Load() (Config, error) {
@@ -26,10 +28,16 @@ func Load() (Config, error) {
 		}
 		baseDir = filepath.Dir(path)
 	}
+	dbPath := resolve(baseDir, getenv("DB_PATH", "./app.db"))
+	resourcesPath := filepath.Join(filepath.Dir(dbPath), "resources")
+	if v := os.Getenv("RESOURCES_PATH"); v != "" {
+		resourcesPath = resolve(baseDir, v)
+	}
 	return Config{
-		DBPath: resolve(baseDir, getenv("DB_PATH", "./app.db")),
-		Port:   getenv("BACKEND_PORT", "8080"),
-		DisplayName: getenv("DISPLAY_NAME", defaultDisplayName()),
+		DBPath:        dbPath,
+		ResourcesPath: resourcesPath,
+		Port:          getenv("BACKEND_PORT", "8080"),
+		DisplayName:   getenv("DISPLAY_NAME", defaultDisplayName()),
 	}, nil
 }
 

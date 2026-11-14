@@ -13,6 +13,7 @@ import (
 	"github.com/emre-tiryaki/YAP/backend/internal/model"
 	"github.com/emre-tiryaki/YAP/backend/internal/repository"
 	"github.com/emre-tiryaki/YAP/backend/internal/service"
+	"github.com/emre-tiryaki/YAP/backend/internal/storage"
 )
 
 type testEnv struct {
@@ -47,6 +48,13 @@ func newTestEnv(t *testing.T) testEnv {
 	NewProjectHandler(session, projectSvc).Register(mux)
 	NewTaskHandler(session, taskSvc).Register(mux)
 	NewCommentHandler(session, commentSvc).Register(mux)
+
+	store, err := storage.NewFS(t.TempDir())
+	if err != nil {
+		t.Fatalf("storage.NewFS() error = %v", err)
+	}
+	NewResourceHandler(session, service.NewResourceService(db, repository.NewResourceRepository(), taskRepo, store)).Register(mux)
+	NewSettingsHandler(session, service.NewSettingsService(db, repository.NewSettingsRepository())).Register(mux)
 
 	return testEnv{mux: mux, session: session}
 }

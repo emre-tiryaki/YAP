@@ -25,7 +25,14 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 }
 
 func writeError(w http.ResponseWriter, r *http.Request, err error) {
+	var maxBytes *http.MaxBytesError
 	switch {
+	case errors.Is(err, service.ErrTooLarge), errors.As(err, &maxBytes):
+		writeJSON(w, http.StatusRequestEntityTooLarge, errorResponse{Error: "too_large"})
+	case errors.Is(err, service.ErrStale):
+		writeJSON(w, http.StatusConflict, errorResponse{Error: "stale"})
+	case errors.Is(err, service.ErrFileMissing):
+		writeJSON(w, http.StatusGone, errorResponse{Error: "file_missing"})
 	case errors.Is(err, service.ErrInvalidInput):
 		writeJSON(w, http.StatusBadRequest, errorResponse{Error: "invalid_input"})
 	case errors.Is(err, service.ErrNotFound):

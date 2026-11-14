@@ -263,6 +263,14 @@ func (*TaskRepository) SoftDeleteTree(ctx context.Context, q database.DBTX, work
 		return fmt.Errorf("close task assignees: %w", err)
 	}
 	_, err = q.ExecContext(ctx,
+		tree+` UPDATE task_resources SET removed_at = ?, updated_at = ?
+		 WHERE workspace_id = ? AND removed_at IS NULL AND task_id IN (SELECT id FROM tree)`,
+		taskID, workspaceID, workspaceID, now, now, workspaceID,
+	)
+	if err != nil {
+		return fmt.Errorf("close task resource links: %w", err)
+	}
+	_, err = q.ExecContext(ctx,
 		tree+` UPDATE task_comments SET deleted_at = ?, updated_at = ?
 		 WHERE workspace_id = ? AND deleted_at IS NULL AND task_id IN (SELECT id FROM tree)`,
 		taskID, workspaceID, workspaceID, now, now, workspaceID,
