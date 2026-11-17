@@ -1,4 +1,6 @@
+import type { ImportCounts, ImportResult } from "../types/account";
 import type { Comment } from "../types/comment";
+import type { SearchResults } from "../types/search";
 import type { CreatePlanInput, Plan, UpdatePlanInput } from "../types/plan";
 import type {
     CreateProjectInput,
@@ -38,6 +40,36 @@ type WorkspaceDto = {
     id: string;
     name: string;
     user_name: string;
+};
+
+type SearchResultsDto = {
+    projects: { id: string; name: string; icon: string }[];
+    plans: {
+        id: string;
+        project_id: string;
+        project_name: string;
+        name: string;
+        icon: string;
+    }[];
+    tasks: {
+        id: string;
+        project_id: string;
+        project_name: string;
+        plan_id: string;
+        plan_name: string;
+        parent_id: string | null;
+        title: string;
+        done: boolean;
+    }[];
+    resources: {
+        id: string;
+        parent_id: string | null;
+        parent_name: string | null;
+        kind: ResourceKind;
+        name: string;
+        mime_type: string;
+        is_text: boolean;
+    }[];
 };
 
 type ProjectDto = {
@@ -291,6 +323,49 @@ function toComment(dto: CommentDto): Comment {
 export async function getWorkspace(): Promise<Workspace> {
     const dto = await request<WorkspaceDto>("/api/workspace");
     return { id: dto.id, name: dto.name, username: dto.user_name };
+}
+
+export async function search(
+    query: string,
+    signal?: AbortSignal,
+): Promise<SearchResults> {
+    const params = new URLSearchParams({ q: query });
+    const dto = await request<SearchResultsDto>(`/api/search?${params}`, {
+        signal,
+    });
+    return {
+        projects: dto.projects.map((p) => ({
+            id: p.id,
+            name: p.name,
+            icon: p.icon,
+        })),
+        plans: dto.plans.map((p) => ({
+            id: p.id,
+            projectId: p.project_id,
+            projectName: p.project_name,
+            name: p.name,
+            icon: p.icon,
+        })),
+        tasks: dto.tasks.map((t) => ({
+            id: t.id,
+            projectId: t.project_id,
+            projectName: t.project_name,
+            planId: t.plan_id,
+            planName: t.plan_name,
+            parentId: t.parent_id,
+            title: t.title,
+            done: t.done,
+        })),
+        resources: dto.resources.map((r) => ({
+            id: r.id,
+            parentId: r.parent_id,
+            parentName: r.parent_name,
+            kind: r.kind,
+            name: r.name,
+            mimeType: r.mime_type,
+            isText: r.is_text,
+        })),
+    };
 }
 
 export async function listProjects(): Promise<Project[]> {
@@ -847,4 +922,37 @@ export async function updateUserSettings(
         body: JSON.stringify(body),
     });
     return toUserSettings(dto);
+}
+
+// URL of the data export: a ZIP with data.json and the resource files. It is
+// a plain download, so it is opened as a link instead of fetched.
+export const accountExportUrl = "/api/account/export";
+
+type ImportResultDto = {
+    restored: boolean;
+    added: ImportCounts;
+    existing: number;
+    renamed: number;
+    missing_files: string[];
+};
+
+// Imports an archive made by the export. Nothing is deleted: what is still
+// here is kept, the rest is added.
+export async function importAccount(file: File): Promise<ImportResult> {
+    const dto = await send<ImportResultDto>("/api/account/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/zip" },
+        body: file,
+    });
+    return {
+        restored: dto.restored,
+        added: dto.added,
+        existing: dto.existing,
+        renamed: dto.renamed,
+        missingFiles: dto.missing_files,
+    };
+}
+
+export async function resetAccount(): Promise<void> {
+    await request<void>("/api/account/reset", { method: "POST" });
 }

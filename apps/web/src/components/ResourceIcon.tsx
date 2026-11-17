@@ -9,8 +9,11 @@ import {
     LuFolder,
     LuFolderOpen,
 } from "react-icons/lu";
-import type { Resource } from "../types/resource";
-import { fileCategory, type FileCategory } from "../util/resources";
+import {
+    fileCategory,
+    type FileCategory,
+    type ResourceLook,
+} from "../util/resources";
 
 const icons: Record<FileCategory, IconType> = {
     folder: LuFolder,
@@ -35,7 +38,7 @@ const colors: Record<FileCategory, string> = {
 };
 
 type ResourceIconProps = {
-    resource: Resource;
+    resource: ResourceLook;
     isOpen?: boolean;
     className?: string;
 };

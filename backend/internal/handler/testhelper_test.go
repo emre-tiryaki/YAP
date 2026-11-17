@@ -55,6 +55,9 @@ func newTestEnv(t *testing.T) testEnv {
 	}
 	NewResourceHandler(session, service.NewResourceService(db, repository.NewResourceRepository(), taskRepo, store)).Register(mux)
 	NewSettingsHandler(session, service.NewSettingsService(db, repository.NewSettingsRepository())).Register(mux)
+	NewAccountHandler(session, service.NewAccountService(db, repository.NewAccountRepository(), repository.NewResourceRepository(),
+		repository.NewWorkspaceRepository(), repository.NewSettingsRepository(), store, "tester")).Register(mux)
+	NewSearchHandler(session, service.NewSearchService(db, repository.NewSearchRepository())).Register(mux)
 
 	return testEnv{mux: mux, session: session}
 }

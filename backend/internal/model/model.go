@@ -195,3 +195,120 @@ type ResourceEventScope struct {
 	// (and their contents) plus link changes on those tasks.
 	ProjectID string
 }
+
+// ExportTable is the live rows of one table in a data export, each row keyed
+// by column name.
+type ExportTable struct {
+	Name string
+	Rows []map[string]any
+}
+
+// ImportRowState says what an exported id stands for where it is imported.
+type ImportRowState string
+
+const (
+	// RowAbsent: no row has the id; it can be used as it is.
+	RowAbsent ImportRowState = "absent"
+	// RowLive: a live row of the workspace has the id; it is already here.
+	RowLive ImportRowState = "live"
+	// RowDeleted: a deleted row of the workspace has the id; it can be
+	// brought back.
+	RowDeleted ImportRowState = "deleted"
+	// RowElsewhere: a row of another workspace has the id.
+	RowElsewhere ImportRowState = "elsewhere"
+)
+
+// The Import* types are rows read back from a data export's data.json. The
+// JSON names are the column names. Nullable columns are pointers; IDs are the
+// ones of the exporting device until the import maps them.
+
+type ImportProject struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Description *string `json:"description"`
+	Icon        *string `json:"icon"`
+	CreatedAt   string  `json:"created_at"`
+	ArchivedAt  *string `json:"archived_at"`
+}
+
+type ImportPlan struct {
+	ID          string  `json:"id"`
+	ProjectID   string  `json:"project_id"`
+	TeamID      *string `json:"team_id"`
+	Name        string  `json:"name"`
+	Description *string `json:"description"`
+	Icon        *string `json:"icon"`
+	CreatedAt   string  `json:"created_at"`
+	ArchivedAt  *string `json:"archived_at"`
+}
+
+type ImportStatus struct {
+	ID          string  `json:"id"`
+	PlanID      string  `json:"plan_id"`
+	Title       string  `json:"title"`
+	Description *string `json:"description"`
+	Color       string  `json:"color"`
+	Category    string  `json:"category"`
+	Position    string  `json:"position"`
+}
+
+type ImportTask struct {
+	ID          string  `json:"id"`
+	ProjectID   string  `json:"project_id"`
+	PlanID      string  `json:"plan_id"`
+	StatusID    string  `json:"status_id"`
+	ParentID    *string `json:"parent_id"`
+	Title       string  `json:"title"`
+	Description *string `json:"description"`
+	Position    string  `json:"position"`
+	DueDate     *string `json:"due_date"`
+	CreatedAt   string  `json:"created_at"`
+	CompletedAt *string `json:"completed_at"`
+}
+
+type ImportAssignee struct {
+	TaskID     string `json:"task_id"`
+	AssignedAt string `json:"assigned_at"`
+}
+
+type ImportComment struct {
+	ID        string `json:"id"`
+	TaskID    string `json:"task_id"`
+	Body      string `json:"body"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+}
+
+type ImportResource struct {
+	ID        string  `json:"id"`
+	ParentID  *string `json:"parent_id"`
+	Kind      string  `json:"kind"`
+	Name      string  `json:"name"`
+	MimeType  *string `json:"mime_type"`
+	Revision  int64   `json:"revision"`
+	CreatedAt string  `json:"created_at"`
+	// Filled in by the import from the archive's bytes.
+	Size   int64 `json:"-"`
+	IsText bool  `json:"-"`
+}
+
+type ImportTaskResource struct {
+	TaskID     string `json:"task_id"`
+	ResourceID string `json:"resource_id"`
+	LinkedAt   string `json:"linked_at"`
+}
+
+type ImportEvent struct {
+	ID         string  `json:"id"`
+	ResourceID string  `json:"resource_id"`
+	Action     string  `json:"action"`
+	TaskID     *string `json:"task_id"`
+	Details    string  `json:"details"`
+	CreatedAt  string  `json:"created_at"`
+	UpdatedAt  string  `json:"updated_at"`
+}
+
+type ImportSetting struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}

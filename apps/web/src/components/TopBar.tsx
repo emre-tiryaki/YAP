@@ -1,19 +1,14 @@
-import { Fragment, useRef } from "react";
+import { Fragment } from "react";
 import { Link } from "react-router";
 import { TbChevronRight } from "react-icons/tb";
-import { useShortcut } from "../hooks/useShortcut";
-import { useTranslate } from "../hooks/useTranslate";
 import type { BreadcrumbItem } from "../types/breadcrumb";
+import { SearchBox } from "./SearchBox";
 
 type TopBarProps = {
     path: BreadcrumbItem[];
 };
 
 export function TopBar({ path }: TopBarProps) {
-    const t = useTranslate();
-    const searchRef = useRef<HTMLInputElement>(null);
-    useShortcut({ key: "k", mod: true }, () => searchRef.current?.focus());
-
     return (
         <header className="grid h-14 shrink-0 grid-cols-3 items-center border-b border-gray-200 bg-white px-6">
             <nav aria-label="breadcrumb" className="min-w-0">
@@ -47,13 +42,7 @@ export function TopBar({ path }: TopBarProps) {
                     })}
                 </ol>
             </nav>
-            <input
-                ref={searchRef}
-                type="search"
-                placeholder={t("topbar.search")}
-                aria-label={t("topbar.search")}
-                className="w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-1.5 text-sm"
-            />
+            <SearchBox />
             <div />
         </header>
     );

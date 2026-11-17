@@ -91,3 +91,34 @@ func TestWithTxCanceledContext(t *testing.T) {
 		t.Error("fn must not run when the transaction cannot begin")
 	}
 }
+func TestIsConstraint(t *testing.T) {
+	ctx := context.Background()
+	db, err := New(ctx, filepath.Join(t.TempDir(), "app.db"))
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	_, fkErr := db.ExecContext(ctx,
+		`INSERT INTO projects (id, workspace_id, name, created_at, updated_at) VALUES (?, ?, 'p', 'x', 'x')`,
+		"00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002")
+	_, syntaxErr := db.ExecContext(ctx, `INSERT INTO nowhere VALUES (1)`)
+
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"foreign key", fkErr, true},
+		{"other sqlite error", syntaxErr, false},
+		{"plain error", errors.New("x"), false},
+		{"nil", nil, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsConstraint(tt.err); got != tt.want {
+				t.Errorf("IsConstraint(%v) = %v, want %v", tt.err, got, tt.want)
+			}
+		})
+	}
+}

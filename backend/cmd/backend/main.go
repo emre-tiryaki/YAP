@@ -50,8 +50,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("Resource storage error: %v", err)
 	}
-	resourceSvc := service.NewResourceService(db, repository.NewResourceRepository(), taskRepo, store)
-	settingsSvc := service.NewSettingsService(db, repository.NewSettingsRepository())
+	resourceRepo := repository.NewResourceRepository()
+	resourceSvc := service.NewResourceService(db, resourceRepo, taskRepo, store)
+	settingsRepo := repository.NewSettingsRepository()
+	settingsSvc := service.NewSettingsService(db, settingsRepo)
+	accountSvc := service.NewAccountService(db, repository.NewAccountRepository(), resourceRepo,
+		repository.NewWorkspaceRepository(), settingsRepo, store, cfg.DisplayName)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/hello-world", handler.HelloWorld)
@@ -61,6 +65,8 @@ func main() {
 	handler.NewCommentHandler(session, commentSvc).Register(mux)
 	handler.NewResourceHandler(session, resourceSvc).Register(mux)
 	handler.NewSettingsHandler(session, settingsSvc).Register(mux)
+	handler.NewAccountHandler(session, accountSvc).Register(mux)
+	handler.NewSearchHandler(session, service.NewSearchService(db, repository.NewSearchRepository())).Register(mux)
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,

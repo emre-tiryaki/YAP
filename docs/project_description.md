@@ -35,6 +35,9 @@ The same logical schema exists in two physical databases:
 | Resource | A folder or file in the workspace's single resource tree. Files can be previewed, text files edited in place. Resources can be linked to tasks (many-to-many). Deleting moves an item to a trash, from which it is restored or purged for good. |
 | Resource event | One entry of the resource activity log: who created, uploaded, edited, renamed, moved, copied, trashed, restored, purged, linked or unlinked which resource, and when. It records that a file changed, not what changed; file contents have no version history. |
 | User setting | A preference that follows the user to every device (for now: autosave on/off and delay for the resource editor). Interface-only preferences stay per device. |
+| Data export | A ZIP archive of everything the user has: all live rows as `data.json` and the resource files in their folder layout. |
+| Data import | Reads a data export back. Into an empty workspace it is a full restore (names and settings included); otherwise it adds what is not already there, without deleting or overwriting anything. |
+| Data reset | Deletes all content of the local workspace and restores the first-run names and settings, keeping the same user and workspace ids. |
 
 ## Design Decisions
 
@@ -46,6 +49,7 @@ The same logical schema exists in two physical databases:
 - **Single owning team per task.** Multi-team work is split into subtasks via `parent_id`.
 - **No ORM (Object-Relational Mapping).** Plain `database/sql` with `modernc.org/sqlite`.
 - **Separate migrations** for SQLite and PostgreSQL (`migrations/sqlite`, `migrations/postgres`).
+- **Workspace search** (`GET /api/search?q=`) matches the names of live projects, plans and resources and the titles and descriptions of live tasks (subtasks included; trashed resources are skipped). Matching is a case-insensitive substring test; SQLite only folds ASCII, so the backend registers a `yap_fold` SQL function (Go `strings.ToLower`) to fold both sides. It runs without an index, which is fine for a local workspace; full-text search (FTS5 / `tsvector`) can replace it if it ever gets slow.
 
 Business rules that cannot be expressed in the schema (last owner protection, subtask cycle prevention, cleanup when a member leaves or a team is removed) are enforced in the service layer and covered by unit tests.
 

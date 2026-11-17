@@ -424,7 +424,7 @@ func scanEvent(row rowScanner, workspaceID string) (model.ResourceEvent, error) 
 func (*ResourceRepository) LastEvent(ctx context.Context, q database.DBTX, workspaceID, resourceID string) (model.ResourceEvent, error) {
 	row := q.QueryRowContext(ctx,
 		selectEvent+`
-		 WHERE e.workspace_id = ? AND e.resource_id = ?
+		 WHERE e.workspace_id = ? AND e.resource_id = ? AND e.deleted_at IS NULL
 		 ORDER BY e.id DESC LIMIT 1`,
 		workspaceID, resourceID,
 	)
@@ -480,6 +480,7 @@ func (*ResourceRepository) ListEvents(ctx context.Context, q database.DBTX, work
 		query = selectEvent + ` WHERE e.workspace_id = ?`
 		args = []any{workspaceID}
 	}
+	query += ` AND e.deleted_at IS NULL`
 	if before != "" {
 		query += ` AND e.id < ?`
 		args = append(args, before)

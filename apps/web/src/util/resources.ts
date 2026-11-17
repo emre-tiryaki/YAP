@@ -109,7 +109,10 @@ function extension(name: string): string {
 }
 
 // Decides how a resource is previewed.
-export function fileCategory(resource: Resource): FileCategory {
+// The fields that decide how a resource is shown.
+export type ResourceLook = Pick<Resource, "kind" | "name" | "mimeType" | "isText">;
+
+export function fileCategory(resource: ResourceLook): FileCategory {
     if (resource.kind === "folder") return "folder";
     const mime = resource.mimeType;
     const ext = extension(resource.name);

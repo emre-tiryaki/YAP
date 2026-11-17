@@ -2,6 +2,7 @@ package model
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -35,5 +36,20 @@ func TestNewIDUniqueAndSortable(t *testing.T) {
 			t.Fatalf("id %q does not sort after %q", id, prev)
 		}
 		prev = id
+	}
+}
+func TestNewIDAtCarriesTheTime(t *testing.T) {
+	at := time.Date(2024, 5, 6, 7, 8, 9, 0, time.UTC)
+	id := NewIDAt(at)
+	u, err := uuid.Parse(id)
+	if err != nil || u.Version() != 7 {
+		t.Fatalf("NewIDAt() = %q (err %v), want a UUIDv7", id, err)
+	}
+	sec, nsec := u.Time().UnixTime()
+	if got := time.Unix(sec, nsec).UTC(); !got.Equal(at) {
+		t.Errorf("time = %v, want %v", got, at)
+	}
+	if NewIDAt(at.Add(-time.Hour)) >= id || id >= NewID() {
+		t.Error("ids do not sort by their time")
 	}
 }
