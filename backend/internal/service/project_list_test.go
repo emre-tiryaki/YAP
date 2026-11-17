@@ -11,7 +11,7 @@ import (
 
 func TestProjectListEmpty(t *testing.T) {
 	db, session := newTestDB(t)
-	svc := NewProjectService(db, repository.NewProjectRepository())
+	svc := NewProjectService(db, repository.NewProjectRepository(), repository.NewSettingsRepository())
 
 	got, err := svc.List(context.Background(), session.WorkspaceID)
 	if err != nil {
@@ -25,7 +25,7 @@ func TestProjectListEmpty(t *testing.T) {
 func TestProjectCreateTrimsAndPersistsFields(t *testing.T) {
 	ctx := context.Background()
 	db, session := newTestDB(t)
-	svc := NewProjectService(db, repository.NewProjectRepository())
+	svc := NewProjectService(db, repository.NewProjectRepository(), repository.NewSettingsRepository())
 
 	tests := []struct {
 		name     string
@@ -54,7 +54,7 @@ func TestProjectCreateTrimsAndPersistsFields(t *testing.T) {
 
 func TestProjectCreateWhitespaceNameIsInvalid(t *testing.T) {
 	db, session := newTestDB(t)
-	svc := NewProjectService(db, repository.NewProjectRepository())
+	svc := NewProjectService(db, repository.NewProjectRepository(), repository.NewSettingsRepository())
 
 	_, err := svc.Create(context.Background(), session.WorkspaceID, CreateProjectInput{Name: "   "})
 	if err == nil {
@@ -65,7 +65,7 @@ func TestProjectCreateWhitespaceNameIsInvalid(t *testing.T) {
 func TestProjectCreateAddsDefaultPlan(t *testing.T) {
 	ctx := context.Background()
 	db, session := newTestDB(t)
-	svc := NewProjectService(db, repository.NewProjectRepository())
+	svc := NewProjectService(db, repository.NewProjectRepository(), repository.NewSettingsRepository())
 
 	p, err := svc.Create(ctx, session.WorkspaceID, CreateProjectInput{Name: "Board"})
 	if err != nil {
@@ -101,7 +101,7 @@ func TestProjectCreateAddsDefaultPlan(t *testing.T) {
 func TestProjectCreateDefaultStatusOrderAndCategories(t *testing.T) {
 	ctx := context.Background()
 	db, session := newTestDB(t)
-	svc := NewProjectService(db, repository.NewProjectRepository())
+	svc := NewProjectService(db, repository.NewProjectRepository(), repository.NewSettingsRepository())
 
 	p, err := svc.Create(ctx, session.WorkspaceID, CreateProjectInput{Name: "Board"})
 	if err != nil {
@@ -140,9 +140,10 @@ func TestProjectCreateDefaultStatusOrderAndCategories(t *testing.T) {
 	if len(gotTitles) != len(defaultStatuses) {
 		t.Fatalf("statuses = %v, want %d", gotTitles, len(defaultStatuses))
 	}
+	names := defaultUserSettings().StatusNames
 	for i, d := range defaultStatuses {
-		if gotTitles[i] != d.title || gotCategories[i] != d.category {
-			t.Errorf("status[%d] = %q/%q, want %q/%q", i, gotTitles[i], gotCategories[i], d.title, d.category)
+		if want := names.get(d.category); gotTitles[i] != want || gotCategories[i] != d.category {
+			t.Errorf("status[%d] = %q/%q, want %q/%q", i, gotTitles[i], gotCategories[i], want, d.category)
 		}
 		if d.description == "" || gotDescriptions[i] != d.description {
 			t.Errorf("status[%d] description = %q, want non-empty %q", i, gotDescriptions[i], d.description)
@@ -153,7 +154,7 @@ func TestProjectCreateDefaultStatusOrderAndCategories(t *testing.T) {
 func TestProjectCreateRollsBackOnFailure(t *testing.T) {
 	ctx := context.Background()
 	db, _ := newTestDB(t)
-	svc := NewProjectService(db, repository.NewProjectRepository())
+	svc := NewProjectService(db, repository.NewProjectRepository(), repository.NewSettingsRepository())
 
 	_, err := svc.Create(ctx, model.NewID(), CreateProjectInput{Name: "orphan"})
 	if err == nil {
@@ -176,7 +177,7 @@ func TestProjectCreateRollsBackOnFailure(t *testing.T) {
 func TestProjectListIsWorkspaceScopedAndNewestFirst(t *testing.T) {
 	ctx := context.Background()
 	db, session := newTestDB(t)
-	svc := NewProjectService(db, repository.NewProjectRepository())
+	svc := NewProjectService(db, repository.NewProjectRepository(), repository.NewSettingsRepository())
 
 	otherWorkspace := model.NewID()
 	if err := repository.NewSessionRepository().InsertWorkspace(ctx, db, otherWorkspace, model.KindPersonal, "Other", nowUTC()); err != nil {

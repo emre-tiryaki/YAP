@@ -3,8 +3,10 @@ import {
     createComment,
     deleteComment,
     listComments,
+    listRecentComments,
     updateComment,
 } from "../api/client";
+import { readCommentsSince, writeCommentsSince } from "../util/notifications";
 
 function commentsKey(taskId: string) {
     return ["tasks", taskId, "comments"];
@@ -15,6 +17,24 @@ export function useComments(taskId: string) {
         queryKey: commentsKey(taskId),
         queryFn: () => listComments(taskId),
         enabled: taskId !== "",
+    });
+}
+
+// Comments other members wrote since the comment notifications were turned
+// on (or since the last one seen), polled while `enabled`.
+export function useRecentComments(enabled: boolean, refetchIntervalMs: number) {
+    return useQuery({
+        queryKey: ["comments", "recent"],
+        queryFn: () => {
+            let since = readCommentsSince();
+            if (!since) {
+                since = new Date();
+                writeCommentsSince(since);
+            }
+            return listRecentComments(since);
+        },
+        enabled,
+        refetchInterval: refetchIntervalMs,
     });
 }
 

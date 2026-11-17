@@ -147,4 +147,28 @@ func TestSettingsRoutes(t *testing.T) {
 		t.Errorf("after patch = %+v", got)
 	}
 	wantErrorCode(t, e.do(t, "PATCH", "/api/settings", `{"autosave_delay_ms":5}`), http.StatusBadRequest, "invalid_input")
+
+	rec = e.do(t, "PATCH", "/api/settings",
+		`{"hide_done":true,"status_names":{"done":"Shipped"},"notifications":{"reminder":"1w","comments":true}}`)
+	wantStatus(t, rec, http.StatusOK)
+	got := decode[settingsResponse](t, rec)
+	if !got.HideDone || got.DoneToBottom || got.StatusNames.Done != "Shipped" || got.StatusNames.ToDo != "To Do" {
+		t.Errorf("after task view patch = %+v", got)
+	}
+	if n := got.Notifications; n.Reminder != "1w" || !n.Comments || !n.DueSoon || !n.Overdue || n.Sound {
+		t.Errorf("notifications = %+v", n)
+	}
+	wantErrorCode(t, e.do(t, "PATCH", "/api/settings", `{"notifications":{"reminder":"soon"}}`), http.StatusBadRequest, "invalid_input")
+	wantErrorCode(t, e.do(t, "PATCH", "/api/settings", `{"status_names":{"blocked":"x"}}`), http.StatusBadRequest, "invalid_input")
+}
+
+func TestRecentCommentsRoute(t *testing.T) {
+	e := newTestEnv(t)
+	rec := e.do(t, "GET", "/api/comments/recent?since=2026-01-01T00:00:00Z", "")
+	wantStatus(t, rec, http.StatusOK)
+	if got := decode[[]recentCommentResponse](t, rec); len(got) != 0 {
+		t.Errorf("recent = %+v, want none (own comments only)", got)
+	}
+	wantErrorCode(t, e.do(t, "GET", "/api/comments/recent", ""), http.StatusBadRequest, "invalid_input")
+	wantErrorCode(t, e.do(t, "GET", "/api/comments/recent?since=yesterday", ""), http.StatusBadRequest, "invalid_input")
 }

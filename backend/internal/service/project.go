@@ -44,27 +44,34 @@ type ProjectRepository interface {
 
 var colorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 
+// The statuses every new plan starts with. Their titles come from the
+// creating user's settings (see StatusNames).
 var defaultStatuses = []struct {
-	title       string
 	description string
 	color       string
 	category    model.StatusCategory
 }{
-	{"To Do", "Tasks that are planned but not started yet.", "#9ca3af", model.StatusToDo},
-	{"In Progress", "Tasks that are currently being worked on.", "#3b82f6", model.StatusInProgress},
-	{"Done", "Finished tasks.", "#22c55e", model.StatusDone},
+	{"Tasks that are planned but not started yet.", "#9ca3af", model.StatusToDo},
+	{"Tasks that are currently being worked on.", "#3b82f6", model.StatusInProgress},
+	{"Finished tasks.", "#22c55e", model.StatusDone},
 }
 
 type CreateProjectInput struct {
 	Name        string
 	Description string
 	Icon        string
+	// UserID is the creating user, whose default status names the first
+	// plan gets; empty uses the built-in names.
+	UserID string
 }
 
 type CreatePlanInput struct {
 	Name        string
 	Description string
 	Icon        string
+	// UserID is the creating user, whose default status names the plan
+	// gets; empty uses the built-in names.
+	UserID string
 }
 
 type CreateStatusInput struct {
@@ -75,12 +82,13 @@ type CreateStatusInput struct {
 }
 
 type ProjectService struct {
-	db   *sql.DB
-	repo ProjectRepository
+	db       *sql.DB
+	repo     ProjectRepository
+	settings SettingsRepository
 }
 
-func NewProjectService(db *sql.DB, repo ProjectRepository) *ProjectService {
-	return &ProjectService{db: db, repo: repo}
+func NewProjectService(db *sql.DB, repo ProjectRepository, settings SettingsRepository) *ProjectService {
+	return &ProjectService{db: db, repo: repo, settings: settings}
 }
 
 func (s *ProjectService) List(ctx context.Context, workspaceID string) ([]model.Project, error) {
@@ -121,7 +129,7 @@ func (s *ProjectService) Create(ctx context.Context, workspaceID string, in Crea
 			return err
 		}
 
-		return s.insertDefaultStatuses(ctx, tx, plan, now)
+		return s.insertDefaultStatuses(ctx, tx, plan, in.UserID, now)
 	})
 	if err != nil {
 		return model.Project{}, err
@@ -190,7 +198,7 @@ func (s *ProjectService) CreatePlan(ctx context.Context, workspaceID, projectID 
 		if err := s.repo.InsertPlan(ctx, tx, plan, now); err != nil {
 			return err
 		}
-		return s.insertDefaultStatuses(ctx, tx, plan, now)
+		return s.insertDefaultStatuses(ctx, tx, plan, in.UserID, now)
 	})
 	if err != nil {
 		return model.Plan{}, err
@@ -198,7 +206,15 @@ func (s *ProjectService) CreatePlan(ctx context.Context, workspaceID, projectID 
 	return plan, nil
 }
 
-func (s *ProjectService) insertDefaultStatuses(ctx context.Context, tx *sql.Tx, plan model.Plan, now string) error {
+func (s *ProjectService) insertDefaultStatuses(ctx context.Context, tx *sql.Tx, plan model.Plan, userID, now string) error {
+	names := defaultUserSettings().StatusNames
+	if userID != "" {
+		settings, err := loadUserSettings(ctx, tx, s.settings, userID)
+		if err != nil {
+			return err
+		}
+		names = settings.StatusNames
+	}
 	pos := ""
 	for _, d := range defaultStatuses {
 		pos = position.After(pos)
@@ -206,7 +222,7 @@ func (s *ProjectService) insertDefaultStatuses(ctx context.Context, tx *sql.Tx, 
 			ID:          model.NewID(),
 			WorkspaceID: plan.WorkspaceID,
 			PlanID:      plan.ID,
-			Title:       d.title,
+			Title:       names.get(d.category),
 			Description: d.description,
 			Color:       d.color,
 			Category:    d.category,

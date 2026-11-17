@@ -46,11 +46,15 @@ import type { UpdateWorkspaceInput } from "../types/workspace";
 import { formatDate } from "../util/date";
 import type { StatusCategory } from "../types/task";
 import type { ImportResult } from "../types/account";
+import type {
+  NotificationSettings as NotificationPreferences,
+  Reminder,
+} from "../types/userSettings";
+import { playNotificationSound } from "../util/notificationSound";
 import { ConfirmDialog } from "./ConfirmDialog";
 
-// General, account, shortcut and appearance settings (except the collapsed
-// sidebar default) are applied and saved. Categories and notifications are
-// still design only: their controls keep local state and nothing is saved.
+// Every setting is applied and saved except the collapsed sidebar default,
+// which is still design only: its toggle keeps local state.
 
 type IconType = ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
 
@@ -690,33 +694,22 @@ const categoryDefaults: { category: StatusCategory; color: string }[] = [
 
 function CategorySettings() {
   const t = useTranslate();
+  const settings = useUserSettings();
+  const update = useUpdateUserSettings();
+  const current = settings.data ?? defaultUserSettings;
 
   return (
     <div className="flex flex-col gap-6">
       <SettingsGroup title={t("settings.categories.defaults")}>
-        {categoryDefaults.map(({ category, color }) => (
-          <div key={category} className="flex items-center gap-4 px-5 py-4">
-            <span
-              aria-hidden
-              style={{ backgroundColor: color }}
-              className="size-3 shrink-0 rounded-full"
+        {settings.data &&
+          categoryDefaults.map(({ category, color }) => (
+            <StatusNameSetting
+              key={category}
+              category={category}
+              color={color}
+              value={settings.data.statusNames[category]}
             />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-gray-900">
-                {t(`status.category.${category}`)}
-              </p>
-              <p className="text-xs text-gray-500">
-                {t(`settings.categories.${category}.hint`)}
-              </p>
-            </div>
-            <input
-              defaultValue={t(`status.category.${category}`)}
-              aria-label={`${t("settings.categories.defaultName")}: ${t(`status.category.${category}`)}`}
-              placeholder={t("settings.categories.defaultName")}
-              className="w-44 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm"
-            />
-          </div>
-        ))}
+          ))}
       </SettingsGroup>
 
       <SettingsGroup>
@@ -724,46 +717,175 @@ function CategorySettings() {
           label={t("settings.categories.doneToBottom")}
           hint={t("settings.categories.doneToBottom.hint")}
         >
-          <Toggle label={t("settings.categories.doneToBottom")} />
+          <div className={current.hideDone ? "opacity-40" : ""}>
+            <Toggle
+              label={t("settings.categories.doneToBottom")}
+              checked={current.doneToBottom}
+              onChange={(doneToBottom) => update.mutate({ doneToBottom })}
+            />
+          </div>
         </SettingRow>
         <SettingRow
           label={t("settings.categories.hideDone")}
-          hint={t("settings.categories.hideDone.hint")}
+          hint={
+            update.isError
+              ? t("common.error")
+              : t("settings.categories.hideDone.hint")
+          }
+          hintTone={update.isError ? "error" : "default"}
         >
-          <Toggle label={t("settings.categories.hideDone")} />
+          <Toggle
+            label={t("settings.categories.hideDone")}
+            checked={current.hideDone}
+            onChange={(hideDone) => update.mutate({ hideDone })}
+          />
         </SettingRow>
       </SettingsGroup>
     </div>
   );
 }
 
+// A default status name, saved when the field loses focus or Enter is
+// pressed.
+function StatusNameSetting({
+  category,
+  color,
+  value,
+}: {
+  category: StatusCategory;
+  color: string;
+  value: string;
+}) {
+  const t = useTranslate();
+  const update = useUpdateUserSettings();
+  const [draft, setDraft] = useState(value);
+  const [error, setError] = useState<string | null>(null);
+  const [isSaved, setIsSaved] = useState(false);
+  const label = `${t("settings.categories.defaultName")}: ${t(`status.category.${category}`)}`;
+
+  function save() {
+    const name = draft.trim();
+    setIsSaved(false);
+    if (name === "") {
+      setDraft(value);
+      setError(t("settings.account.nameRequired"));
+      return;
+    }
+    setError(null);
+    if (name === value) {
+      setDraft(value);
+      return;
+    }
+    update.mutate(
+      { statusNames: { [category]: name } },
+      {
+        onSuccess: (settings) => {
+          setDraft(settings.statusNames[category]);
+          setIsSaved(true);
+        },
+        onError: () => {
+          setDraft(value);
+          setError(t("settings.account.saveError"));
+        },
+      },
+    );
+  }
+
+  let hint = t(`settings.categories.${category}.hint`);
+  if (isSaved) hint = t("settings.account.saved");
+  if (error) hint = error;
+
+  return (
+    <div className="flex items-center gap-4 px-5 py-4">
+      <span
+        aria-hidden
+        style={{ backgroundColor: color }}
+        className="size-3 shrink-0 rounded-full"
+      />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium text-gray-900">
+          {t(`status.category.${category}`)}
+        </p>
+        <p
+          role={error ? "alert" : undefined}
+          className={`text-xs ${error ? "text-red-600" : "text-gray-500"}`}
+        >
+          {hint}
+        </p>
+      </div>
+      <input
+        value={draft}
+        onChange={(event) => {
+          setDraft(event.target.value);
+          setIsSaved(false);
+        }}
+        onBlur={save}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") event.currentTarget.blur();
+        }}
+        disabled={update.isPending}
+        maxLength={100}
+        aria-label={label}
+        aria-invalid={error !== null}
+        placeholder={t("settings.categories.defaultName")}
+        className="w-44 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm aria-invalid:border-red-400 disabled:opacity-60"
+      />
+    </div>
+  );
+}
+
 function NotificationSettings() {
   const t = useTranslate();
+  const settings = useUserSettings();
+  const update = useUpdateUserSettings();
+  const current = (settings.data ?? defaultUserSettings).notifications;
+  const save = (patch: Partial<NotificationPreferences>) =>
+    update.mutate({ notifications: patch });
 
   return (
     <div className="flex flex-col gap-6">
+      <SettingsGroup>
+        <DesktopNotificationSetting />
+      </SettingsGroup>
+
       <SettingsGroup title={t("settings.notifications.tasks")}>
         <SettingRow
           label={t("settings.notifications.dueSoon")}
-          hint={t("settings.notifications.dueSoon.hint")}
+          hint={
+            update.isError
+              ? t("common.error")
+              : t("settings.notifications.dueSoon.hint")
+          }
+          hintTone={update.isError ? "error" : "default"}
         >
-          <Toggle label={t("settings.notifications.dueSoon")} defaultOn />
+          <Toggle
+            label={t("settings.notifications.dueSoon")}
+            checked={current.dueSoon}
+            onChange={(dueSoon) => save({ dueSoon })}
+          />
         </SettingRow>
         <SettingRow label={t("settings.notifications.reminder")}>
-          <Select
-            label={t("settings.notifications.reminder")}
-            options={[
-              { value: "1h", label: t("settings.notifications.reminder.1h") },
-              { value: "1d", label: t("settings.notifications.reminder.1d") },
-              { value: "1w", label: t("settings.notifications.reminder.1w") },
-            ]}
-          />
+          <div className={current.dueSoon ? "" : "opacity-40"}>
+            <Select
+              label={t("settings.notifications.reminder")}
+              value={current.reminder}
+              onChange={(reminder) => save({ reminder: reminder as Reminder })}
+              options={reminders.map((value) => ({
+                value,
+                label: t(`settings.notifications.reminder.${value}`),
+              }))}
+            />
+          </div>
         </SettingRow>
         <SettingRow
           label={t("settings.notifications.overdue")}
           hint={t("settings.notifications.overdue.hint")}
         >
-          <Toggle label={t("settings.notifications.overdue")} defaultOn />
+          <Toggle
+            label={t("settings.notifications.overdue")}
+            checked={current.overdue}
+            onChange={(overdue) => save({ overdue })}
+          />
         </SettingRow>
       </SettingsGroup>
 
@@ -772,13 +894,73 @@ function NotificationSettings() {
           label={t("settings.notifications.comments")}
           hint={t("settings.notifications.comments.hint")}
         >
-          <Toggle label={t("settings.notifications.comments")} />
+          <Toggle
+            label={t("settings.notifications.comments")}
+            checked={current.comments}
+            onChange={(comments) => save({ comments })}
+          />
         </SettingRow>
-        <SettingRow label={t("settings.notifications.sound")}>
-          <Toggle label={t("settings.notifications.sound")} />
+        <SettingRow
+          label={t("settings.notifications.sound")}
+          hint={t("settings.notifications.sound.hint")}
+        >
+          <Toggle
+            label={t("settings.notifications.sound")}
+            checked={current.sound}
+            onChange={(sound) => {
+              save({ sound });
+              if (sound) playNotificationSound();
+            }}
+          />
         </SettingRow>
       </SettingsGroup>
     </div>
+  );
+}
+
+const reminders: Reminder[] = ["1h", "1d", "1w"];
+
+type Permission = NotificationPermission | "unsupported";
+
+function readPermission(): Permission {
+  return "Notification" in window ? Notification.permission : "unsupported";
+}
+
+// System notifications are allowed per browser, so this is not a stored
+// setting: it shows and asks for the browser's permission.
+function DesktopNotificationSetting() {
+  const t = useTranslate();
+  const [permission, setPermission] = useState<Permission>(readPermission);
+
+  return (
+    <SettingRow
+      label={t("settings.notifications.desktop")}
+      hint={t(`settings.notifications.desktop.${permission}`)}
+    >
+      {permission === "default" ? (
+        <button
+          type="button"
+          onClick={() =>
+            void Notification.requestPermission().then(setPermission)
+          }
+          className="cursor-pointer rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          {t("settings.notifications.desktop.allow")}
+        </button>
+      ) : (
+        <span
+          className={`text-sm font-medium ${
+            permission === "granted" ? "text-green-600" : "text-gray-400"
+          }`}
+        >
+          {t(
+            permission === "granted"
+              ? "settings.notifications.desktop.on"
+              : "settings.notifications.desktop.off",
+          )}
+        </span>
+      )}
+    </SettingRow>
   );
 }
 
@@ -907,8 +1089,8 @@ function SettingRow({
 
 type Option = { value: string; label: string };
 
-// Controls are controlled when given value and onChange; the design-only
-// sections leave them out and the control keeps its own state.
+// Controls are controlled when given value and onChange; design-only
+// controls leave them out and keep their own state.
 function Select({
   label,
   options,
@@ -973,16 +1155,14 @@ function Segmented({
 
 function Toggle({
   label,
-  defaultOn = false,
   checked,
   onChange,
 }: {
   label: string;
-  defaultOn?: boolean;
   checked?: boolean;
   onChange?: (checked: boolean) => void;
 }) {
-  const [localOn, setLocalOn] = useState(defaultOn);
+  const [localOn, setLocalOn] = useState(false);
   const isOn = checked ?? localOn;
   return (
     <button

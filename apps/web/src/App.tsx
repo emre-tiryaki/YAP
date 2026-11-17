@@ -6,6 +6,7 @@ import PlanDetailPage from "./pages/PlanDetailPage";
 import ResourcesPage from "./pages/ResourcesPage";
 import { useEffect } from "react";
 import { Sidebar } from "./components/SideBar";
+import { NotificationCenter } from "./components/NotificationCenter";
 import { usePreferences } from "./hooks/usePreferences";
 import { useTheme } from "./hooks/useTheme";
 
@@ -15,6 +16,7 @@ function AppLayout() {
       <div className="flex min-h-screen">
           <Sidebar />
           <Outlet />
+          <NotificationCenter />
       </div>
   );
 }

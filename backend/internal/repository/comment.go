@@ -117,3 +117,50 @@ func (*CommentRepository) SoftDelete(ctx context.Context, q database.DBTX, works
 	}
 	return nil
 }
+
+// ListRecentByOthers returns the live comments of live tasks in the workspace
+// that were written by someone other than the member at or after since,
+// oldest first.
+func (*CommentRepository) ListRecentByOthers(ctx context.Context, q database.DBTX, workspaceID, membershipID, since string, limit int) ([]model.RecentComment, error) {
+	rows, err := q.QueryContext(ctx,
+		`SELECT c.id, c.task_id, c.author_id, u.display_name, c.body, c.created_at, c.updated_at,
+			t.title, t.project_id, t.plan_id, COALESCE(t.parent_id, '')
+		 FROM task_comments c
+		 JOIN memberships m ON m.id = c.author_id AND m.workspace_id = c.workspace_id
+		 JOIN users u ON u.id = m.user_id
+		 JOIN tasks t ON t.id = c.task_id AND t.workspace_id = c.workspace_id
+		 JOIN projects p ON p.id = t.project_id AND p.workspace_id = t.workspace_id
+		 JOIN plans pl ON pl.id = t.plan_id AND pl.workspace_id = t.workspace_id
+		 WHERE c.workspace_id = ? AND c.author_id <> ? AND c.created_at >= ?
+		   AND c.deleted_at IS NULL AND t.deleted_at IS NULL
+		   AND p.deleted_at IS NULL AND pl.deleted_at IS NULL
+		 ORDER BY c.created_at, c.id
+		 LIMIT ?`,
+		workspaceID, membershipID, since, limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list recent comments: %w", err)
+	}
+	defer rows.Close()
+
+	comments := []model.RecentComment{}
+	for rows.Next() {
+		rc := model.RecentComment{Comment: model.Comment{WorkspaceID: workspaceID}}
+		var createdAt, updatedAt string
+		if err := rows.Scan(&rc.ID, &rc.TaskID, &rc.AuthorID, &rc.AuthorName, &rc.Body, &createdAt, &updatedAt,
+			&rc.TaskTitle, &rc.ProjectID, &rc.PlanID, &rc.ParentID); err != nil {
+			return nil, fmt.Errorf("scan recent comment: %w", err)
+		}
+		if rc.CreatedAt, err = time.Parse(time.RFC3339, createdAt); err != nil {
+			return nil, fmt.Errorf("parse created_at: %w", err)
+		}
+		if rc.UpdatedAt, err = time.Parse(time.RFC3339, updatedAt); err != nil {
+			return nil, fmt.Errorf("parse updated_at: %w", err)
+		}
+		comments = append(comments, rc)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list recent comments: %w", err)
+	}
+	return comments, nil
+}

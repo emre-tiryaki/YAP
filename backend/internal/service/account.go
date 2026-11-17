@@ -11,7 +11,6 @@ import (
 	"io/fs"
 	"os"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -229,11 +228,7 @@ func (s *AccountService) Reset(ctx context.Context, session model.Session) error
 		if err := s.repo.Reset(ctx, tx, session.WorkspaceID, now); err != nil {
 			return err
 		}
-		defaults := defaultUserSettings()
-		if err := s.settings.Put(ctx, tx, session.UserID, settingAutosaveEnabled, strconv.FormatBool(defaults.AutosaveEnabled), now); err != nil {
-			return err
-		}
-		if err := s.settings.Put(ctx, tx, session.UserID, settingAutosaveDelayMs, strconv.Itoa(defaults.AutosaveDelayMs), now); err != nil {
+		if err := resetUserSettings(ctx, tx, s.settings, session.UserID, now); err != nil {
 			return err
 		}
 		if err := s.workspaces.UpdateDisplayName(ctx, tx, session.UserID, s.defaultDisplayName, now); err != nil {

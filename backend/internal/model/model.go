@@ -312,3 +312,13 @@ type ImportSetting struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
 }
+
+// RecentComment is a comment with what is needed to point at its task.
+type RecentComment struct {
+	Comment
+	TaskTitle string
+	ProjectID string
+	PlanID    string
+	// ParentID is the top-level task of a subtask's comment; empty otherwise.
+	ParentID string
+}

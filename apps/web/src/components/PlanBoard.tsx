@@ -23,9 +23,15 @@ import {
 } from "@dnd-kit/sortable";
 import { FiPlus } from "react-icons/fi";
 import { useTranslate } from "../hooks/useTranslate";
+import { useCurrentUserSettings } from "../hooks/useUserSettings";
 import type { CardAction } from "../types/cardAction";
 import type { Status } from "../types/status";
 import type { PlanTask, StatusCategory } from "../types/task";
+import {
+    arrangeTasks,
+    storedIndex,
+    type TaskViewOptions,
+} from "../util/taskView";
 import { PlanTaskCard } from "./PlanTaskCard";
 import { StatusColumn } from "./StatusColumn";
 import type { BoardView } from "./ViewToggle";
@@ -51,10 +57,20 @@ type PlanBoardProps = {
     onEditStatus: (status: Status) => void;
 };
 
-function toColumns(statuses: Status[], tasks: PlanTask[]): Columns {
+// Columns in display order: the server's order with the completed-task
+// settings applied.
+function toColumns(
+    statuses: Status[],
+    tasks: PlanTask[],
+    view: TaskViewOptions,
+): Columns {
     const columns: Columns = {};
-    for (const status of statuses) columns[status.id] = [];
-    for (const task of tasks) columns[task.statusId]?.push(task.id);
+    for (const status of statuses) {
+        columns[status.id] = arrangeTasks(
+            tasks.filter((task) => task.statusId === status.id),
+            view,
+        ).map((task) => task.id);
+    }
     return columns;
 }
 
@@ -123,7 +139,9 @@ export function PlanBoard({
             ? statusOverride.order
             : statuses;
 
-    const serverColumns = toColumns(statuses, tasks);
+    const { hideDone, doneToBottom } = useCurrentUserSettings();
+    const view: TaskViewOptions = { hideDone, doneToBottom };
+    const serverColumns = toColumns(statuses, tasks, view);
     const columns =
         override && override.basis === tasks ? override.columns : serverColumns;
     const taskById = new Map(tasks.map((task) => [task.id, task]));
@@ -205,11 +223,16 @@ export function PlanBoard({
             return;
         }
         setOverride({ basis: tasks, columns: { ...columns, [column]: items } });
+        // The column may leave out or reorder tasks, so the drop position is
+        // mapped onto all tasks of the status in stored order.
+        const siblings = tasks.filter(
+            (t) => t.statusId === column && t.id !== task.id,
+        );
         onMove({
             taskId: task.id,
             statusId: column,
             statusCategory: status.category,
-            index,
+            index: storedIndex(items, task.id, task, siblings),
         });
     }
 
@@ -253,6 +276,15 @@ export function PlanBoard({
                                 const task = taskById.get(id);
                                 return task ? [task] : [];
                             })}
+                            hiddenCount={
+                                hideDone
+                                    ? tasks.filter(
+                                          (task) =>
+                                              task.statusId === status.id &&
+                                              task.completedAt !== null,
+                                      ).length
+                                    : 0
+                            }
                             onAddTask={() => onAddTask(status.id)}
                             onEdit={() => onEditStatus(status)}
                             onTaskAction={onTaskAction}

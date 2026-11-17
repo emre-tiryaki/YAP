@@ -13,7 +13,7 @@ import (
 func TestSearch(t *testing.T) {
 	env := newResourceEnv(t)
 	ctx := context.Background()
-	projectSvc := NewProjectService(env.db, repository.NewProjectRepository())
+	projectSvc := NewProjectService(env.db, repository.NewProjectRepository(), repository.NewSettingsRepository())
 	taskSvc := NewTaskService(env.db, repository.NewProjectRepository(), repository.NewTaskRepository())
 	searchSvc := NewSearchService(env.db, repository.NewSearchRepository())
 	ws := env.session.WorkspaceID

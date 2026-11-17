@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -18,6 +19,7 @@ func NewCommentHandler(session model.Session, svc *service.CommentService) *Comm
 }
 
 func (h *CommentHandler) Register(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/comments/recent", h.recent)
 	mux.HandleFunc("GET /api/tasks/{id}/comments", h.list)
 	mux.HandleFunc("POST /api/tasks/{id}/comments", h.create)
 	mux.HandleFunc("PATCH /api/comments/{id}", h.update)
@@ -51,6 +53,48 @@ func (h *CommentHandler) toResponse(c model.Comment) commentResponse {
 		UpdatedAt:  c.UpdatedAt.UTC().Format(time.RFC3339),
 		IsOwn:      c.AuthorID == h.session.MembershipID,
 	}
+}
+
+type recentCommentResponse struct {
+	ID         string `json:"id"`
+	TaskID     string `json:"task_id"`
+	TaskTitle  string `json:"task_title"`
+	ProjectID  string `json:"project_id"`
+	PlanID     string `json:"plan_id"`
+	ParentID   string `json:"parent_id"`
+	AuthorName string `json:"author_name"`
+	Body       string `json:"body"`
+	CreatedAt  string `json:"created_at"`
+}
+
+// recent lists comments by other members since the `since` query parameter
+// (RFC 3339, required).
+func (h *CommentHandler) recent(w http.ResponseWriter, r *http.Request) {
+	since, err := time.Parse(time.RFC3339, r.URL.Query().Get("since"))
+	if err != nil {
+		writeError(w, r, fmt.Errorf("%w: since", service.ErrInvalidInput))
+		return
+	}
+	comments, err := h.svc.Recent(r.Context(), h.session, since)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	res := make([]recentCommentResponse, 0, len(comments))
+	for _, c := range comments {
+		res = append(res, recentCommentResponse{
+			ID:         c.ID,
+			TaskID:     c.TaskID,
+			TaskTitle:  c.TaskTitle,
+			ProjectID:  c.ProjectID,
+			PlanID:     c.PlanID,
+			ParentID:   c.ParentID,
+			AuthorName: c.AuthorName,
+			Body:       c.Body,
+			CreatedAt:  c.CreatedAt.UTC().Format(time.RFC3339),
+		})
+	}
+	writeJSON(w, http.StatusOK, res)
 }
 
 func (h *CommentHandler) list(w http.ResponseWriter, r *http.Request) {

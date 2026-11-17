@@ -17,6 +17,8 @@ import type { BoardView } from "./ViewToggle";
 type StatusColumnProps = {
     status: Status;
     tasks: PlanTask[];
+    // Completed tasks of this status left out by the "hide completed" setting.
+    hiddenCount: number;
     layout: BoardView;
     onAddTask: () => void;
     onEdit: () => void;
@@ -27,6 +29,7 @@ type StatusColumnProps = {
 export function StatusColumn({
     status,
     tasks,
+    hiddenCount,
     layout,
     onAddTask,
     onEdit,
@@ -141,9 +144,17 @@ export function StatusColumn({
                             onOpen={() => onOpenTask(task)}
                         />
                     ))}
-                    {tasks.length === 0 && (
+                    {tasks.length === 0 && hiddenCount === 0 && (
                         <li className="flex h-16 items-center justify-center rounded-md border border-dashed border-gray-300 text-xs text-gray-400">
                             {t("plan.column.empty")}
+                        </li>
+                    )}
+                    {hiddenCount > 0 && (
+                        <li className="px-1 text-xs text-gray-400">
+                            {t("plan.column.hiddenDone").replace(
+                                "{count}",
+                                String(hiddenCount),
+                            )}
                         </li>
                     )}
                 </ul>

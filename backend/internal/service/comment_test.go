@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/emre-tiryaki/YAP/backend/internal/model"
 	"github.com/emre-tiryaki/YAP/backend/internal/repository"
@@ -233,5 +234,38 @@ func TestCommentsDeletedWithTheirTask(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestCommentRecentByOthers(t *testing.T) {
+	ctx := context.Background()
+	env := newCommentEnv(t)
+	project := env.project(t, "P")
+	task := env.createTasks(t, project.ID, "Task")[0]
+	before := time.Now().Add(-time.Minute)
+
+	env.comment(t, task.ID, "mine")
+	theirs := env.foreignComment(t, task.ID)
+
+	got, err := env.comments.Recent(ctx, env.session, before)
+	if err != nil {
+		t.Fatalf("Recent() error = %v", err)
+	}
+	if len(got) != 1 || got[0].ID != theirs.ID {
+		t.Fatalf("Recent() = %+v, want only the other member's comment", got)
+	}
+	if c := got[0]; c.TaskTitle != "Task" || c.ProjectID != project.ID || c.PlanID == "" || c.AuthorName != "other" {
+		t.Errorf("Recent()[0] = %+v, want task, project, plan and author filled in", c)
+	}
+
+	if got, err := env.comments.Recent(ctx, env.session, time.Now().Add(time.Minute)); err != nil || len(got) != 0 {
+		t.Errorf("Recent(future) = %+v (err %v), want none", got, err)
+	}
+
+	if err := env.tasks.Delete(ctx, env.session, task.ID); err != nil {
+		t.Fatalf("Delete() error = %v", err)
+	}
+	if got, err := env.comments.Recent(ctx, env.session, before); err != nil || len(got) != 0 {
+		t.Errorf("Recent() after task delete = %+v (err %v), want none", got, err)
 	}
 }

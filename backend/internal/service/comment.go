@@ -16,12 +16,16 @@ import (
 // maxCommentLength is counted in code points.
 const maxCommentLength = 10_000
 
+// recentCommentLimit caps one page of comment notifications.
+const recentCommentLimit = 50
+
 type CommentRepository interface {
 	Insert(ctx context.Context, q database.DBTX, c model.Comment, now string) error
 	ListByTask(ctx context.Context, q database.DBTX, workspaceID, taskID string) ([]model.Comment, error)
 	Get(ctx context.Context, q database.DBTX, workspaceID, commentID string) (model.Comment, error)
 	UpdateBody(ctx context.Context, q database.DBTX, workspaceID, commentID, body, now string) error
 	SoftDelete(ctx context.Context, q database.DBTX, workspaceID, commentID, now string) error
+	ListRecentByOthers(ctx context.Context, q database.DBTX, workspaceID, membershipID, since string, limit int) ([]model.RecentComment, error)
 }
 
 // CommentTaskLookup is the part of the task repository comments need: making
@@ -59,6 +63,13 @@ func (s *CommentService) requireTask(ctx context.Context, q database.DBTX, works
 		return err
 	}
 	return nil
+}
+
+// Recent returns the comments other members wrote at or after since, oldest
+// first, for the new-comment notifications.
+func (s *CommentService) Recent(ctx context.Context, session model.Session, since time.Time) ([]model.RecentComment, error) {
+	return s.comments.ListRecentByOthers(ctx, s.db, session.WorkspaceID, session.MembershipID,
+		since.UTC().Format(time.RFC3339), recentCommentLimit)
 }
 
 func (s *CommentService) List(ctx context.Context, session model.Session, taskID string) ([]model.Comment, error) {

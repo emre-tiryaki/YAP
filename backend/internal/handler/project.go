@@ -76,6 +76,7 @@ func (h *ProjectHandler) create(w http.ResponseWriter, r *http.Request) {
 		Name:        req.Name,
 		Description: req.Description,
 		Icon:        req.Icon,
+		UserID:      h.session.UserID,
 	})
 	if err != nil {
 		writeError(w, r, err)
@@ -151,6 +152,7 @@ func (h *ProjectHandler) createPlan(w http.ResponseWriter, r *http.Request) {
 		Name:        req.Name,
 		Description: req.Description,
 		Icon:        req.Icon,
+		UserID:      h.session.UserID,
 	})
 	if err != nil {
 		writeError(w, r, err)

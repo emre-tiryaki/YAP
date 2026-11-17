@@ -1,5 +1,6 @@
 import type { ImportCounts, ImportResult } from "../types/account";
 import type { Comment } from "../types/comment";
+import type { RecentComment } from "../types/notification";
 import type { SearchResults } from "../types/search";
 import type { CreatePlanInput, Plan, UpdatePlanInput } from "../types/plan";
 import type {
@@ -32,6 +33,7 @@ import type {
     ResourceKind,
 } from "../types/resource";
 import type {
+    Reminder,
     UpdateUserSettingsInput,
     UserSettings,
 } from "../types/userSettings";
@@ -199,6 +201,35 @@ type LinkedTaskDto = {
 type UserSettingsDto = {
     autosave_enabled: boolean;
     autosave_delay_ms: number;
+    hide_done: boolean;
+    done_to_bottom: boolean;
+    status_names: { todo: string; in_progress: string; done: string };
+    notifications: {
+        due_soon: boolean;
+        reminder: Reminder;
+        overdue: boolean;
+        comments: boolean;
+        sound: boolean;
+    };
+};
+
+type UpdateUserSettingsDto = Partial<
+    Omit<UserSettingsDto, "status_names" | "notifications">
+> & {
+    status_names?: Partial<UserSettingsDto["status_names"]>;
+    notifications?: Partial<UserSettingsDto["notifications"]>;
+};
+
+type RecentCommentDto = {
+    id: string;
+    task_id: string;
+    task_title: string;
+    project_id: string;
+    plan_id: string;
+    parent_id: string;
+    author_name: string;
+    body: string;
+    created_at: string;
 };
 
 export class ApiError extends Error {
@@ -899,9 +930,20 @@ export async function unlinkResource(
 }
 
 function toUserSettings(dto: UserSettingsDto): UserSettings {
+    const n = dto.notifications;
     return {
         autosaveEnabled: dto.autosave_enabled,
         autosaveDelayMs: dto.autosave_delay_ms,
+        hideDone: dto.hide_done,
+        doneToBottom: dto.done_to_bottom,
+        statusNames: { ...dto.status_names },
+        notifications: {
+            dueSoon: n.due_soon,
+            reminder: n.reminder,
+            overdue: n.overdue,
+            comments: n.comments,
+            sound: n.sound,
+        },
     };
 }
 
@@ -912,16 +954,53 @@ export async function getUserSettings(): Promise<UserSettings> {
 export async function updateUserSettings(
     input: UpdateUserSettingsInput,
 ): Promise<UserSettings> {
-    const body: Partial<UserSettingsDto> = {};
+    const body: UpdateUserSettingsDto = {};
     if (input.autosaveEnabled !== undefined)
         body.autosave_enabled = input.autosaveEnabled;
     if (input.autosaveDelayMs !== undefined)
         body.autosave_delay_ms = input.autosaveDelayMs;
+    if (input.hideDone !== undefined) body.hide_done = input.hideDone;
+    if (input.doneToBottom !== undefined)
+        body.done_to_bottom = input.doneToBottom;
+    if (input.statusNames) body.status_names = { ...input.statusNames };
+    const n = input.notifications;
+    if (n) {
+        body.notifications = {};
+        if (n.dueSoon !== undefined) body.notifications.due_soon = n.dueSoon;
+        if (n.reminder !== undefined) body.notifications.reminder = n.reminder;
+        if (n.overdue !== undefined) body.notifications.overdue = n.overdue;
+        if (n.comments !== undefined) body.notifications.comments = n.comments;
+        if (n.sound !== undefined) body.notifications.sound = n.sound;
+    }
     const dto = await request<UserSettingsDto>("/api/settings", {
         method: "PATCH",
         body: JSON.stringify(body),
     });
     return toUserSettings(dto);
+}
+
+// Comments other members wrote at or after `since`, oldest first.
+export async function listRecentComments(since: Date): Promise<RecentComment[]> {
+    const params = new URLSearchParams({ since: toSecondsISO(since) });
+    const dtos = await request<RecentCommentDto[]>(
+        `/api/comments/recent?${params}`,
+    );
+    return dtos.map((dto) => ({
+        id: dto.id,
+        taskId: dto.task_id,
+        taskTitle: dto.task_title,
+        projectId: dto.project_id,
+        planId: dto.plan_id,
+        parentId: dto.parent_id || null,
+        authorName: dto.author_name,
+        body: dto.body,
+        createdAt: new Date(dto.created_at),
+    }));
+}
+
+// RFC 3339 without fractional seconds, as the backend parses it.
+function toSecondsISO(date: Date): string {
+    return date.toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
 // URL of the data export: a ZIP with data.json and the resource files. It is

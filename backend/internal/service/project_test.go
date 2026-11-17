@@ -10,7 +10,7 @@ import (
 
 func TestProjectCreate(t *testing.T) {
 	db, session := newTestDB(t)
-	svc := NewProjectService(db, repository.NewProjectRepository())
+	svc := NewProjectService(db, repository.NewProjectRepository(), repository.NewSettingsRepository())
 
 	tests := []struct {
 		name    string
@@ -34,7 +34,7 @@ func TestProjectCreate(t *testing.T) {
 func TestProjectCreateAddsDefaultStatuses(t *testing.T) {
 	ctx := context.Background()
 	db, session := newTestDB(t)
-	svc := NewProjectService(db, repository.NewProjectRepository())
+	svc := NewProjectService(db, repository.NewProjectRepository(), repository.NewSettingsRepository())
 
 	project, err := svc.Create(ctx, session.WorkspaceID, CreateProjectInput{Name: "Backend"})
 	if err != nil {

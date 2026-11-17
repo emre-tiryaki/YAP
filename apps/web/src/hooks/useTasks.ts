@@ -31,10 +31,13 @@ export type MoveTaskVariables = MoveTaskInput & {
     statusCategory: StatusCategory;
 };
 
-export function useUpcomingTasks() {
+// refetchIntervalMs keeps the list fresh while the caller is mounted (the
+// due-date notifications use it).
+export function useUpcomingTasks(refetchIntervalMs?: number) {
     return useQuery({
         queryKey: ["tasks", "upcoming"],
         queryFn: listUpcomingTasks,
+        refetchInterval: refetchIntervalMs,
     });
 }
 

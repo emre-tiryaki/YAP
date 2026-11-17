@@ -518,7 +518,7 @@ func (zeroReader) Read(p []byte) (int, error) {
 func newTask(t *testing.T, e resourceEnv) (projectID string, task model.Task) {
 	t.Helper()
 	projectRepo := repository.NewProjectRepository()
-	project, err := NewProjectService(e.db, projectRepo).Create(e.ctx, e.session.WorkspaceID, CreateProjectInput{Name: "P"})
+	project, err := NewProjectService(e.db, projectRepo, repository.NewSettingsRepository()).Create(e.ctx, e.session.WorkspaceID, CreateProjectInput{Name: "P"})
 	if err != nil {
 		t.Fatalf("Create project error = %v", err)
 	}

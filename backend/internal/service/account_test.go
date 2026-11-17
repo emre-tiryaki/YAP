@@ -9,6 +9,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/emre-tiryaki/YAP/backend/internal/model"
 	"github.com/emre-tiryaki/YAP/backend/internal/repository"
 )
 
@@ -32,7 +33,7 @@ func newAccountEnv(t *testing.T) accountEnv {
 		resourceEnv: re,
 		svc: NewAccountService(re.db, repository.NewAccountRepository(), repository.NewResourceRepository(),
 			repository.NewWorkspaceRepository(), repository.NewSettingsRepository(), store, "tester"),
-		projects:  NewProjectService(re.db, projectRepo),
+		projects:  NewProjectService(re.db, projectRepo, repository.NewSettingsRepository()),
 		tasks:     NewTaskService(re.db, projectRepo, taskRepo),
 		comments:  NewCommentService(re.db, taskRepo, repository.NewCommentRepository()),
 		settings:  NewSettingsService(re.db, repository.NewSettingsRepository()),
@@ -73,8 +74,14 @@ func (e accountEnv) seed(t *testing.T) {
 	if err := e.resourceEnv.svc.MoveToTrash(e.ctx, e.session, old.ID); err != nil {
 		t.Fatalf("MoveToTrash() error = %v", err)
 	}
-	off, delay := false, 5000
-	if _, err := e.settings.Update(e.ctx, e.session, UpdateSettingsInput{AutosaveEnabled: &off, AutosaveDelayMs: &delay}); err != nil {
+	off, on, delay, week := false, true, 5000, ReminderWeek
+	if _, err := e.settings.Update(e.ctx, e.session, UpdateSettingsInput{
+		AutosaveEnabled: &off,
+		AutosaveDelayMs: &delay,
+		HideDone:        &on,
+		StatusNames:     map[model.StatusCategory]string{model.StatusDone: "Finished"},
+		NotifyReminder:  &week,
+	}); err != nil {
 		t.Fatalf("Update settings error = %v", err)
 	}
 	user, ws := "Someone", "Work"
@@ -148,7 +155,8 @@ func TestExport(t *testing.T) {
 		{"tasks", "title", []string{"T"}},
 		{"task_comments", "body", []string{"hello"}},
 		{"resources", "name", []string{"docs", "empty", "spec.md"}},
-		{"user_settings", "key", []string{settingAutosaveDelayMs, settingAutosaveEnabled}},
+		{"user_settings", "key", []string{settingNotifyReminder, settingAutosaveDelayMs, settingAutosaveEnabled,
+			settingStatusNamePrefix + "done", settingHideDone}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.table, func(t *testing.T) {

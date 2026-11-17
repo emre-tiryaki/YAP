@@ -41,7 +41,8 @@ func main() {
 		log.Fatalf("Session error: %v", err)
 	}
 
-	projectSvc := service.NewProjectService(db, projectRepo)
+	settingsRepo := repository.NewSettingsRepository()
+	projectSvc := service.NewProjectService(db, projectRepo, settingsRepo)
 	taskSvc := service.NewTaskService(db, projectRepo, taskRepo)
 	commentSvc := service.NewCommentService(db, taskRepo, commentRepo)
 	workspaceSvc := service.NewWorkspaceService(db, repository.NewWorkspaceRepository())
@@ -52,7 +53,6 @@ func main() {
 	}
 	resourceRepo := repository.NewResourceRepository()
 	resourceSvc := service.NewResourceService(db, resourceRepo, taskRepo, store)
-	settingsRepo := repository.NewSettingsRepository()
 	settingsSvc := service.NewSettingsService(db, settingsRepo)
 	accountSvc := service.NewAccountService(db, repository.NewAccountRepository(), resourceRepo,
 		repository.NewWorkspaceRepository(), settingsRepo, store, cfg.DisplayName)
