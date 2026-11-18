@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
   type ComponentType,
+  type DragEvent,
   type FocusEvent,
   type MouseEvent,
   type ReactNode,
@@ -33,17 +34,42 @@ import {
   TbPin,
 } from "react-icons/tb";
 import { useTranslate, type TranslationKey } from "../hooks/useTranslate";
-import { unpinWhere, usePins } from "../hooks/usePins";
+import { addPin, unpinWhere, usePins } from "../hooks/usePins";
 import { useProjects } from "../hooks/useProjects";
 import { useShortcut } from "../hooks/useShortcut";
 import { useWorkspace } from "../hooks/useWorkspace";
 import type { Pin } from "../types/pin";
 import type { SettingsSection } from "../types/settings";
+import { hasPinDrag, readPinDrag, setPinDragData } from "../util/pinDrag";
 import { SettingsModal } from "./SettingsModal";
 
 type IconType = ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
 
 const COLLAPSED_KEY = "yap.sidebar.collapsed";
+
+// True while something pinnable is being dragged anywhere in the window, so
+// the Pinned section can show itself as a drop target before the pointer
+// reaches it.
+function usePinDragActive() {
+  const [isActive, setIsActive] = useState(false);
+  useEffect(() => {
+    function handleStart(event: globalThis.DragEvent) {
+      if (hasPinDrag(event)) setIsActive(true);
+    }
+    function handleEnd() {
+      setIsActive(false);
+    }
+    window.addEventListener("dragstart", handleStart);
+    window.addEventListener("dragend", handleEnd);
+    window.addEventListener("drop", handleEnd);
+    return () => {
+      window.removeEventListener("dragstart", handleStart);
+      window.removeEventListener("dragend", handleEnd);
+      window.removeEventListener("drop", handleEnd);
+    };
+  }, []);
+  return isActive;
+}
 
 // Shows `label` right of the hovered or focused element at once (no native
 // title delay). Rendered in a portal with fixed position so the scrolling nav
@@ -93,6 +119,29 @@ export function Sidebar() {
 
   useShortcut({ key: "b", mod: true }, () => setIsCollapsed((c) => !c));
   const toggleTip = useSideLabel(t("sidebar.expand"), isCollapsed);
+  const isPinDragActive = usePinDragActive();
+  const [isPinDropOver, setIsPinDropOver] = useState(false);
+
+  const pinDropProps = {
+    onDragOver: (event: DragEvent) => {
+      if (!hasPinDrag(event)) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "copy";
+      setIsPinDropOver(true);
+    },
+    onDragLeave: (event: DragEvent) => {
+      // Moving onto a child element also fires dragleave; ignore that.
+      if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+        setIsPinDropOver(false);
+    },
+    onDrop: (event: DragEvent) => {
+      setIsPinDropOver(false);
+      const pin = readPinDrag(event);
+      if (!pin) return;
+      event.preventDefault();
+      addPin(pin);
+    },
+  };
 
   const projectItems = projects.data ?? [];
   // Show the live project name and icon, so an edit elsewhere is picked up at once.
@@ -166,12 +215,28 @@ export function Sidebar() {
           />
         </ul>
 
-        {(pins.length > 0 || !isCollapsed) && (
-          <Section title={t("sidebar.pinned")} isCollapsed={isCollapsed}>
+        {(pins.length > 0 || !isCollapsed || isPinDragActive) && (
+          <Section
+            title={t("sidebar.pinned")}
+            isCollapsed={isCollapsed}
+            dropProps={pinDropProps}
+            dropState={
+              isPinDropOver ? "over" : isPinDragActive ? "active" : undefined
+            }
+          >
             {pins.length === 0 && (
-              <li className="flex items-center gap-2 px-3 py-1 text-xs text-gray-400">
+              <li
+                className={`flex items-center gap-2 py-1 text-xs ${
+                  isCollapsed ? "justify-center px-2 py-2" : "px-3"
+                } ${isPinDropOver ? "text-accent" : "text-gray-400"}`}
+              >
                 <TbPin aria-hidden className="shrink-0" />
-                {t("sidebar.pinned.empty")}
+                {!isCollapsed &&
+                  t(
+                    isPinDragActive
+                      ? "sidebar.pinned.drop"
+                      : "sidebar.pinned.empty",
+                  )}
               </li>
             )}
             {pins.map((pin) => (
@@ -228,6 +293,12 @@ export function Sidebar() {
                 emoji={project.icon}
                 isActive={pathname === href || pathname.startsWith(`${href}/`)}
                 isCollapsed={isCollapsed}
+                dragPin={{
+                  kind: "project",
+                  id: project.id,
+                  label: project.name,
+                  href,
+                }}
               />
             );
           })}
@@ -244,12 +315,41 @@ type SectionProps = {
   // Makes the title a link, e.g. to the page listing the section's items.
   href?: string;
   isCollapsed: boolean;
+  // Makes the section a drop target; dropState styles it while a matching
+  // item is dragged ("active") or held over it ("over").
+  dropProps?: {
+    onDragOver: (event: DragEvent) => void;
+    onDragLeave: (event: DragEvent) => void;
+    onDrop: (event: DragEvent) => void;
+  };
+  dropState?: "active" | "over";
   children: ReactNode;
 };
 
-function Section({ title, href, isCollapsed, children }: SectionProps) {
+function Section({
+  title,
+  href,
+  isCollapsed,
+  dropProps,
+  dropState,
+  children,
+}: SectionProps) {
   return (
-    <section aria-label={title}>
+    <section
+      aria-label={title}
+      {...dropProps}
+      className={
+        dropProps
+          ? `-m-1 rounded-lg border border-dashed p-1 transition-colors ${
+              dropState === "over"
+                ? "border-accent bg-accent/10"
+                : dropState === "active"
+                  ? "border-gray-300 bg-gray-100"
+                  : "border-transparent"
+            }`
+          : undefined
+      }
+    >
       {isCollapsed ? (
         <hr className="mx-2 mb-3 border-gray-200" />
       ) : (
@@ -277,6 +377,8 @@ type NavLinkProps = {
   isActive: boolean;
   isCollapsed: boolean;
   onUnpin?: () => void;
+  // Dragging the link carries this pin, so it can be dropped on Pinned.
+  dragPin?: Pin;
 };
 
 function NavLink({
@@ -287,6 +389,7 @@ function NavLink({
   isActive,
   isCollapsed,
   onUnpin,
+  dragPin,
 }: NavLinkProps) {
   const t = useTranslate();
   const sideLabel = useSideLabel(label, isCollapsed);
@@ -297,6 +400,14 @@ function NavLink({
         to={href}
         title={isCollapsed ? undefined : label}
         {...sideLabel.handlers}
+        onDragStart={
+          dragPin
+            ? (event: DragEvent) => {
+                sideLabel.handlers.onMouseLeave?.();
+                setPinDragData(event, dragPin);
+              }
+            : undefined
+        }
         aria-current={isActive ? "page" : undefined}
         className={`flex items-center gap-3 rounded-md py-2 text-sm text-gray-700 hover:bg-gray-200 aria-[current=page]:bg-gray-200 aria-[current=page]:font-semibold ${
           isCollapsed ? "justify-center px-2" : "px-3"

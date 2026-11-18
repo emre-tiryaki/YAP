@@ -27,6 +27,8 @@ const (
 	settingNotifyComments = "notifications.comments"
 	settingNotifySound    = "notifications.sound"
 
+	settingRepoAutoUpdate = "repositories.auto_update"
+
 	minAutosaveDelayMs = 300
 	maxAutosaveDelayMs = 10_000
 
@@ -98,6 +100,9 @@ type UserSettings struct {
 	DoneToBottom  bool
 	StatusNames   StatusNames
 	Notifications NotificationSettings
+	// RepoAutoUpdate keeps GitHub repositories up to date in the background
+	// while the app runs and GitHub can be reached.
+	RepoAutoUpdate bool
 }
 
 func defaultUserSettings() UserSettings {
@@ -110,6 +115,7 @@ func defaultUserSettings() UserSettings {
 			Reminder: ReminderDay,
 			Overdue:  true,
 		},
+		RepoAutoUpdate: true,
 	}
 }
 
@@ -127,6 +133,8 @@ type UpdateSettingsInput struct {
 	NotifyOverdue  *bool
 	NotifyComments *bool
 	NotifySound    *bool
+
+	RepoAutoUpdate *bool
 }
 
 type SettingsRepository interface {
@@ -194,6 +202,7 @@ func parseUserSettings(values map[string]string) UserSettings {
 	readSetting(values, settingNotifyOverdue, &n.Overdue, nil)
 	readSetting(values, settingNotifyComments, &n.Comments, nil)
 	readSetting(values, settingNotifySound, &n.Sound, nil)
+	readSetting(values, settingRepoAutoUpdate, &out.RepoAutoUpdate, nil)
 	return out
 }
 
@@ -259,6 +268,9 @@ func settingValues(in UpdateSettingsInput) (map[string]any, error) {
 	if in.NotifySound != nil {
 		values[settingNotifySound] = *in.NotifySound
 	}
+	if in.RepoAutoUpdate != nil {
+		values[settingRepoAutoUpdate] = *in.RepoAutoUpdate
+	}
 	return values, nil
 }
 
@@ -294,6 +306,7 @@ func resetUserSettings(ctx context.Context, q database.DBTX, repo SettingsReposi
 		NotifyOverdue:  &n.Overdue,
 		NotifyComments: &n.Comments,
 		NotifySound:    &n.Sound,
+		RepoAutoUpdate: &d.RepoAutoUpdate,
 	})
 	if err != nil {
 		return err

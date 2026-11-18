@@ -1,4 +1,5 @@
 import type { IconType } from "react-icons";
+import { FiGithub } from "react-icons/fi";
 import {
     LuFile,
     LuFileAudio,
@@ -48,6 +49,8 @@ export function ResourceIcon({
     isOpen = false,
     className = "",
 }: ResourceIconProps) {
+    if (resource.isRepository)
+        return <FiGithub aria-hidden className={`shrink-0 text-gray-700 ${className}`} />;
     const category = fileCategory(resource);
     const Icon = category === "folder" && isOpen ? LuFolderOpen : icons[category];
     return (

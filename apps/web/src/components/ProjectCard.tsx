@@ -5,6 +5,7 @@ import type { CardAction } from "../types/cardAction";
 import type { Pin } from "../types/pin";
 import type { Project } from "../types/project";
 import { cardAccent as accent, initials } from "../util/accent";
+import { setPinDragData } from "../util/pinDrag";
 import { CardMenu } from "./CardMenu";
 import { ProjectDialogs } from "./ProjectDialogs";
 
@@ -36,6 +37,7 @@ export function ProjectCard({ project, layout = "row" }: ProjectCardProps) {
             <div className="relative h-full">
                 <Link
                     to={`/projects/${project.id}`}
+                    onDragStart={(event) => setPinDragData(event, pin)}
                     className={`flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-accent ${accent.hoverBorder}`}
                 >
                     <span
@@ -80,6 +82,7 @@ export function ProjectCard({ project, layout = "row" }: ProjectCardProps) {
         <div className="relative">
             <Link
                 to={`/projects/${project.id}`}
+                onDragStart={(event) => setPinDragData(event, pin)}
                 className={`flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 pr-12 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-accent ${accent.hoverBorder}`}
             >
                 <span

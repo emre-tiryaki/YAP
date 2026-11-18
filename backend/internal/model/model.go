@@ -130,6 +130,9 @@ type Resource struct {
 	// TrashedRootID is the item that was moved to the trash, taking this one
 	// with it; equal to ID for the items listed in the trash.
 	TrashedRootID string
+	// IsRepository marks a folder filled with a GitHub repository. Its
+	// content is read-only and is not made of resource rows.
+	IsRepository bool
 }
 
 type ResourceAction string
@@ -290,6 +293,15 @@ type ImportResource struct {
 	// Filled in by the import from the archive's bytes.
 	Size   int64 `json:"-"`
 	IsText bool  `json:"-"`
+}
+
+type ImportRepository struct {
+	ResourceID string `json:"resource_id"`
+	GitHubID   int64  `json:"github_id"`
+	FullName   string `json:"full_name"`
+	HTMLURL    string `json:"html_url"`
+	Branch     string `json:"branch"`
+	IsPrivate  int64  `json:"is_private"`
 }
 
 type ImportTaskResource struct {

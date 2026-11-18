@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"io"
 	"mime"
 	"net/http"
 	"strconv"
@@ -61,6 +62,8 @@ type resourceResponse struct {
 	// TrashedRootID is the item that was moved to the trash, taking this one
 	// with it. Only an item that is its own trash root can be restored.
 	TrashedRootID *string `json:"trashed_root_id"`
+	// IsRepository marks a read-only folder filled with a GitHub repository.
+	IsRepository bool `json:"is_repository"`
 }
 
 func rfc3339(t time.Time) string {
@@ -89,6 +92,7 @@ func toResourceResponse(r model.Resource) resourceResponse {
 	}
 	res.TrashedAt = formatTime(r.TrashedAt)
 	res.TrashedRootID = optionalString(r.TrashedRootID)
+	res.IsRepository = r.IsRepository
 	return res
 }
 
@@ -222,10 +226,7 @@ func (h *ResourceHandler) upload(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, toResourceResponse(res))
 }
 
-// content serves the bytes of a file. Range requests work, so audio and
-// video can seek. The response is sandboxed so an uploaded HTML or SVG file
-// cannot run script with the app's origin; PDFs are left out because the
-// browser's viewer does not load in a sandbox.
+// content serves the bytes of a file (see serveFile).
 func (h *ResourceHandler) content(w http.ResponseWriter, r *http.Request) {
 	res, f, err := h.svc.Open(r.Context(), h.session, r.PathValue("id"))
 	if err != nil {
@@ -233,12 +234,30 @@ func (h *ResourceHandler) content(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer f.Close()
+	serveFile(w, r, servedFile{
+		Name: res.Name, MimeType: res.MimeType, IsText: res.IsText, ModTime: res.UpdatedAt,
+		ETag: `"` + res.ID + "-" + strconv.FormatInt(res.Revision, 10) + `"`,
+	}, f)
+}
 
-	contentType := res.MimeType
+type servedFile struct {
+	Name     string
+	MimeType string
+	IsText   bool
+	ModTime  time.Time
+	ETag     string
+}
+
+// serveFile sends file bytes for preview or download. Range requests work,
+// so audio and video can seek. The response is sandboxed so an HTML or SVG
+// file cannot run script with the app's origin; PDFs are left out because
+// the browser's viewer does not load in a sandbox.
+func serveFile(w http.ResponseWriter, r *http.Request, file servedFile, content io.ReadSeeker) {
+	contentType := file.MimeType
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
-	if res.IsText && (strings.HasPrefix(contentType, "text/") || contentType == "application/octet-stream") {
+	if file.IsText && (strings.HasPrefix(contentType, "text/") || contentType == "application/octet-stream") {
 		if contentType == "application/octet-stream" {
 			contentType = "text/plain"
 		}
@@ -247,17 +266,19 @@ func (h *ResourceHandler) content(w http.ResponseWriter, r *http.Request) {
 	header := w.Header()
 	header.Set("Content-Type", contentType)
 	header.Set("X-Content-Type-Options", "nosniff")
-	if res.MimeType != "application/pdf" {
+	if file.MimeType != "application/pdf" {
 		header.Set("Content-Security-Policy", "sandbox; default-src 'none'; img-src 'self' data:; media-src 'self'; style-src 'unsafe-inline'")
 	}
 	header.Set("Cache-Control", "no-cache")
-	header.Set("ETag", `"`+res.ID+"-"+strconv.FormatInt(res.Revision, 10)+`"`)
+	if file.ETag != "" {
+		header.Set("ETag", file.ETag)
+	}
 	disposition := "inline"
 	if r.URL.Query().Get("download") == "1" {
 		disposition = "attachment"
 	}
-	header.Set("Content-Disposition", mime.FormatMediaType(disposition, map[string]string{"filename": res.Name}))
-	http.ServeContent(w, r, "", res.UpdatedAt, f)
+	header.Set("Content-Disposition", mime.FormatMediaType(disposition, map[string]string{"filename": file.Name}))
+	http.ServeContent(w, r, "", file.ModTime, content)
 }
 
 // saveContent replaces the text of a file. The revision the edit is based on

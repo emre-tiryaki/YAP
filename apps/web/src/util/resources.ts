@@ -110,7 +110,8 @@ function extension(name: string): string {
 
 // Decides how a resource is previewed.
 // The fields that decide how a resource is shown.
-export type ResourceLook = Pick<Resource, "kind" | "name" | "mimeType" | "isText">;
+export type ResourceLook = Pick<Resource, "kind" | "name" | "mimeType" | "isText"> &
+    Partial<Pick<Resource, "isRepository">>;
 
 export function fileCategory(resource: ResourceLook): FileCategory {
     if (resource.kind === "folder") return "folder";

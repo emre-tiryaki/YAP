@@ -69,6 +69,7 @@ type importDocument struct {
 		Resources      []model.ImportResource     `json:"resources"`
 		TaskResources  []model.ImportTaskResource `json:"task_resources"`
 		ResourceEvents []model.ImportEvent        `json:"resource_events"`
+		Repositories   []model.ImportRepository   `json:"resource_repositories"`
 		UserSettings   []model.ImportSetting      `json:"user_settings"`
 	} `json:"tables"`
 }
@@ -277,7 +278,7 @@ func (im *importer) run(ctx context.Context, tx *sql.Tx) error {
 
 	steps := []func(context.Context, *sql.Tx) error{
 		im.projects, im.plans, im.statuses, im.tasks, im.assignees, im.comments,
-		im.resources, im.taskResources, im.events,
+		im.resources, im.repositories, im.taskResources, im.events,
 	}
 	if im.result.Restored {
 		steps = append(steps, im.profile)
@@ -447,6 +448,8 @@ type localTree struct {
 	parent map[string]string
 	name   map[string]string
 	kind   map[string]model.ResourceKind
+	// repo marks repository folders, which nothing may be merged into.
+	repo map[string]bool
 	// children maps a folder id ("" for the top) to its children's name keys
 	// and ids, the shape freeName wants.
 	children map[string]map[string]string
@@ -454,9 +457,10 @@ type localTree struct {
 
 func newLocalTree(resources []model.Resource) *localTree {
 	t := &localTree{parent: map[string]string{}, name: map[string]string{},
-		kind: map[string]model.ResourceKind{}, children: map[string]map[string]string{}}
+		kind: map[string]model.ResourceKind{}, repo: map[string]bool{}, children: map[string]map[string]string{}}
 	for _, r := range resources {
 		t.add(r.ID, r.ParentID, r.Name, r.Kind)
+		t.repo[r.ID] = r.IsRepository
 	}
 	return t
 }
@@ -494,6 +498,10 @@ func (im *importer) resources(ctx context.Context, tx *sql.Tx) error {
 		depth[resources[i].ID] = len(importPath(byID, &resources[i]))
 	}
 	slices.SortStableFunc(resources, func(a, b model.ImportResource) int { return depth[a.ID] - depth[b.ID] })
+	repoFolders := make(map[string]bool, len(im.doc.Tables.Repositories))
+	for _, rr := range im.doc.Tables.Repositories {
+		repoFolders[rr.ResourceID] = true
+	}
 
 	for _, r := range resources {
 		state, err := im.s.repo.RowState(ctx, tx, im.session.WorkspaceID, "resources", r.ID)
@@ -519,7 +527,8 @@ func (im *importer) resources(ctx context.Context, tx *sql.Tx) error {
 		}
 		siblings := tree.children[parentID]
 		if existing, taken := siblings[nameKey(r.Name)]; taken {
-			if kind == model.ResourceFolder && tree.kind[existing] == model.ResourceFolder {
+			if kind == model.ResourceFolder && tree.kind[existing] == model.ResourceFolder &&
+				!tree.repo[existing] && !repoFolders[r.ID] {
 				im.ids[r.ID] = existing
 				im.result.Existing++
 				continue
@@ -564,6 +573,22 @@ func (im *importer) resources(ctx context.Context, tx *sql.Tx) error {
 		}
 		im.placed = append(im.placed, path)
 		im.result.Added.Resources++
+	}
+	return nil
+}
+
+// repositories makes the folders the import added repository folders again.
+// Their files are fetched afterwards, like those of a newly added repository.
+func (im *importer) repositories(ctx context.Context, tx *sql.Tx) error {
+	for _, rr := range im.doc.Tables.Repositories {
+		resourceID, ok := im.ids[rr.ResourceID]
+		if !ok || !im.added[resourceID] {
+			continue
+		}
+		rr.ResourceID = resourceID
+		if err := im.s.repo.InsertRepository(ctx, tx, im.session.WorkspaceID, im.session.MembershipID, rr, im.now); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -889,6 +914,28 @@ func validateImport(doc *importDocument) error {
 			return invalid("two resources with the same name in one folder")
 		}
 		siblings[key] = true
+	}
+	repoFolders := map[string]bool{}
+	for _, rr := range tb.Repositories {
+		folder, ok := resources[rr.ResourceID]
+		switch {
+		case !ok || folder.Kind != string(model.ResourceFolder):
+			return invalid("repository without its folder")
+		case repoFolders[rr.ResourceID]:
+			return invalid("two repositories in one folder")
+		case rr.GitHubID <= 0, len(rr.FullName) < 3, len(rr.FullName) > 200, !strings.Contains(rr.FullName, "/"),
+			!validBranch(rr.Branch), rr.IsPrivate != 0 && rr.IsPrivate != 1:
+			return invalid("repository")
+		}
+		if !strings.HasPrefix(rr.HTMLURL, "https://") {
+			return invalid("repository url")
+		}
+		repoFolders[rr.ResourceID] = true
+	}
+	for _, r := range resources {
+		if r.ParentID != nil && repoFolders[*r.ParentID] {
+			return invalid("resource inside a repository")
+		}
 	}
 
 	for _, l := range tb.TaskResources {

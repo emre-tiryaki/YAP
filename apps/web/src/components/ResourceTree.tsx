@@ -6,11 +6,13 @@ import { usePreferences } from "../hooks/usePreferences";
 import { useTranslate } from "../hooks/useTranslate";
 import type { Resource } from "../types/resource";
 import { isDropAccepted, readDrop, startResourceDrag, type DroppedItems } from "../util/resourceDrag";
+import { resourcePin, setPinDragData } from "../util/pinDrag";
 import { childrenOf, pathTo, type ResourceIndex } from "../util/resources";
 import { ResourceIcon } from "./ResourceIcon";
 import { ResourceMenu, type ResourceMenuItem } from "./ResourceMenu";
 
 const EXPANDED_KEY = "yap.resources.expanded";
+const ROOT_COLLAPSED_KEY = "yap.resources.rootCollapsed";
 
 function readExpanded(): Set<string> {
     try {
@@ -45,8 +47,11 @@ export function ResourceTree({
     const t = useTranslate();
     const { shortcutsEnabled } = usePreferences();
     const [expanded, setExpanded] = useState(readExpanded);
+    const [rootOpen, setRootOpen] = useState(() => localStorage.getItem(ROOT_COLLAPSED_KEY) !== "1");
     const [dropTarget, setDropTarget] = useState<string | null | undefined>(undefined);
     // The folders above the open item stay open, so it is always visible.
+    // Collapsing the top level still keeps an open item visible.
+    const rootShown = rootOpen || Boolean(selectedId);
     const forced = new Set(pathTo(index, selectedId ?? null).slice(0, -1).map((r) => r.id));
 
     function toggle(id: string) {
@@ -56,6 +61,14 @@ export function ResourceTree({
             else next.add(id);
             localStorage.setItem(EXPANDED_KEY, JSON.stringify([...next]));
             return next;
+        });
+    }
+
+    function toggleRoot() {
+        setRootOpen((prev) => {
+            if (prev) localStorage.setItem(ROOT_COLLAPSED_KEY, "1");
+            else localStorage.removeItem(ROOT_COLLAPSED_KEY);
+            return !prev;
         });
     }
 
@@ -91,7 +104,10 @@ export function ResourceTree({
                 >
                     <div
                         draggable
-                        onDragStart={(event) => startResourceDrag(event, [r.id])}
+                        onDragStart={(event) => {
+                            startResourceDrag(event, [r.id]);
+                            setPinDragData(event, resourcePin(r));
+                        }}
                         {...(r.kind === "folder" ? dropProps(r.id) : {})}
                         className={`group flex items-center rounded-md pr-1 text-sm ${
                             selectedId === r.id
@@ -143,21 +159,50 @@ export function ResourceTree({
 
     return (
         <nav aria-label={t("resources.tree.label")} className="flex min-h-0 flex-1 flex-col">
-            <ul role="tree" aria-label={t("resources.tree.label")} className="flex-1 overflow-y-auto p-2">
-                <li role="treeitem" aria-selected={selectedId === null} aria-expanded>
-                    <Link
-                        to="/resources"
-                        {...dropProps(null)}
-                        className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-semibold ${
-                            selectedId === null ? "bg-gray-200 text-gray-900" : "text-gray-700 hover:bg-gray-100"
-                        } ${dropTarget === null ? "ring-2 ring-accent" : ""}`}
-                    >
-                        <LuHardDrive aria-hidden className="text-gray-500" />
-                        {t("resources.title")}
-                    </Link>
-                    <ul role="group">{renderLevel(null, 0)}</ul>
-                </li>
-            </ul>
+            {/* The empty space below the tree is the top level too. */}
+            <div
+                {...dropProps(null)}
+                onDragLeave={(event) => {
+                    // Moving between rows inside the tree is not leaving it.
+                    if (!event.currentTarget.contains(event.relatedTarget as Node)) setDropTarget(undefined);
+                }}
+                className={`m-1 flex-1 overflow-y-auto rounded-lg p-1 transition-colors ${
+                    dropTarget === null ? "bg-accent/10 ring-2 ring-accent/40 ring-inset" : ""
+                }`}
+            >
+                <ul role="tree" aria-label={t("resources.tree.label")}>
+                    <li role="treeitem" aria-selected={selectedId === null} aria-expanded={rootShown}>
+                        <div
+                            className={`flex items-center rounded-md pr-1 text-sm font-semibold ${
+                                selectedId === null ? "bg-gray-200 text-gray-900" : "text-gray-700 hover:bg-gray-100"
+                            } ${dropTarget === null ? "ring-2 ring-accent" : ""}`}
+                            style={{ paddingLeft: 4 }}
+                        >
+                            <button
+                                type="button"
+                                tabIndex={-1}
+                                onClick={toggleRoot}
+                                aria-label={t(rootShown ? "resources.tree.collapse" : "resources.tree.expand")}
+                                className="cursor-pointer rounded p-0.5 text-gray-400 hover:text-gray-900"
+                            >
+                                <FiChevronRight
+                                    aria-hidden
+                                    className={`transition-transform ${rootShown ? "rotate-90" : ""}`}
+                                />
+                            </button>
+                            <Link
+                                to="/resources"
+                                onClick={() => !rootOpen && toggleRoot()}
+                                className="flex min-w-0 flex-1 items-center gap-2 py-1 pl-1 focus:outline-none focus-visible:underline"
+                            >
+                                <LuHardDrive aria-hidden className="text-gray-500" />
+                                {t("resources.title")}
+                            </Link>
+                        </div>
+                        {rootShown && <ul role="group">{renderLevel(null, 1)}</ul>}
+                    </li>
+                </ul>
+            </div>
             <Link
                 to="/resources/trash"
                 aria-current={selectedId === undefined ? "page" : undefined}

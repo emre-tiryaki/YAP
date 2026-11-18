@@ -11,7 +11,7 @@ Read before non-trivial changes:
 
 ## Commands
 
-A `.env` at the repo root is required (`DB_PATH`, `BACKEND_PORT`, `COOKIE_SECURE`; optional `RESOURCES_PATH`, default `resources/` next to the DB, where resource files are stored). The backend finds it by walking up from cwd (stopping at `.git`) and resolves relative `DB_PATH` against the `.env` directory. The Vite config throws if `../../.env` or `BACKEND_PORT` is missing.
+A `.env` at the repo root is required (`DB_PATH`, `BACKEND_PORT`, `COOKIE_SECURE`; optional `RESOURCES_PATH`, default `resources/` next to the DB, where resource files are stored; optional `GITHUB_CLIENT_ID`, the OAuth app's Client ID with "Enable Device Flow" on, which turns on the GitHub repository resources). The backend finds it by walking up from cwd (stopping at `.git`) and resolves relative `DB_PATH` against the `.env` directory. The Vite config throws if `../../.env` or `BACKEND_PORT` is missing.
 
 ```bash
 make dev                                  # start backend, wait for /hello-world, then start Vite
@@ -42,6 +42,7 @@ Strict one-way layering: `handler → service → repository → database`, with
 - **Errors**: sentinel errors live in `internal/service/errors.go`; handlers map them to status codes with `errors.Is` and never leak internal error text. JSON helpers are in `internal/handler/json.go`.
 - **Ordering**: `internal/position` implements fractional-index strings for `position` columns (compare with plain byte order, never locale-aware).
 - **Time**: injected via `internal/service/clock.go`; always UTC RFC 3339 strings.
+- **GitHub**: `internal/github` (HTTP client, errors as `model.ErrGitHub*`), `internal/repofetch` (ZIP unpacking for the in-app copy; `git clone` only into a folder the user picks, never touched again), `internal/secrets` (token in the OS keychain). `service.RepositoryService.Run` is the background loop started in `main.go`; tests use fakes of the GitHub API and keychain (`service/github_fakes_test.go`), never the network.
 
 ### Database / migrations
 

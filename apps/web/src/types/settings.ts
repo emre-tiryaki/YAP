@@ -4,6 +4,7 @@ export type SettingsSection =
   | "appearance"
   | "categories"
   | "notifications"
+  | "github"
   | "shortcuts";
 
 export type Language = "en" | "tr";

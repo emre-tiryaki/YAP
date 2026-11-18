@@ -190,6 +190,9 @@ erDiagram
     resources ||--o{ task_resources : "linked to"
     resources ||--o{ resource_events : "has activity"
     memberships ||--o{ resource_events : "acts"
+    resources ||--o| resource_repositories : "filled by"
+    resource_repositories ||--o| repository_checkouts : "local copy"
+    resource_repositories ||--o{ repository_clones : "cloned to"
     users ||--o{ user_settings : "has"
 ```
 
@@ -201,7 +204,7 @@ The same logical schema exists in two physical databases.
 | -------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
 | Engine   | SQLite (`modernc.org/sqlite`, `database/sql`, no ORM (Object-Relational Mapping))                          | PostgreSQL                                               |
 | Scope    | The user's own device                                                                                      | Team workspaces, accounts, invitations, synchronization |
-| Tables   | users, workspaces, memberships, teams, team_members, projects, project_teams, plans, statuses, tasks, task_assignees, task_comments | All local tables, plus accounts and invitations         |
+| Tables   | users, workspaces, memberships, teams, team_members, projects, project_teams, plans, statuses, tasks, task_assignees, task_comments, resources, task_resources, resource_events, resource_repositories, repository_checkouts, repository_clones, user_settings | All local tables except repository_checkouts and repository_clones, plus accounts and invitations |
 
 DDL (Data Definition Language) is maintained in two separate directories: `migrations/sqlite` and `migrations/postgres`. The logical schema is the same; only type mappings and language-specific differences vary.
 
@@ -274,6 +277,8 @@ Rules:
 | A resource, its parent, its task links and its events belong to the same workspace. | Composite foreign keys on `(resource_id / parent_id, workspace_id)`. |
 | Live sibling resource names are unique case-insensitively. | Partial unique index on `(workspace_id, COALESCE(parent_id, ''), name_key) WHERE trashed_at IS NULL AND deleted_at IS NULL`; `name_key` is the lowercased name. |
 | A trashed resource knows what it was trashed with. | `CHECK ((trashed_at IS NULL) = (trashed_root_id IS NULL))`. |
+| A repository row belongs to a folder of the same workspace. | `resource_repositories (resource_id, workspace_id)` → `resources (id, workspace_id)`. |
+| A copy that is ready names its commit; a pending one has none. | `CHECK (state != 'ready' OR commit_sha IS NOT NULL)`, `CHECK (state != 'pending' OR commit_sha IS NULL)`. |
 | A folder has no content fields. | `CHECK (kind = 'file' OR (mime_type IS NULL AND size = 0 AND is_text = 0))`. |
 | Plan names are unique within a project and team scope. | Partial unique index on `(project_id, COALESCE(team_id, ''), name) WHERE deleted_at IS NULL`. |
 | Team names are unique within a workspace. | Partial unique index: `WHERE deleted_at IS NULL`. |
@@ -312,17 +317,25 @@ All of these rules are protected by unit tests.
 | Editing a status. | Only `title`, `description` and `color` can be changed (`#rrggbb`, stored lowercase); the status must belong to the plan in the URL. `category` and `position` are left untouched, so the "at least one `done` status" rule cannot be broken by an edit. |
 | Deleting a status. | The status, its tasks and all of their subtasks (even those in other statuses) and their comments are individually marked with `deleted_at`, and their open `task_assignees` rows get `removed_at`, within the same transaction. The status must belong to the plan in the URL, and the plan's last `done`-category status cannot be deleted. |
 | When a task is deleted. | The task, all of its subtasks and their comments are marked with `deleted_at`, and their open `task_assignees` and `task_resources` rows get `removed_at`, within the same transaction. Deleting a plan, status or project closes the `task_resources` rows of its tasks the same way. |
-| Resource names. | Trimmed; 1–255 bytes of UTF-8; no `/ \ : * ? " < > \|` or control characters; not `.` or `..`. `.yap-trash` is reserved at the top of the tree (it is the trash directory on disk). |
+| Resource names. | Trimmed; 1–255 bytes of UTF-8; no `/ \ : * ? " < > \|` or control characters; not `.` or `..`. `.yap-trash` and `.yap-repos` are reserved at the top of the tree (they are the trash and repository directories on disk). |
+| Repository folders are read-only. | Nothing can be created, uploaded, moved, pasted or imported into a folder that has a `resource_repositories` row (`read_only`, 409), and a repository folder (or a folder holding one) cannot be copied. Renaming, moving, trashing, restoring, purging and task links work as for any folder. |
+| Adding a repository. | Needs a connected GitHub account. The repository is looked up by `owner/name`; its id (which survives renames), default branch and URL are stored with the new folder (named after the repository; a taken name gets a ` (n)` suffix) in one transaction, logged as `created` with the repository name. The files are then fetched in the background. |
+| Fetching and updating a copy. | Each device keeps its copy under `RESOURCES_PATH/<workspace_id>/.yap-repos/<resource_id>/` and its state in `repository_checkouts`. An attempt looks the repository up by id (storing a new name or URL), reads the branch head, and only downloads when the commit changed or the copy is missing. The ZIP is unpacked into a temporary directory and swapped in (at most 1 GiB downloaded, 2 GiB and 200 000 files unpacked; links and paths leaving the directory are skipped). A copy still holding a `.git` directory (a clone kept by the first version, reset by migration 009) is downloaded again. A failure keeps the copy and records `offline`, `unauthorized`, `not_found`, `too_large` or `failed`; a rejected token is forgotten. Without a token public repositories still update. Trashed repositories are not updated. |
+| Cloning to the user's computer. | Needs the git program. The target is a new folder (a valid resource name) inside an existing folder given as an absolute path; a taken name is a conflict. A full `git clone` of the repository's current clone URL is made with the token passed in the environment, so it is neither on the command line nor stored in the clone (later pulls of private repositories use the user's own credentials). A failed clone removes what it left. The clone is recorded in `repository_clones`; the app never runs anything in it afterwards. The list shows whether each clone's `.git` is still there; removing one from the list only sets `deleted_at`. Only JSON requests are accepted, so another site cannot trigger a clone through the browser. |
+| Commit history. | `GET /api/resources/{id}/repository/commits?page=` passes a page (1 to 100, 50 commits each) of the branch's history straight from GitHub, newest first, with parents, so the client can draw the graph. Nothing is stored; without GitHub it answers `github_unavailable`. Public repositories work without an account. |
+| Picking the clone folder. | `GET /api/local-folders?path=` lists the subfolders (hidden ones left out, links to folders included) of an absolute path, or of the home folder when empty, with its parent (none at the root). |
+| Background updates. | While the app runs: a pending copy is tried every minute whatever the settings say; with `repositories.auto_update` on, a ready copy is checked every 15 minutes, or every minute after an `offline` failure. "Update now" works with the setting off. Copies whose folder was purged are removed. A `fetching` state left by a stop is cleared on start. |
+| Browsing a copy. | Paths are `/`-separated inside the repository; empty, `.` and `..` segments, backslashes and NUL are rejected, the copy is opened as an `os.Root` (no link can leave it), and a top-level `.git` directory is never shown. Folders are listed folders first, then by name; whether a file is text is sniffed from its first 8 KiB. |
 | Name conflicts on create, upload, move and copy. | `fail` (409), `keep_both` (first free `name (n).ext`) or `replace`. Replace is only file over file: an upload gives the existing file the new content (it keeps its id and task links); a move or copy moves the existing file to the trash. Restoring from the trash always uses `keep_both`. |
 | A folder cannot be moved or copied into itself or its descendants. | Rejected as invalid input. |
 | Trash. | Trashing marks the item and its live descendants with `trashed_at` and `trashed_root_id` = the item. Only items with `trashed_root_id = id` are listed in the trash. Restoring brings back exactly that group, into the original folder, or to the top when that folder is no longer live. Task links stay while an item is trashed and are shown as trashed. |
 | Purge (permanent delete). | Only for trash roots, one by one or by emptying the trash. The bytes are removed from the disk; the rows get `deleted_at` and stay as tombstones so the activity log and synchronization still see them; their open `task_resources` rows get `removed_at`. |
 | Editing a text file. | The save carries the revision it was based on; a different stored revision is rejected as `stale` (409). Every content change bumps `revision`. Content must be valid UTF-8 without NUL bytes and at most 20 MiB. Uploads are at most 100 MiB. |
 | Activity log. | Every change to a resource writes a `resource_events` row in the same transaction. Saves of the same file by the same member less than 10 minutes after the previous one extend that member's last `edited` event (`updated_at`, `details`) instead of adding a row. Link and unlink events carry `task_id`. |
-| User settings. | Known keys: `resources.autosave_enabled`, `resources.autosave_delay_ms` (300 to 10 000), `tasks.hide_done`, `tasks.done_to_bottom`, `statuses.default_name.{todo,in_progress,done}` (trimmed, 1 to 100 characters), `notifications.due_soon`, `notifications.reminder` (`1h`, `1d` or `1w`), `notifications.overdue`, `notifications.comments`, `notifications.sound`. An update with any invalid value writes nothing. Unknown or unreadable stored values fall back to the defaults (autosave on, 1000 ms; completed tasks shown in place; statuses "To Do", "In Progress", "Done"; due-soon one day before and overdue reminders on, comment and sound off). A reset writes the default of every key. |
+| User settings. | Known keys: `resources.autosave_enabled`, `resources.autosave_delay_ms` (300 to 10 000), `tasks.hide_done`, `tasks.done_to_bottom`, `statuses.default_name.{todo,in_progress,done}` (trimmed, 1 to 100 characters), `notifications.due_soon`, `notifications.reminder` (`1h`, `1d` or `1w`), `notifications.overdue`, `notifications.comments`, `notifications.sound`, `repositories.auto_update`. An update with any invalid value writes nothing. Unknown or unreadable stored values fall back to the defaults (autosave on, 1000 ms; completed tasks shown in place; statuses "To Do", "In Progress", "Done"; due-soon one day before and overdue reminders on, comment and sound off; automatic repository updates on). A reset writes the default of every key. |
 | Default statuses of a new plan. | Every new plan (also the first plan of a new project) gets one todo, one in-progress and one done status, titled with the creating user's `statuses.default_name.*` settings. Existing plans are not renamed when the settings change. |
 | Comment notifications. | `GET /api/comments/recent?since=` lists live comments on live tasks (of live plans and projects) written by other members at or after `since`, oldest first, at most 50. Which notifications were already shown is remembered per device, not in the database. |
-| Exporting the data. | A ZIP with `data.json` (format `yap-export`, version 1: the live rows of the user, the workspace and every workspace table, plus `user_settings`) and the bytes of the live resources under `files/`, laid out like the tree. Rows are read in one transaction. Trashed resources and their links are left out. Files whose bytes are missing from the disk are listed in `missing_files` instead. |
+| Exporting the data. | A ZIP with `data.json` (format `yap-export`, version 1: the live rows of the user, the workspace and every workspace table, plus `user_settings`) and the bytes of the live resources under `files/`, laid out like the tree. Repository folders are exported as empty folders with their `resource_repositories` row; their files, `repository_checkouts` and `repository_clones` are not exported. Importing such a row makes the added folder a repository folder again with a pending copy; nothing in the archive may sit inside a repository folder. Rows are read in one transaction. Trashed resources and their links are left out. Files whose bytes are missing from the disk are listed in `missing_files` instead. |
 | Importing an export. | All or nothing, and nothing is deleted. Rows are checked like rows made in the app (names, colors, icons, times, comment bodies, resource names) and every reference must point to a row of the archive; teams and team plans are rejected because a personal workspace has none. Rows keep their ids: a row whose id is still live is kept as it is, a deleted row of the workspace with that id is brought back (its `deleted_at` cleared, its columns taken from the archive), and a free id is used as it is, so importing the same export twice adds nothing, also after a reset. Only an id taken by another workspace or by an item in the trash gets a new one (the trashed item stays in the trash and a live copy is added). A folder whose name is taken by a folder is merged into it; a file whose name is taken gets a free `name (n).ext`; a plan whose name is taken in a kept project becomes `name (n)`. Assignments and task links are only added for tasks or resources the import adds, and go to the importing member. The activity log of added resources comes along, with ids that carry the original times. Files missing from the archive are skipped and reported. Only when the workspace had no live projects and resources are the display name, the workspace name and the user settings taken from the archive. |
 | Resetting the local data. | In one transaction every content row of the workspace (projects, plans, statuses, tasks, comments, teams, resources, live or trashed, and resource events) gets `deleted_at`, and every relationship row (`task_assignees`, `task_resources`, `project_teams`, `team_members`) gets `removed_at`. The user, the workspace and the owner membership keep their ids; the display name, the workspace name and the user settings go back to their first-run defaults. Afterwards the workspace's directory, trash included, is removed from the disk; a failure there is reported and a second reset finishes it. |
 
@@ -347,6 +360,9 @@ All of these rules are protected by unit tests.
 | task_resources | Both     | Links between tasks and resources | Re-linking clears `removed_at`. |
 | resource_events | Both    | Resource activity log | Append-only apart from extending an open `edited` event; `deleted_at` is only set by a data reset. `details` is a JSON object (name, from/to paths, size, task title). |
 | user_settings  | Both     | Per-user settings, synchronized to all of the user's devices | Not workspace-scoped. Key/value with a JSON value. |
+| resource_repositories | Both | The GitHub repository that fills a resource folder | `github_id` identifies the repository across renames. No `deleted_at`: the row follows its folder. (`method` was dropped by migration 009.) |
+| repository_checkouts | Local | This device's copy of a repository | `state` (`pending`, `fetching`, `ready`), `commit_sha` and `fetched_at` of the copy, `checked_at` (last answer from GitHub), `attempted_at` and `error` of the last attempt. Never synchronized. |
+| repository_clones | Local | Git clones the user made into folders of their choice | `path` is absolute on this computer; `deleted_at` only takes a clone off the list. Never synchronized. |
 | invitations    | Server   | Workspace invitations | The token is never stored in plaintext; only its hash is stored. |
 
 ## 6. Indexes
@@ -369,10 +385,11 @@ All of these rules are protected by unit tests.
 | `projects (workspace_id) WHERE deleted_at IS NULL` | non-deleted projects of a workspace |
 | `resources (workspace_id, COALESCE(parent_id, ''), name_key) WHERE trashed_at IS NULL AND deleted_at IS NULL` (unique) | Sibling name uniqueness. |
 | `resources (parent_id)` | Walk a folder's subtree. |
+| `repository_clones (resource_id) WHERE deleted_at IS NULL` | List a repository's clones. |
 | `resources (trashed_root_id) WHERE trashed_root_id IS NOT NULL` | Restore or purge a trashed group. |
 | `task_resources (resource_id) WHERE removed_at IS NULL` | Tasks a resource is linked to. |
 | `resource_events (workspace_id, id)`, `(resource_id, id)`, `(task_id)` | Page the activity log of a workspace, a resource or a project. |
-| `resources`, `task_resources`, `resource_events (workspace_id, updated_at)` | Retrieve changed records during synchronization. |
+| `resources`, `task_resources`, `resource_events`, `resource_repositories (workspace_id, updated_at)` | Retrieve changed records during synchronization. |
 
 ## 7. Synchronization Notes
 
@@ -383,6 +400,7 @@ Synchronization is not implemented at this stage; the schema has been designed w
 - AI chat tables are not synchronized. API keys are not stored in the database; they are stored in the operating system's keychain.
 - Resource bytes are not in the database. Synchronizing them needs a blob transfer next to the row sync (the server stores the bytes and hands them only to members allowed to see them).
 - `user_settings` is synchronized per user across all of their devices, not per workspace.
+- `resource_repositories` is synchronized, `repository_checkouts`, `repository_clones` and the repository files are not: every device fetches its own copy from GitHub with its own member's token. GitHub tokens live in the OS keychain (service `yap-github`, keyed by user id) and are never synchronized.
 
 ## 8. Out of Scope
 
@@ -399,6 +417,8 @@ Synchronization is not implemented at this stage; the schema has been designed w
 | A separate (NoSQL) store for the activity log | The log is low-volume thanks to edit merging; an append-only SQLite table is enough. Old events can be archived on the server if it ever grows too large. |
 | Watching the resources folder for outside changes | Changes made outside the app are not detected or logged; the database is the source of truth and a missing file is reported as such. |
 | Link resources (URLs), folder upload, automatic trash cleanup | Not needed for the first version. |
+| Writing to GitHub repositories, other branches than the default, issues and pull requests | Repositories are read-only copies of their default branch; work happens in a clone the user made. Linking tasks to issues or pull requests and webhooks (which need a server) can come later. |
+| Revoking the GitHub token | Needs the OAuth app's client secret, which a local app cannot keep. Disconnecting only forgets the token; the user revokes it on GitHub. |
 
 ## 9. Open Decisions
 

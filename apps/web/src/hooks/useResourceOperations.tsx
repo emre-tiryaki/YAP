@@ -55,6 +55,22 @@ export function errorKey(error: unknown): TranslationKey {
             return "resources.error.missing";
         case "not_found":
             return "resources.error.notFound";
+        case "read_only":
+            return "resources.error.readOnly";
+        case "github_not_connected":
+            return "resources.error.githubNotConnected";
+        case "github_unavailable":
+            return "resources.error.githubUnavailable";
+        case "github_not_configured":
+            return "resources.error.githubNotConfigured";
+        case "github_client_invalid":
+            return "resources.error.githubClientInvalid";
+        case "github_device_flow_disabled":
+            return "resources.error.githubDeviceFlowDisabled";
+        case "git_missing":
+            return "resources.error.gitMissing";
+        case "keychain_unavailable":
+            return "resources.error.keychain";
         default:
             return "common.error";
     }

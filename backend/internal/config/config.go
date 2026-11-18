@@ -15,6 +15,9 @@ type Config struct {
 	ResourcesPath string
 	Port          string
 	DisplayName   string
+	// GitHubClientID is the OAuth app used to connect GitHub accounts;
+	// empty turns the GitHub features off.
+	GitHubClientID string
 }
 
 func Load() (Config, error) {
@@ -34,10 +37,11 @@ func Load() (Config, error) {
 		resourcesPath = resolve(baseDir, v)
 	}
 	return Config{
-		DBPath:        dbPath,
-		ResourcesPath: resourcesPath,
-		Port:          getenv("BACKEND_PORT", "8080"),
-		DisplayName:   getenv("DISPLAY_NAME", defaultDisplayName()),
+		DBPath:         dbPath,
+		ResourcesPath:  resourcesPath,
+		Port:           getenv("BACKEND_PORT", "8080"),
+		DisplayName:    getenv("DISPLAY_NAME", defaultDisplayName()),
+		GitHubClientID: os.Getenv("GITHUB_CLIENT_ID"),
 	}, nil
 }
 

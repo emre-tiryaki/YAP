@@ -30,6 +30,9 @@ export function useResourceMenuItems(ops: ResourceOperations) {
         const ids = selection.includes(resource.id) ? selection : [resource.id];
         const single = ids.length === 1;
         const pinned = isPinned("resource", resource.id);
+        // A repository's content comes from GitHub: nothing goes into it and
+        // it cannot be copied.
+        const writable = resource.kind === "folder" && !resource.isRepository;
         const items: ResourceMenuItem[] = [];
         if (single)
             items.push({
@@ -38,7 +41,7 @@ export function useResourceMenuItems(ops: ResourceOperations) {
                 Icon: FiExternalLink,
                 onSelect: () => void navigate(`/resources/${resource.id}`),
             });
-        if (single && resource.kind === "folder")
+        if (single && writable)
             items.push({
                 key: "newFolder",
                 label: t("resources.newFolder"),
@@ -52,22 +55,21 @@ export function useResourceMenuItems(ops: ResourceOperations) {
                 Icon: FiEdit3,
                 onSelect: () => ops.startRename(resource),
             });
-        items.push(
-            {
-                key: "cut",
-                label: t("resources.cut"),
-                Icon: FiScissors,
-                onSelect: () => ops.cut(ids),
-                startsGroup: true,
-            },
-            {
+        items.push({
+            key: "cut",
+            label: t("resources.cut"),
+            Icon: FiScissors,
+            onSelect: () => ops.cut(ids),
+            startsGroup: true,
+        });
+        if (!resource.isRepository)
+            items.push({
                 key: "copy",
                 label: t("resources.copy"),
                 Icon: FiCopy,
                 onSelect: () => ops.copy(ids),
-            },
-        );
-        if (single && resource.kind === "folder" && ops.clipboard)
+            });
+        if (single && writable && ops.clipboard)
             items.push({
                 key: "paste",
                 label: t("resources.paste"),

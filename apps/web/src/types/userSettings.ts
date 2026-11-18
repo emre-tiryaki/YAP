@@ -22,6 +22,8 @@ export type UserSettings = {
     // Titles of the statuses a new plan starts with.
     statusNames: Record<StatusCategory, string>;
     notifications: NotificationSettings;
+    // GitHub repositories are kept up to date while GitHub can be reached.
+    repositoriesAutoUpdate: boolean;
 };
 
 export type UpdateUserSettingsInput = Partial<

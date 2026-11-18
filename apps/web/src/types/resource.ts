@@ -19,6 +19,8 @@ export type Resource = {
   // The item that was moved to the trash, taking this one with it. Only an
   // item that is its own trash root can be restored.
   trashedRootId: string | null;
+  // A read-only folder filled with a GitHub repository.
+  isRepository: boolean;
 };
 
 // What to do when the target folder already has an item with the name.

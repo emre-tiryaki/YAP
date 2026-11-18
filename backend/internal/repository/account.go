@@ -44,6 +44,12 @@ var exportQueries = []struct {
 		                  AND r.trashed_at IS NULL AND r.deleted_at IS NULL)
 		 ORDER BY tr.task_id, tr.resource_id`, byWorkspace},
 	{"resource_events", `SELECT * FROM resource_events WHERE workspace_id = ? AND deleted_at IS NULL ORDER BY id`, byWorkspace},
+	// Which repository fills a folder, not its files: every device fetches
+	// its own copy. The local checkout state is left out.
+	{"resource_repositories", `SELECT rr.* FROM resource_repositories rr
+		 JOIN resources r ON r.id = rr.resource_id AND r.workspace_id = rr.workspace_id
+		 WHERE rr.workspace_id = ? AND r.trashed_at IS NULL AND r.deleted_at IS NULL
+		 ORDER BY rr.resource_id`, byWorkspace},
 	{"user_settings", `SELECT * FROM user_settings WHERE user_id = ? ORDER BY key`, byUser},
 }
 

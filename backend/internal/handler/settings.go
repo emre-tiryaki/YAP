@@ -42,6 +42,7 @@ type settingsResponse struct {
 	DoneToBottom    bool                         `json:"done_to_bottom"`
 	StatusNames     statusNamesResponse          `json:"status_names"`
 	Notifications   notificationSettingsResponse `json:"notifications"`
+	RepoAutoUpdate  bool                         `json:"repositories_auto_update"`
 }
 
 type updateNotificationSettingsRequest struct {
@@ -58,8 +59,9 @@ type updateSettingsRequest struct {
 	HideDone        *bool `json:"hide_done"`
 	DoneToBottom    *bool `json:"done_to_bottom"`
 	// StatusNames maps a status category to its new default name.
-	StatusNames   map[string]string                  `json:"status_names"`
-	Notifications *updateNotificationSettingsRequest `json:"notifications"`
+	StatusNames    map[string]string                  `json:"status_names"`
+	Notifications  *updateNotificationSettingsRequest `json:"notifications"`
+	RepoAutoUpdate *bool                              `json:"repositories_auto_update"`
 }
 
 func toSettingsResponse(s service.UserSettings) settingsResponse {
@@ -81,6 +83,7 @@ func toSettingsResponse(s service.UserSettings) settingsResponse {
 			Comments: n.Comments,
 			Sound:    n.Sound,
 		},
+		RepoAutoUpdate: s.RepoAutoUpdate,
 	}
 }
 
@@ -90,6 +93,7 @@ func (req updateSettingsRequest) toInput() service.UpdateSettingsInput {
 		AutosaveDelayMs: req.AutosaveDelayMs,
 		HideDone:        req.HideDone,
 		DoneToBottom:    req.DoneToBottom,
+		RepoAutoUpdate:  req.RepoAutoUpdate,
 	}
 	if len(req.StatusNames) > 0 {
 		in.StatusNames = map[model.StatusCategory]string{}

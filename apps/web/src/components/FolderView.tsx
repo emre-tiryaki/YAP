@@ -5,6 +5,7 @@ import { useDateFormat } from "../hooks/useDateFormat";
 import { usePreferences } from "../hooks/usePreferences";
 import { useTranslate, type TranslationKey } from "../hooks/useTranslate";
 import type { Resource, ResourceViewMode } from "../types/resource";
+import { resourcePin, setPinDragData } from "../util/pinDrag";
 import { isDropAccepted, readDrop, startResourceDrag, type DroppedItems } from "../util/resourceDrag";
 import { compareResources, fileCategory, formatSize, type ResourceSortKey } from "../util/resources";
 import { ResourceIcon } from "./ResourceIcon";
@@ -117,8 +118,12 @@ export function FolderView({
     function itemDrag(r: Resource) {
         return {
             draggable: true,
-            onDragStart: (event: DragEvent) =>
-                startResourceDrag(event, selected.has(r.id) ? selection : [r.id]),
+            onDragStart: (event: DragEvent) => {
+                const ids = selected.has(r.id) ? selection : [r.id];
+                startResourceDrag(event, ids);
+                // Only a single item can be pinned by dropping it on the sidebar.
+                if (ids.length === 1) setPinDragData(event, resourcePin(r));
+            },
             ...(r.kind === "folder"
                 ? {
                       onDragOver: (event: DragEvent) => {

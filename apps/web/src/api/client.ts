@@ -24,6 +24,23 @@ import type {
 } from "../types/task";
 import type { UpdateWorkspaceInput, Workspace } from "../types/workspace";
 import type {
+    AddRepositoryInput,
+    CheckoutError,
+    CheckoutState,
+    ConnectResult,
+    ConnectState,
+    DeviceFlow,
+    GitHubAccount,
+    GitHubRepo,
+    GitHubStatus,
+    CloneRepositoryInput,
+    LocalFolder,
+    RepoEntry,
+    Repository,
+    RepositoryClone,
+    RepoCommit,
+} from "../types/github";
+import type {
     LinkedTask,
     OnConflict,
     Resource,
@@ -167,6 +184,7 @@ type ResourceDto = {
     updated_at: string;
     trashed_at: string | null;
     trashed_root_id: string | null;
+    is_repository: boolean;
 };
 
 type ResourceEventDto = {
@@ -211,6 +229,7 @@ type UserSettingsDto = {
         comments: boolean;
         sound: boolean;
     };
+    repositories_auto_update: boolean;
 };
 
 type UpdateUserSettingsDto = Partial<
@@ -683,6 +702,7 @@ function toResource(dto: ResourceDto): Resource {
         updatedAt: new Date(dto.updated_at),
         trashedAt: dto.trashed_at ? new Date(dto.trashed_at) : null,
         trashedRootId: dto.trashed_root_id,
+        isRepository: dto.is_repository,
     };
 }
 
@@ -944,6 +964,7 @@ function toUserSettings(dto: UserSettingsDto): UserSettings {
             comments: n.comments,
             sound: n.sound,
         },
+        repositoriesAutoUpdate: dto.repositories_auto_update,
     };
 }
 
@@ -972,6 +993,8 @@ export async function updateUserSettings(
         if (n.comments !== undefined) body.notifications.comments = n.comments;
         if (n.sound !== undefined) body.notifications.sound = n.sound;
     }
+    if (input.repositoriesAutoUpdate !== undefined)
+        body.repositories_auto_update = input.repositoriesAutoUpdate;
     const dto = await request<UserSettingsDto>("/api/settings", {
         method: "PATCH",
         body: JSON.stringify(body),
@@ -1034,4 +1057,276 @@ export async function importAccount(file: File): Promise<ImportResult> {
 
 export async function resetAccount(): Promise<void> {
     await request<void>("/api/account/reset", { method: "POST" });
+}
+
+type GitHubAccountDto = {
+    id: number;
+    login: string;
+    name: string;
+    avatar_url: string;
+    scopes: string;
+    connected_at: string;
+};
+
+type GitHubStatusDto = {
+    configured: boolean;
+    git_available: boolean;
+    account: GitHubAccountDto | null;
+};
+
+type DeviceFlowDto = {
+    user_code: string;
+    verification_uri: string;
+    expires_at: string;
+    interval_seconds: number;
+};
+
+type GitHubRepoDto = {
+    id: number;
+    full_name: string;
+    description: string;
+    html_url: string;
+    default_branch: string;
+    private: boolean;
+    pushed_at: string | null;
+};
+
+type RepositoryDto = {
+    resource_id: string;
+    github_id: number;
+    full_name: string;
+    html_url: string;
+    branch: string;
+    private: boolean;
+    state: CheckoutState;
+    commit_sha: string | null;
+    fetched_at: string | null;
+    checked_at: string | null;
+    attempted_at: string | null;
+    error: CheckoutError | null;
+};
+
+type RepoEntryDto = {
+    name: string;
+    path: string;
+    kind: ResourceKind;
+    size: number;
+    mime_type: string;
+    is_text: boolean;
+    modified_at: string;
+};
+
+function optionalDate(value: string | null): Date | null {
+    return value ? new Date(value) : null;
+}
+
+function toGitHubAccount(dto: GitHubAccountDto | null): GitHubAccount | null {
+    if (!dto) return null;
+    return {
+        id: dto.id,
+        login: dto.login,
+        name: dto.name,
+        avatarUrl: dto.avatar_url,
+        scopes: dto.scopes,
+        connectedAt: new Date(dto.connected_at),
+    };
+}
+
+export async function getGitHubStatus(): Promise<GitHubStatus> {
+    const dto = await request<GitHubStatusDto>("/api/github");
+    return {
+        configured: dto.configured,
+        gitAvailable: dto.git_available,
+        account: toGitHubAccount(dto.account),
+    };
+}
+
+// Starts connecting a GitHub account with the device flow.
+export async function startGitHubConnect(): Promise<DeviceFlow> {
+    const dto = await request<DeviceFlowDto>("/api/github/connect", { method: "POST" });
+    return {
+        userCode: dto.user_code,
+        verificationUri: dto.verification_uri,
+        expiresAt: new Date(dto.expires_at),
+        intervalSeconds: dto.interval_seconds,
+    };
+}
+
+export async function pollGitHubConnect(): Promise<ConnectResult> {
+    const dto = await request<{ state: ConnectState; account: GitHubAccountDto | null }>(
+        "/api/github/connect/poll",
+        { method: "POST" },
+    );
+    return { state: dto.state, account: toGitHubAccount(dto.account) };
+}
+
+export async function disconnectGitHub(): Promise<void> {
+    await request<void>("/api/github/account", { method: "DELETE" });
+}
+
+export async function listGitHubRepos(): Promise<GitHubRepo[]> {
+    const dtos = await request<GitHubRepoDto[]>("/api/github/repos");
+    return dtos.map((dto) => ({
+        id: dto.id,
+        fullName: dto.full_name,
+        description: dto.description,
+        htmlUrl: dto.html_url,
+        defaultBranch: dto.default_branch,
+        private: dto.private,
+        pushedAt: optionalDate(dto.pushed_at),
+    }));
+}
+
+// Adds a repository to the resource tree as a read-only folder; its files
+// are fetched in the background.
+export async function addRepository(input: AddRepositoryInput): Promise<Resource> {
+    const dto = await request<ResourceDto>("/api/resources/repositories", {
+        method: "POST",
+        body: JSON.stringify({
+            parent_id: input.parentId,
+            full_name: input.fullName,
+            on_conflict: "keep_both",
+        }),
+    });
+    return toResource(dto);
+}
+
+function toRepository(dto: RepositoryDto): Repository {
+    return {
+        resourceId: dto.resource_id,
+        githubId: dto.github_id,
+        fullName: dto.full_name,
+        htmlUrl: dto.html_url,
+        branch: dto.branch,
+        private: dto.private,
+        state: dto.state,
+        commitSha: dto.commit_sha,
+        fetchedAt: optionalDate(dto.fetched_at),
+        checkedAt: optionalDate(dto.checked_at),
+        attemptedAt: optionalDate(dto.attempted_at),
+        error: dto.error,
+    };
+}
+
+export async function getRepository(resourceId: string): Promise<Repository> {
+    return toRepository(await request<RepositoryDto>(`/api/resources/${resourceId}/repository`));
+}
+
+// Fetches the newest commit now; the returned state is "fetching".
+export async function syncRepository(resourceId: string): Promise<Repository> {
+    const dto = await request<RepositoryDto>(`/api/resources/${resourceId}/repository/sync`, {
+        method: "POST",
+    });
+    return toRepository(dto);
+}
+
+export async function listRepoEntries(resourceId: string, path: string): Promise<RepoEntry[]> {
+    const query = new URLSearchParams({ path });
+    const dtos = await request<RepoEntryDto[]>(
+        `/api/resources/${resourceId}/repository/entries?${query}`,
+    );
+    return dtos.map((dto) => ({
+        name: dto.name,
+        path: dto.path,
+        kind: dto.kind,
+        size: dto.size,
+        mimeType: dto.mime_type,
+        isText: dto.is_text,
+        modifiedAt: new Date(dto.modified_at),
+    }));
+}
+
+// The bytes of a repository file. `version` (the commit) makes a new copy a
+// new URL.
+export function repoContentUrl(
+    resourceId: string,
+    path: string,
+    version: string,
+    download = false,
+): string {
+    const query = new URLSearchParams({ path, v: version });
+    if (download) query.set("download", "1");
+    return `/api/resources/${resourceId}/repository/content?${query}`;
+}
+
+export async function readRepoText(resourceId: string, path: string, version: string): Promise<string> {
+    const response = await fetch(repoContentUrl(resourceId, path, version));
+    if (!response.ok) {
+        const body: unknown = await response.json().catch(() => null);
+        const code =
+            typeof body === "object" && body !== null && "error" in body && typeof body.error === "string"
+                ? body.error
+                : "unknown";
+        throw new ApiError(response.status, code);
+    }
+    return response.text();
+}
+
+type RepositoryCloneDto = {
+    id: string;
+    path: string;
+    created_at: string;
+    exists: boolean;
+};
+
+function toRepositoryClone(dto: RepositoryCloneDto): RepositoryClone {
+    return { id: dto.id, path: dto.path, createdAt: new Date(dto.created_at), exists: dto.exists };
+}
+
+export async function listRepositoryClones(resourceId: string): Promise<RepositoryClone[]> {
+    const dtos = await request<RepositoryCloneDto[]>(`/api/resources/${resourceId}/repository/clones`);
+    return dtos.map(toRepositoryClone);
+}
+
+// Clones the repository with git into a new folder `name` inside
+// `parentPath`. Resolves when the clone is done.
+export async function cloneRepository(input: CloneRepositoryInput): Promise<RepositoryClone> {
+    const dto = await request<RepositoryCloneDto>(`/api/resources/${input.resourceId}/repository/clones`, {
+        method: "POST",
+        body: JSON.stringify({ parent_path: input.parentPath, name: input.name }),
+    });
+    return toRepositoryClone(dto);
+}
+
+// Takes a clone off the list; its files stay.
+export async function forgetRepositoryClone(resourceId: string, cloneId: string): Promise<void> {
+    await request<void>(`/api/resources/${resourceId}/repository/clones/${cloneId}`, { method: "DELETE" });
+}
+
+// The subfolders of a folder on this computer; "" is the home folder.
+export async function listLocalFolders(path: string): Promise<LocalFolder> {
+    const query = new URLSearchParams({ path });
+    const dto = await request<{ path: string; parent: string | null; home: string; folders: string[] }>(
+        `/api/local-folders?${query}`,
+    );
+    return { path: dto.path, parent: dto.parent, home: dto.home, folders: dto.folders };
+}
+
+// How many commits a page of history holds, mirrored from the backend.
+export const COMMITS_PER_PAGE = 50;
+
+type RepoCommitDto = {
+    sha: string;
+    parents: string[];
+    message: string;
+    author_name: string;
+    author_login: string;
+    avatar_url: string;
+    date: string;
+    html_url: string;
+};
+
+// A page (from 1) of the history of the repository's branch, from GitHub.
+export async function listRepoCommits(resourceId: string, page: number): Promise<RepoCommit[]> {
+    const dtos = await request<RepoCommitDto[]>(`/api/resources/${resourceId}/repository/commits?page=${page}`);
+    return dtos.map((dto) => ({
+        sha: dto.sha,
+        parents: dto.parents,
+        message: dto.message,
+        authorName: dto.author_name,
+        authorLogin: dto.author_login,
+        avatarUrl: dto.avatar_url,
+        date: new Date(dto.date),
+        htmlUrl: dto.html_url,
+    }));
 }

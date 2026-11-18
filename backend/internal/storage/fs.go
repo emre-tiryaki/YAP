@@ -251,3 +251,83 @@ func (d *textDetector) Write(p []byte) (int, error) {
 func (d *textDetector) done() bool {
 	return d.valid && len(d.leftover) == 0
 }
+
+// Path returns the absolute path of segments under the root, for a directory
+// handed to another program or opened as an os.Root.
+func (s *FS) Path(path []string) (string, error) {
+	return s.abs(path)
+}
+
+// TempDir creates an empty directory on the same file system as the tree, so
+// it can be moved into place with a rename.
+func (s *FS) TempDir() (string, error) {
+	dir, err := os.MkdirTemp(filepath.Join(s.root, tempDir), "repo-*")
+	if err != nil {
+		return "", fmt.Errorf("create temp dir: %w", err)
+	}
+	return dir, nil
+}
+
+// TempFile creates an empty temporary file; the caller closes and removes
+// it.
+func (s *FS) TempFile() (*os.File, error) {
+	f, err := os.CreateTemp(filepath.Join(s.root, tempDir), "download-*")
+	if err != nil {
+		return nil, fmt.Errorf("create temp file: %w", err)
+	}
+	return f, nil
+}
+
+// InstallDir puts the directory src (from TempDir) at path, replacing what is
+// there. The old directory is moved aside first and removed afterwards, so a
+// reader never sees a half-written tree.
+func (s *FS) InstallDir(src string, path []string) error {
+	dst, err := s.abs(path)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return fmt.Errorf("create parent dir: %w", err)
+	}
+	old := src + ".old"
+	switch err := os.Rename(dst, old); {
+	case err == nil:
+	case errors.Is(err, fs.ErrNotExist):
+		old = ""
+	default:
+		return fmt.Errorf("move old dir aside: %w", err)
+	}
+	if err := os.Rename(src, dst); err != nil {
+		if old != "" {
+			_ = os.Rename(old, dst) // best effort: put the old copy back
+		}
+		return fmt.Errorf("install dir: %w", err)
+	}
+	if old != "" {
+		if err := os.RemoveAll(old); err != nil {
+			return fmt.Errorf("remove old dir: %w", err)
+		}
+	}
+	return nil
+}
+
+// DirNames lists the names in the directory at path; a missing directory has
+// none.
+func (s *FS) DirNames(path []string) ([]string, error) {
+	p, err := s.abs(path)
+	if err != nil {
+		return nil, err
+	}
+	entries, err := os.ReadDir(p)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read dir: %w", err)
+	}
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	return names, nil
+}

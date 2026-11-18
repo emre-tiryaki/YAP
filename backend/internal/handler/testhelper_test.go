@@ -10,7 +10,9 @@ import (
 	"testing"
 
 	"github.com/emre-tiryaki/YAP/backend/internal/database"
+	"github.com/emre-tiryaki/YAP/backend/internal/github"
 	"github.com/emre-tiryaki/YAP/backend/internal/model"
+	"github.com/emre-tiryaki/YAP/backend/internal/repofetch"
 	"github.com/emre-tiryaki/YAP/backend/internal/repository"
 	"github.com/emre-tiryaki/YAP/backend/internal/service"
 	"github.com/emre-tiryaki/YAP/backend/internal/storage"
@@ -53,7 +55,15 @@ func newTestEnv(t *testing.T) testEnv {
 	if err != nil {
 		t.Fatalf("storage.NewFS() error = %v", err)
 	}
-	NewResourceHandler(session, service.NewResourceService(db, repository.NewResourceRepository(), taskRepo, store)).Register(mux)
+	resourceSvc := service.NewResourceService(db, repository.NewResourceRepository(), taskRepo, store)
+	NewResourceHandler(session, resourceSvc).Register(mux)
+	// GitHub is not configured and nobody is connected; no request leaves
+	// the test.
+	githubSvc := service.NewGitHubService(github.New(""), memCreds{}, false)
+	repoSvc := service.NewRepositoryService(db, repository.NewRepoRepository(), resourceSvc, githubSvc,
+		repository.NewSettingsRepository(), store, repofetch.NewFetcher(&repofetch.Git{}, repofetch.DefaultLimits))
+	NewGitHubHandler(session, githubSvc).Register(mux)
+	NewRepositoryHandler(session, repoSvc).Register(mux)
 	NewSettingsHandler(session, service.NewSettingsService(db, repository.NewSettingsRepository())).Register(mux)
 	NewAccountHandler(session, service.NewAccountService(db, repository.NewAccountRepository(), repository.NewResourceRepository(),
 		repository.NewWorkspaceRepository(), repository.NewSettingsRepository(), store, "tester")).Register(mux)
@@ -99,3 +109,12 @@ func wantErrorCode(t *testing.T, rec *httptest.ResponseRecorder, status int, cod
 		t.Errorf("error code = %q, want %q", got, code)
 	}
 }
+
+// memCreds is a keychain that never holds a credential.
+type memCreds struct{}
+
+func (memCreds) Get(string) (model.GitHubCredential, error) {
+	return model.GitHubCredential{}, model.ErrNoCredential
+}
+func (memCreds) Set(string, model.GitHubCredential) error { return nil }
+func (memCreds) Delete(string) error                      { return nil }

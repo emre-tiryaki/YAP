@@ -17,17 +17,19 @@ func NewResourceRepository() *ResourceRepository {
 }
 
 const resourceColumns = `r.id, r.parent_id, r.kind, r.name, r.mime_type, r.size, r.is_text, r.revision,
-	r.created_by, r.created_at, r.updated_at, r.trashed_at, r.trashed_root_id`
+	r.created_by, r.created_at, r.updated_at, r.trashed_at, r.trashed_root_id,
+	EXISTS (SELECT 1 FROM resource_repositories rr WHERE rr.resource_id = r.id) AS is_repository`
 
 func scanResource(row rowScanner, workspaceID string) (model.Resource, error) {
 	r := model.Resource{WorkspaceID: workspaceID}
 	var parentID, mimeType, trashedAt, trashedRootID sql.NullString
 	var kind, createdAt, updatedAt string
-	var isText int
+	var isText, isRepository int
 	if err := row.Scan(&r.ID, &parentID, &kind, &r.Name, &mimeType, &r.Size, &isText, &r.Revision,
-		&r.CreatedBy, &createdAt, &updatedAt, &trashedAt, &trashedRootID); err != nil {
+		&r.CreatedBy, &createdAt, &updatedAt, &trashedAt, &trashedRootID, &isRepository); err != nil {
 		return model.Resource{}, err
 	}
+	r.IsRepository = isRepository == 1
 	r.ParentID = parentID.String
 	r.Kind = model.ResourceKind(kind)
 	r.MimeType = mimeType.String

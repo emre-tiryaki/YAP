@@ -102,7 +102,7 @@ func TestSchemaTablesExistAndAreStrict(t *testing.T) {
 	want := []string{
 		"users", "workspaces", "memberships", "teams", "projects", "plans",
 		"statuses", "project_teams", "team_members", "tasks", "task_assignees",
-		"task_comments",
+		"task_comments", "resource_repositories", "repository_checkouts", "repository_clones",
 	}
 	for _, name := range want {
 		t.Run(name, func(t *testing.T) {
@@ -305,6 +305,8 @@ func TestSchemaIndexesExist(t *testing.T) {
 		"idx_task_assignees_membership_id",
 		"idx_task_comments_task_id",
 		"idx_task_comments_workspace_id_updated_at",
+		"idx_resource_repositories_workspace_id_updated_at",
+		"idx_repository_clones_resource_id",
 	}
 	for _, name := range want {
 		t.Run(name, func(t *testing.T) {

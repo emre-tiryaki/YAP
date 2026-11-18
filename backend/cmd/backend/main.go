@@ -4,19 +4,25 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/emre-tiryaki/YAP/backend/internal/config"
 	"github.com/emre-tiryaki/YAP/backend/internal/database"
+	"github.com/emre-tiryaki/YAP/backend/internal/github"
 	"github.com/emre-tiryaki/YAP/backend/internal/handler"
+	"github.com/emre-tiryaki/YAP/backend/internal/repofetch"
 	"github.com/emre-tiryaki/YAP/backend/internal/repository"
+	"github.com/emre-tiryaki/YAP/backend/internal/secrets"
 	"github.com/emre-tiryaki/YAP/backend/internal/service"
 	"github.com/emre-tiryaki/YAP/backend/internal/storage"
 )
 
 func main() {
 	log.Println("Server is starting...")
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -57,6 +63,12 @@ func main() {
 	accountSvc := service.NewAccountService(db, repository.NewAccountRepository(), resourceRepo,
 		repository.NewWorkspaceRepository(), settingsRepo, store, cfg.DisplayName)
 
+	fetcher := repofetch.NewFetcher(repofetch.NewGit(), repofetch.DefaultLimits)
+	githubSvc := service.NewGitHubService(github.New(cfg.GitHubClientID), secrets.NewKeyring(), fetcher.GitAvailable())
+	repositorySvc := service.NewRepositoryService(db, repository.NewRepoRepository(), resourceSvc, githubSvc,
+		settingsRepo, store, fetcher)
+	go repositorySvc.Run(ctx, session)
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/hello-world", handler.HelloWorld)
 	handler.NewWorkspaceHandler(session, workspaceSvc).Register(mux)
@@ -64,6 +76,8 @@ func main() {
 	handler.NewTaskHandler(session, taskSvc).Register(mux)
 	handler.NewCommentHandler(session, commentSvc).Register(mux)
 	handler.NewResourceHandler(session, resourceSvc).Register(mux)
+	handler.NewRepositoryHandler(session, repositorySvc).Register(mux)
+	handler.NewGitHubHandler(session, githubSvc).Register(mux)
 	handler.NewSettingsHandler(session, settingsSvc).Register(mux)
 	handler.NewAccountHandler(session, accountSvc).Register(mux)
 	handler.NewSearchHandler(session, service.NewSearchService(db, repository.NewSearchRepository())).Register(mux)
@@ -74,6 +88,16 @@ func main() {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = srv.Shutdown(shutdownCtx) // exiting anyway
+	}()
+
 	log.Printf("listening on http://localhost%s", srv.Addr)
-	log.Fatal(srv.ListenAndServe())
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatal(err)
+	}
+	repositorySvc.Wait()
 }

@@ -206,6 +206,19 @@ func (*AccountRepository) InsertResource(ctx context.Context, q database.DBTX, w
 	return nil
 }
 
+// InsertRepository makes an imported folder a repository folder again, with
+// a copy still to be fetched.
+func (*AccountRepository) InsertRepository(ctx context.Context, q database.DBTX, workspaceID, addedBy string, r model.ImportRepository, now string) error {
+	repo := model.Repository{
+		ResourceID: r.ResourceID, WorkspaceID: workspaceID, GitHubID: r.GitHubID, FullName: r.FullName,
+		HTMLURL: r.HTMLURL, Branch: r.Branch, Private: r.IsPrivate == 1, AddedBy: addedBy,
+	}
+	if err := (&RepoRepository{}).Insert(ctx, q, repo, now); err != nil {
+		return fmt.Errorf("import repository: %w", err)
+	}
+	return nil
+}
+
 // InsertTaskResource links a task and a resource, reopening a removed link.
 func (*AccountRepository) InsertTaskResource(ctx context.Context, q database.DBTX, workspaceID, linkedBy string, l model.ImportTaskResource, now string) error {
 	_, err := q.ExecContext(ctx,

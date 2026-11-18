@@ -33,6 +33,22 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 		writeJSON(w, http.StatusConflict, errorResponse{Error: "stale"})
 	case errors.Is(err, service.ErrFileMissing):
 		writeJSON(w, http.StatusGone, errorResponse{Error: "file_missing"})
+	case errors.Is(err, service.ErrReadOnly):
+		writeJSON(w, http.StatusConflict, errorResponse{Error: "read_only"})
+	case errors.Is(err, service.ErrGitHubNotConfigured):
+		writeJSON(w, http.StatusServiceUnavailable, errorResponse{Error: "github_not_configured"})
+	case errors.Is(err, service.ErrGitHubClientInvalid):
+		writeJSON(w, http.StatusServiceUnavailable, errorResponse{Error: "github_client_invalid"})
+	case errors.Is(err, service.ErrDeviceFlowDisabled):
+		writeJSON(w, http.StatusServiceUnavailable, errorResponse{Error: "github_device_flow_disabled"})
+	case errors.Is(err, service.ErrGitHubNotConnected):
+		writeJSON(w, http.StatusConflict, errorResponse{Error: "github_not_connected"})
+	case errors.Is(err, service.ErrGitHubUnavailable):
+		writeJSON(w, http.StatusServiceUnavailable, errorResponse{Error: "github_unavailable"})
+	case errors.Is(err, service.ErrKeychainUnavailable):
+		writeJSON(w, http.StatusServiceUnavailable, errorResponse{Error: "keychain_unavailable"})
+	case errors.Is(err, service.ErrGitMissing):
+		writeJSON(w, http.StatusConflict, errorResponse{Error: "git_missing"})
 	case errors.Is(err, service.ErrInvalidInput):
 		writeJSON(w, http.StatusBadRequest, errorResponse{Error: "invalid_input"})
 	case errors.Is(err, service.ErrNotFound):

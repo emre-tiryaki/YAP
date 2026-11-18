@@ -9,7 +9,7 @@ const listeners = new Set<() => void>();
 // Cached so useSyncExternalStore gets the same array until the pins change.
 let cache: Pin[] | null = null;
 
-function isPin(value: unknown): value is Pin {
+export function isPin(value: unknown): value is Pin {
   if (typeof value !== "object" || value === null) return false;
   const pin = value as Record<string, unknown>;
   return (
@@ -63,6 +63,12 @@ export function togglePin(pin: Pin) {
       ? pins.filter((p) => !samePin(p, pin.kind, pin.id))
       : [...pins, pin],
   );
+}
+
+// Pins the item unless it already is (dropping a pinned item again is a no-op).
+export function addPin(pin: Pin) {
+  const pins = read();
+  if (!pins.some((p) => samePin(p, pin.kind, pin.id))) write([...pins, pin]);
 }
 
 export function unpinWhere(match: (pin: Pin) => boolean) {

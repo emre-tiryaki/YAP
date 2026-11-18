@@ -30,6 +30,9 @@ const (
 	// trashDirName holds trashed items inside a workspace's directory; the
 	// name is reserved at the top of the tree.
 	trashDirName = ".yap-trash"
+	// repoDirName holds the copies of GitHub repositories inside a
+	// workspace's directory; the name is reserved at the top of the tree.
+	repoDirName = ".yap-repos"
 	// editMergeWindow folds repeated saves by the same member into one
 	// 'edited' event while they keep coming within this window.
 	editMergeWindow  = 10 * time.Minute
@@ -138,7 +141,7 @@ func nameKey(name string) string {
 }
 
 func checkReservedName(parentID, name string) error {
-	if parentID == "" && nameKey(name) == trashDirName {
+	if parentID == "" && (nameKey(name) == trashDirName || nameKey(name) == repoDirName) {
 		return fmt.Errorf("%w: name is reserved", ErrInvalidInput)
 	}
 	return nil
@@ -250,6 +253,9 @@ func (s *ResourceService) requireFolder(ctx context.Context, q database.DBTX, wo
 	}
 	if r.Kind != model.ResourceFolder {
 		return fmt.Errorf("%w: parent is not a folder", ErrInvalidInput)
+	}
+	if r.IsRepository {
+		return fmt.Errorf("%w: a repository's content comes from GitHub", ErrReadOnly)
 	}
 	return nil
 }
@@ -367,38 +373,49 @@ func (s *ResourceService) resolveName(ctx context.Context, q database.DBTX, work
 func (s *ResourceService) CreateFolder(ctx context.Context, session model.Session, parentID, name string) (model.Resource, error) {
 	var created model.Resource
 	err := database.WithTx(ctx, s.db, func(tx *sql.Tx) error {
-		if err := s.requireFolder(ctx, tx, session.WorkspaceID, parentID); err != nil {
-			return err
-		}
-		name, _, err := s.resolveName(ctx, tx, session.WorkspaceID, parentID, name, model.ResourceFolder, ConflictFail, "")
-		if err != nil {
-			return err
-		}
-		now := s.nowString()
-		r := model.Resource{
-			ID: model.NewID(), WorkspaceID: session.WorkspaceID, ParentID: parentID,
-			Kind: model.ResourceFolder, Name: name, CreatedBy: session.MembershipID,
-		}
-		if err := s.repo.Insert(ctx, tx, r, nameKey(name), now); err != nil {
-			return err
-		}
-		if err := s.logEvent(ctx, tx, session, r.ID, "", model.ResourceCreated, map[string]any{"name": name}, now); err != nil {
-			return err
-		}
-		path, err := s.diskPath(ctx, tx, session.WorkspaceID, r.ID)
-		if err != nil {
-			return err
-		}
-		if err := s.store.MakeDir(path); err != nil {
-			return err
-		}
-		created, err = s.repo.Get(ctx, tx, session.WorkspaceID, r.ID)
+		var err error
+		created, err = s.createFolder(ctx, tx, session, parentID, name, ConflictFail, nil)
 		return err
 	})
 	if err != nil {
 		return model.Resource{}, err
 	}
 	return created, nil
+}
+
+// createFolder adds a folder inside tx and logs it as created, with extra
+// fields in the event details.
+func (s *ResourceService) createFolder(ctx context.Context, tx *sql.Tx, session model.Session, parentID, name string, onConflict OnConflict, extra map[string]any) (model.Resource, error) {
+	if err := s.requireFolder(ctx, tx, session.WorkspaceID, parentID); err != nil {
+		return model.Resource{}, err
+	}
+	name, _, err := s.resolveName(ctx, tx, session.WorkspaceID, parentID, name, model.ResourceFolder, onConflict, "")
+	if err != nil {
+		return model.Resource{}, err
+	}
+	now := s.nowString()
+	r := model.Resource{
+		ID: model.NewID(), WorkspaceID: session.WorkspaceID, ParentID: parentID,
+		Kind: model.ResourceFolder, Name: name, CreatedBy: session.MembershipID,
+	}
+	if err := s.repo.Insert(ctx, tx, r, nameKey(name), now); err != nil {
+		return model.Resource{}, err
+	}
+	fields := map[string]any{"name": name}
+	for k, v := range extra {
+		fields[k] = v
+	}
+	if err := s.logEvent(ctx, tx, session, r.ID, "", model.ResourceCreated, fields, now); err != nil {
+		return model.Resource{}, err
+	}
+	path, err := s.diskPath(ctx, tx, session.WorkspaceID, r.ID)
+	if err != nil {
+		return model.Resource{}, err
+	}
+	if err := s.store.MakeDir(path); err != nil {
+		return model.Resource{}, err
+	}
+	return s.repo.Get(ctx, tx, session.WorkspaceID, r.ID)
 }
 
 // CreateFile creates an empty file, ready to be edited.
@@ -741,6 +758,11 @@ func (s *ResourceService) Copy(ctx context.Context, session model.Session, id st
 		subtree, err := s.repo.LiveSubtree(ctx, tx, session.WorkspaceID, id)
 		if err != nil {
 			return err
+		}
+		for _, item := range subtree {
+			if item.IsRepository {
+				return fmt.Errorf("%w: a repository cannot be copied", ErrReadOnly)
+			}
 		}
 		from, err := s.diskPath(ctx, tx, session.WorkspaceID, id)
 		if err != nil {

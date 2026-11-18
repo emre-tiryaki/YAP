@@ -54,6 +54,7 @@ func TestUserSettingsTaskViewsAndNotifications(t *testing.T) {
 		NotifyOverdue:  &off,
 		NotifyComments: &on,
 		NotifySound:    &on,
+		RepoAutoUpdate: &off,
 		StatusNames: map[model.StatusCategory]string{
 			model.StatusToDo: "  Backlog ",
 			model.StatusDone: "Shipped",
@@ -64,6 +65,7 @@ func TestUserSettingsTaskViewsAndNotifications(t *testing.T) {
 	}
 	want := defaultUserSettings()
 	want.HideDone, want.DoneToBottom = true, true
+	want.RepoAutoUpdate = false
 	want.Notifications = NotificationSettings{DueSoon: false, Reminder: ReminderHour, Overdue: false, Comments: true, Sound: true}
 	want.StatusNames.ToDo, want.StatusNames.Done = "Backlog", "Shipped"
 	if got != want {
@@ -116,6 +118,7 @@ func TestUserSettingsIgnoreUnreadableStoredValues(t *testing.T) {
 		settingHideDone:                  `"yes"`,
 		settingStatusNamePrefix + "todo": `""`,
 		settingStatusNamePrefix + "done": `42`,
+		settingRepoAutoUpdate:            `"off"`,
 	} {
 		if err := repo.Put(ctx, db, session.UserID, key, value, now); err != nil {
 			t.Fatal(err)

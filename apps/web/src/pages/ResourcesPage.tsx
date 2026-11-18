@@ -1,6 +1,7 @@
 import { useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
-import { FiClipboard, FiDownload, FiFilePlus, FiFolderPlus, FiGrid, FiList, FiRotateCcw, FiTrash2, FiUpload } from "react-icons/fi";
+import { FiClipboard, FiDownload, FiFilePlus, FiFolderPlus, FiGithub, FiGrid, FiList, FiRotateCcw, FiTrash2, FiUpload } from "react-icons/fi";
 import { useNavigate, useParams } from "react-router";
+import { AddRepositoryDialog } from "../components/AddRepositoryDialog";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { FilePreview } from "../components/FilePreview";
 import { FolderView } from "../components/FolderView";
@@ -9,7 +10,9 @@ import { LinkedTaskList } from "../components/LinkedTaskList";
 import { ResourceActivity } from "../components/ResourceActivity";
 import { ResourceIcon } from "../components/ResourceIcon";
 import { ResourceMenu } from "../components/ResourceMenu";
+import { RepositoryPane } from "../components/RepositoryPane";
 import { ResourceTree } from "../components/ResourceTree";
+import { Tabs } from "../components/Tabs";
 import { TopBar } from "../components/TopBar";
 import { useDateFormat } from "../hooks/useDateFormat";
 import { useResourceMenuItems } from "../hooks/useResourceMenuItems";
@@ -86,6 +89,15 @@ export default function ResourcesPage({ view = "browse" }: { view?: "browse" | "
             <p className="p-6 text-sm text-gray-400">{t("common.loading")}</p>
         ) : (
             <p className="p-6 text-sm text-gray-500">{t("resources.error.notFound")}</p>
+        );
+    } else if (current?.isRepository && !current.trashedAt) {
+        body = (
+            <RepositoryPane
+                key={current.id}
+                resource={current}
+                menu={menuItems(current)}
+                onLink={() => ops.startLink(current)}
+            />
         );
     } else if (current?.kind === "file" || current?.trashedAt) {
         body = <ItemPane key={current.id} resource={current} ops={ops} menu={menuItems(current)} />;
@@ -191,25 +203,6 @@ function ResizeHandle({ width, onChange }: { width: number; onChange: (width: nu
     );
 }
 
-function Tabs({ value, onChange, tabs }: { value: Tab; onChange: (tab: Tab) => void; tabs: { id: Tab; label: string }[] }) {
-    return (
-        <div role="tablist" className="flex gap-1">
-            {tabs.map((tab) => (
-                <button
-                    key={tab.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={value === tab.id}
-                    onClick={() => onChange(tab.id)}
-                    className="cursor-pointer border-b-2 border-transparent px-3 py-2 text-sm text-gray-500 hover:text-gray-900 aria-selected:border-accent aria-selected:font-medium aria-selected:text-gray-900"
-                >
-                    {tab.label}
-                </button>
-            ))}
-        </div>
-    );
-}
-
 type FolderPaneProps = {
     folder: Resource | null;
     index: ResourceIndex;
@@ -225,6 +218,7 @@ function FolderPane({ folder, index, ops, mode, onModeChange, menuItems, onDrop,
     const t = useTranslate();
     const [tab, setTab] = useState<Tab>("content");
     const [selection, setSelection] = useState<string[]>([]);
+    const [isAddingRepo, setIsAddingRepo] = useState(false);
     const fileInput = useRef<HTMLInputElement>(null);
     const folderId = folder?.id ?? null;
     const items = childrenOf(index, folderId);
@@ -281,6 +275,19 @@ function FolderPane({ folder, index, ops, mode, onModeChange, menuItems, onDrop,
                             <FiClipboard aria-hidden />
                             {t("resources.paste")}
                         </button>
+                        <button type="button" className={toolButton} onClick={() => setIsAddingRepo(true)}>
+                            <FiGithub aria-hidden />
+                            {t("resources.addRepository")}
+                        </button>
+                        <AddRepositoryDialog
+                            isOpen={isAddingRepo}
+                            parentId={folderId}
+                            onClose={() => setIsAddingRepo(false)}
+                            onAdded={(resource) => {
+                                setIsAddingRepo(false);
+                                onOpen(resource);
+                            }}
+                        />
                         <span className="flex-1" />
                         {liveSelection.length > 1 && (
                             <span className="px-2 text-xs text-gray-500">
