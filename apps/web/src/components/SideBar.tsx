@@ -4,8 +4,11 @@ import {
   useRef,
   useState,
   type ComponentType,
+  type FocusEvent,
+  type MouseEvent,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import { Link, useLocation } from "react-router";
 import {
   FiBell,
@@ -42,6 +45,39 @@ type IconType = ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
 
 const COLLAPSED_KEY = "yap.sidebar.collapsed";
 
+// Shows `label` right of the hovered or focused element at once (no native
+// title delay). Rendered in a portal with fixed position so the scrolling nav
+// does not clip it.
+function useSideLabel(label: string, isEnabled: boolean) {
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  const show = (event: MouseEvent<HTMLElement> | FocusEvent<HTMLElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setPos({ top: rect.top + rect.height / 2, left: rect.right + 8 });
+  };
+  const hide = () => setPos(null);
+
+  const handlers = isEnabled
+    ? { onMouseEnter: show, onMouseLeave: hide, onFocus: show, onBlur: hide }
+    : {};
+
+  const tip =
+    isEnabled && pos
+      ? createPortal(
+          <span
+            role="tooltip"
+            style={{ top: pos.top, left: pos.left }}
+            className="pointer-events-none fixed z-50 -translate-y-1/2 rounded-md bg-gray-900 px-2 py-1 text-xs font-medium whitespace-nowrap text-white shadow-lg"
+          >
+            {label}
+          </span>,
+          document.body,
+        )
+      : null;
+
+  return { handlers, tip };
+}
+
 export function Sidebar() {
   const t = useTranslate();
   const { pathname } = useLocation();
@@ -56,6 +92,7 @@ export function Sidebar() {
   }, [isCollapsed]);
 
   useShortcut({ key: "b", mod: true }, () => setIsCollapsed((c) => !c));
+  const toggleTip = useSideLabel(t("sidebar.expand"), isCollapsed);
 
   const projectItems = projects.data ?? [];
   // Show the live project name and icon, so an edit elsewhere is picked up at once.
@@ -83,9 +120,13 @@ export function Sidebar() {
         )}
         <button
           type="button"
-          onClick={() => setIsCollapsed(!isCollapsed)}
+          onClick={() => {
+            toggleTip.handlers.onMouseLeave?.();
+            setIsCollapsed(!isCollapsed);
+          }}
+          {...toggleTip.handlers}
           aria-label={t(isCollapsed ? "sidebar.expand" : "sidebar.collapse")}
-          title={t(isCollapsed ? "sidebar.expand" : "sidebar.collapse")}
+          title={isCollapsed ? undefined : t("sidebar.collapse")}
           aria-expanded={!isCollapsed}
           className="cursor-pointer rounded-md p-1.5 text-xl text-gray-500 hover:bg-gray-200 hover:text-gray-900"
         >
@@ -95,6 +136,7 @@ export function Sidebar() {
             <TbLayoutSidebarLeftCollapse aria-hidden />
           )}
         </button>
+        {toggleTip.tip}
       </div>
 
       <nav className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-3">
@@ -117,39 +159,43 @@ export function Sidebar() {
             href="/resources"
             label={t("sidebar.resources")}
             Icon={FiHardDrive}
-            isActive={pathname === "/resources" || pathname.startsWith("/resources/")}
+            isActive={
+              pathname === "/resources" || pathname.startsWith("/resources/")
+            }
             isCollapsed={isCollapsed}
           />
         </ul>
 
-        <Section title={t("sidebar.pinned")} isCollapsed={isCollapsed}>
-          {pins.length === 0 && !isCollapsed && (
-            <li className="flex items-center gap-2 px-3 py-1 text-xs text-gray-400">
-              <TbPin aria-hidden className="shrink-0" />
-              {t("sidebar.pinned.empty")}
-            </li>
-          )}
-          {pins.map((pin) => (
-            <NavLink
-              key={`${pin.kind}-${pin.id}`}
-              href={pin.href}
-              label={pinLabel(pin)}
-              Icon={
-                pin.kind === "project"
-                  ? FiFolder
-                  : pin.kind === "resource"
-                    ? FiFile
-                    : FiCheckSquare
-              }
-              emoji={pinEmoji(pin)}
-              isActive={false}
-              isCollapsed={isCollapsed}
-              onUnpin={() =>
-                unpinWhere((p) => p.kind === pin.kind && p.id === pin.id)
-              }
-            />
-          ))}
-        </Section>
+        {(pins.length > 0 || !isCollapsed) && (
+          <Section title={t("sidebar.pinned")} isCollapsed={isCollapsed}>
+            {pins.length === 0 && (
+              <li className="flex items-center gap-2 px-3 py-1 text-xs text-gray-400">
+                <TbPin aria-hidden className="shrink-0" />
+                {t("sidebar.pinned.empty")}
+              </li>
+            )}
+            {pins.map((pin) => (
+              <NavLink
+                key={`${pin.kind}-${pin.id}`}
+                href={pin.href}
+                label={pinLabel(pin)}
+                Icon={
+                  pin.kind === "project"
+                    ? FiFolder
+                    : pin.kind === "resource"
+                      ? FiFile
+                      : FiCheckSquare
+                }
+                emoji={pinEmoji(pin)}
+                isActive={false}
+                isCollapsed={isCollapsed}
+                onUnpin={() =>
+                  unpinWhere((p) => p.kind === pin.kind && p.id === pin.id)
+                }
+              />
+            ))}
+          </Section>
+        )}
 
         <Section
           title={t("sidebar.projects")}
@@ -180,9 +226,7 @@ export function Sidebar() {
                 label={project.name}
                 Icon={FiFolder}
                 emoji={project.icon}
-                isActive={
-                  pathname === href || pathname.startsWith(`${href}/`)
-                }
+                isActive={pathname === href || pathname.startsWith(`${href}/`)}
                 isCollapsed={isCollapsed}
               />
             );
@@ -245,19 +289,24 @@ function NavLink({
   onUnpin,
 }: NavLinkProps) {
   const t = useTranslate();
+  const sideLabel = useSideLabel(label, isCollapsed);
 
   return (
     <li className="group relative">
       <Link
         to={href}
-        title={label}
+        title={isCollapsed ? undefined : label}
+        {...sideLabel.handlers}
         aria-current={isActive ? "page" : undefined}
         className={`flex items-center gap-3 rounded-md py-2 text-sm text-gray-700 hover:bg-gray-200 aria-[current=page]:bg-gray-200 aria-[current=page]:font-semibold ${
           isCollapsed ? "justify-center px-2" : "px-3"
         } ${onUnpin && !isCollapsed ? "pr-8" : ""}`}
       >
         {emoji ? (
-          <span aria-hidden className="w-4 shrink-0 text-center text-base leading-none">
+          <span
+            aria-hidden
+            className="w-4 shrink-0 text-center text-base leading-none"
+          >
             {emoji}
           </span>
         ) : (
@@ -272,6 +321,7 @@ function NavLink({
           <span className="truncate">{label}</span>
         )}
       </Link>
+      {sideLabel.tip}
       {onUnpin && !isCollapsed && (
         <button
           type="button"
@@ -331,6 +381,10 @@ function ProfileMenu({ isCollapsed }: { isCollapsed: boolean }) {
   }, [isOpen]);
 
   const username = workspace.data?.username ?? "";
+  const profileTip = useSideLabel(
+    username || t("sidebar.profile.label"),
+    isCollapsed && !isOpen,
+  );
   const close = () => setIsOpen(false);
   const closeSettings = useCallback(() => setSettingsSection(null), []);
 
@@ -347,7 +401,8 @@ function ProfileMenu({ isCollapsed }: { isCollapsed: boolean }) {
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-label={t("sidebar.profile.label")}
-        title={username || t("sidebar.profile.label")}
+        title={isCollapsed ? undefined : username || t("sidebar.profile.label")}
+        {...profileTip.handlers}
         className={`flex w-full cursor-pointer items-center gap-3 rounded-md p-2 text-left hover:bg-gray-200 ${
           isCollapsed ? "justify-center" : ""
         } ${isOpen ? "bg-gray-200" : ""}`}
@@ -375,12 +430,15 @@ function ProfileMenu({ isCollapsed }: { isCollapsed: boolean }) {
           </>
         )}
       </button>
+      {profileTip.tip}
 
       {isOpen && (
         <ul
           role="menu"
           className={`app-opaque absolute z-40 w-56 rounded-md border border-gray-200 bg-white py-1 text-sm shadow-lg ${
-            isCollapsed ? "bottom-3 left-full ml-2" : "right-3 bottom-full left-3 mb-1 w-auto"
+            isCollapsed
+              ? "bottom-3 left-full ml-2"
+              : "right-3 bottom-full left-3 mb-1 w-auto"
           }`}
         >
           {profileItems.map(({ label, Icon, section }) => (
