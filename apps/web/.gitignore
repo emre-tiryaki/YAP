@@ -1,0 +1,4 @@
+
+# Source pictures for the background presets (large originals);
+# `bun run backgrounds` turns them into public/backgrounds/.
+/backgrounds/

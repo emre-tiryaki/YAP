@@ -11,6 +11,26 @@
         var prefs = JSON.parse(localStorage.getItem("yap.preferences") || "{}");
         if (typeof prefs.accent === "string") document.documentElement.dataset.accent = prefs.accent;
         if (prefs.density === "compact") document.documentElement.dataset.density = "compact";
+        // Background (hooks/useBackground.ts): presets are attributes styled in
+        // index.css; an uploaded picture loads later from IndexedDB, so only its
+        // average color is painted now. Unknown values just match no CSS rule.
+        var bg = prefs.background;
+        if (bg && typeof bg === "object") {
+          var root = document.documentElement;
+          if (bg.kind === "color" && typeof bg.color === "string") {
+            root.dataset.bg = "color";
+            root.dataset.bgColor = bg.color;
+          } else if (bg.kind === "image" && typeof bg.image === "string") {
+            root.dataset.bg = "image";
+            root.dataset.bgImage = bg.image;
+          } else if (bg.kind === "customColor" && /^#[0-9a-f]{6}$/i.test(bg.color)) {
+            root.dataset.bg = "customColor";
+            root.style.setProperty("--app-bg-tint", bg.color);
+          } else if (bg.kind === "custom" && /^#[0-9a-f]{6}$/i.test(bg.tint)) {
+            root.dataset.bg = "custom";
+            root.style.setProperty("--app-bg-tint", bg.tint);
+          }
+        }
         var theme = prefs.theme;
         if (theme !== "light" && theme !== "dark") theme = "system";
         if (theme === "dark" || (theme === "system" && matchMedia("(prefers-color-scheme: dark)").matches)) {

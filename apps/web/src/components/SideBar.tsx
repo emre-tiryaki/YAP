@@ -9,6 +9,7 @@ import {
 import { Link, useLocation } from "react-router";
 import {
   FiBell,
+  FiCalendar,
   FiCheckSquare,
   FiChevronUp,
   FiCommand,
@@ -66,7 +67,7 @@ export function Sidebar() {
 
   return (
     <aside
-      className={`sticky top-0 flex h-screen shrink-0 flex-col border-r border-gray-200 bg-gray-50 transition-[width] duration-200 ${
+      className={`sticky top-0 flex h-screen shrink-0 flex-col border-r border-gray-200 app-sidebar transition-[width] duration-200 ${
         isCollapsed ? "w-16" : "w-64"
       }`}
     >
@@ -103,6 +104,13 @@ export function Sidebar() {
             label={t("sidebar.home")}
             Icon={FiHome}
             isActive={pathname === "/home"}
+            isCollapsed={isCollapsed}
+          />
+          <NavLink
+            href="/tasks"
+            label={t("workspace.tasks.title")}
+            Icon={FiCalendar}
+            isActive={pathname === "/tasks"}
             isCollapsed={isCollapsed}
           />
           <NavLink
@@ -143,7 +151,11 @@ export function Sidebar() {
           ))}
         </Section>
 
-        <Section title={t("sidebar.projects")} isCollapsed={isCollapsed}>
+        <Section
+          title={t("sidebar.projects")}
+          href="/projects"
+          isCollapsed={isCollapsed}
+        >
           {projects.isLoading && !isCollapsed && (
             <li className="px-3 py-1 text-xs text-gray-400">
               {t("common.loading")}
@@ -185,18 +197,26 @@ export function Sidebar() {
 
 type SectionProps = {
   title: string;
+  // Makes the title a link, e.g. to the page listing the section's items.
+  href?: string;
   isCollapsed: boolean;
   children: ReactNode;
 };
 
-function Section({ title, isCollapsed, children }: SectionProps) {
+function Section({ title, href, isCollapsed, children }: SectionProps) {
   return (
     <section aria-label={title}>
       {isCollapsed ? (
         <hr className="mx-2 mb-3 border-gray-200" />
       ) : (
         <h2 className="mb-1 px-3 text-xs font-semibold tracking-wide text-gray-400 uppercase">
-          {title}
+          {href ? (
+            <Link to={href} className="rounded hover:text-gray-900">
+              {title}
+            </Link>
+          ) : (
+            title
+          )}
         </h2>
       )}
       <ul className="flex flex-col gap-1">{children}</ul>
@@ -359,7 +379,7 @@ function ProfileMenu({ isCollapsed }: { isCollapsed: boolean }) {
       {isOpen && (
         <ul
           role="menu"
-          className={`absolute z-40 w-56 rounded-md border border-gray-200 bg-white py-1 text-sm shadow-lg ${
+          className={`app-opaque absolute z-40 w-56 rounded-md border border-gray-200 bg-white py-1 text-sm shadow-lg ${
             isCollapsed ? "bottom-3 left-full ml-2" : "right-3 bottom-full left-3 mb-1 w-auto"
           }`}
         >

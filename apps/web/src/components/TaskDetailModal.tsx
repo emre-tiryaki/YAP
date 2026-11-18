@@ -76,7 +76,7 @@ export function TaskDetailModal({
                     if (isClosing && event.target === event.currentTarget)
                         onClose();
                 }}
-                className={`absolute inset-y-0 right-0 flex w-full max-w-5xl flex-col bg-white shadow-2xl sm:w-[85vw] ${
+                className={`app-opaque absolute inset-y-0 right-0 flex w-full max-w-5xl flex-col bg-white shadow-2xl sm:w-[85vw] ${
                     isClosing ? "animate-drawer-out" : "animate-drawer-in"
                 }`}
             >

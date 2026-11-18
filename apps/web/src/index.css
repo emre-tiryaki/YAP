@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* Background preset pictures, built by scripts/backgrounds.ts. */
+@import "./generated/backgrounds.css";
 @plugin "@tailwindcss/typography";
 
 /* Class-based dark mode: the `dark` class on <html> (set from the theme
@@ -232,12 +234,127 @@
     }
 }
 
+/* Background (`data-bg` on <html>, set from the background preference, see
+   hooks/useBackground.ts and the pre-paint script in index.html). The page
+   canvas shows a solid color or a wallpaper; `--app-bg-tint` is painted under
+   the image so a dark wallpaper never flashes white while it loads. Preset
+   pictures come from generated/backgrounds.css (`data-bg-image`). */
+@layer theme {
+    :root {
+        --bg-swatch-slate: #cdd5df;
+        --bg-swatch-sand: #e6dccb;
+        --bg-swatch-sage: #c9d6c3;
+        --bg-swatch-sky: #c3d9f2;
+        --bg-swatch-teal: #bcdedb;
+        --bg-swatch-lavender: #d8d0f0;
+        --bg-swatch-rose: #f0cdd3;
+        --bg-swatch-peach: #f3d6be;
+    }
+    :root.dark {
+        --bg-swatch-slate: #222a36;
+        --bg-swatch-sand: #352f26;
+        --bg-swatch-sage: #25302a;
+        --bg-swatch-sky: #1a2b42;
+        --bg-swatch-teal: #173130;
+        --bg-swatch-lavender: #2a2542;
+        --bg-swatch-rose: #3a2129;
+        --bg-swatch-peach: #3a2a1f;
+    }
+
+    :root[data-bg-color="slate"] { --app-bg-tint: var(--bg-swatch-slate); }
+    :root[data-bg-color="sand"] { --app-bg-tint: var(--bg-swatch-sand); }
+    :root[data-bg-color="sage"] { --app-bg-tint: var(--bg-swatch-sage); }
+    :root[data-bg-color="sky"] { --app-bg-tint: var(--bg-swatch-sky); }
+    :root[data-bg-color="teal"] { --app-bg-tint: var(--bg-swatch-teal); }
+    :root[data-bg-color="lavender"] { --app-bg-tint: var(--bg-swatch-lavender); }
+    :root[data-bg-color="rose"] { --app-bg-tint: var(--bg-swatch-rose); }
+    :root[data-bg-color="peach"] { --app-bg-tint: var(--bg-swatch-peach); }
+}
+
 @layer base {
     html {
         background-color: var(--color-white);
     }
+    :root[data-bg] {
+        background-color: var(--app-bg-tint, var(--color-gray-100));
+        background-image:
+            linear-gradient(var(--app-scrim), var(--app-scrim)),
+            var(--app-bg-image, none);
+        background-position: center;
+        background-size: cover;
+        background-attachment: fixed;
+    }
     .dark body {
         color: var(--color-gray-950);
+    }
+}
+
+/* App shell over a background. The picture shows unblurred: the page itself
+   is transparent, and inside the shell (`app-surface`, `app-sidebar`) the
+   surface colors that cards, bars and hover states are painted with
+   (`bg-white`, `bg-gray-50/100/200`) become translucent versions of
+   themselves. `--app-*` keep the opaque values, captured on :root where they
+   resolve per theme. Menus, drawers and dialogs rendered inside the shell
+   carry `app-opaque`, which restores them so they stay readable; portaled
+   ones live outside the shell and are untouched. Text and accent colors are
+   left alone (`--color-accent-fg` already resolved to opaque on :root). */
+@layer theme {
+    :root {
+        --app-white: var(--color-white);
+        --app-gray-50: var(--color-gray-50);
+        --app-gray-100: var(--color-gray-100);
+        --app-gray-200: var(--color-gray-200);
+        /* How much of each surface covers the picture. */
+        --app-alpha-white: 82%;
+        --app-alpha-50: 85%;
+        --app-alpha-100: 88%;
+        --app-alpha-200: 90%;
+        /* A veil of the surface color over the picture itself, so very light
+           or very dark pictures still leave room for the text on top. */
+        --app-scrim: color-mix(in oklab, var(--app-white) 40%, transparent);
+    }
+    :root.dark {
+        --app-alpha-white: 76%;
+        --app-alpha-50: 80%;
+        --app-alpha-100: 85%;
+        --app-alpha-200: 88%;
+        --app-scrim: color-mix(in oklab, var(--app-white) 45%, transparent);
+    }
+    :root[data-bg] .app-surface,
+    :root[data-bg] .app-sidebar {
+        --color-white: color-mix(in oklab, var(--app-white) var(--app-alpha-white), transparent);
+        --color-gray-50: color-mix(in oklab, var(--app-gray-50) var(--app-alpha-50), transparent);
+        --color-gray-100: color-mix(in oklab, var(--app-gray-100) var(--app-alpha-100), transparent);
+        --color-gray-200: color-mix(in oklab, var(--app-gray-200) var(--app-alpha-200), transparent);
+    }
+    :root[data-bg] .app-opaque {
+        --color-white: var(--app-white);
+        --color-gray-50: var(--app-gray-50);
+        --color-gray-100: var(--app-gray-100);
+        --color-gray-200: var(--app-gray-200);
+    }
+}
+
+@layer components {
+    .app-sidebar {
+        background-color: var(--color-gray-50);
+    }
+    .app-topbar {
+        background-color: var(--color-white);
+    }
+    /* Text placed straight on the picture (headings, date labels, links)
+       gets a soft halo of the surface color; on cards it matches the card
+       and does not show. Not on accent buttons, whose text is the inverse
+       color, nor inside opaque menus and dialogs. Plain colors need none. */
+    :root:is([data-bg="image"], [data-bg="custom"]) .app-surface,
+    :root:is([data-bg="image"], [data-bg="custom"]) .app-sidebar {
+        text-shadow:
+            0 0 2px var(--app-white),
+            0 0 6px var(--app-white);
+    }
+    :root[data-bg] .app-opaque,
+    :root[data-bg] .bg-accent {
+        text-shadow: none;
     }
 }
 

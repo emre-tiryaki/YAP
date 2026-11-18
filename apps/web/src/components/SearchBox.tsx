@@ -185,7 +185,7 @@ export function SearchBox() {
                 className="w-full rounded-md border border-gray-300 bg-gray-50 py-1.5 pr-3 pl-8 text-sm"
             />
             {showPanel && (
-                <div className="absolute top-full right-0 left-0 z-40 mt-1 max-h-[70vh] overflow-y-auto rounded-md border border-gray-200 bg-white py-1 shadow-lg">
+                <div className="app-opaque absolute top-full right-0 left-0 z-40 mt-1 max-h-[70vh] overflow-y-auto rounded-md border border-gray-200 bg-white py-1 shadow-lg">
                     {status && (
                         <p role="status" className="px-3 py-2 text-sm text-gray-500">
                             {status}

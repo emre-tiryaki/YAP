@@ -12,6 +12,11 @@ import { CreateProjectForm } from "../components/CreateProjectForm";
 import { TaskList } from "../components/TaskList";
 import { CreateTaskForm } from "../components/CreateTaskForm";
 
+// The home page shows a short preview of each list; the full lists live on
+// the projects and upcoming tasks pages.
+const HOME_PROJECT_LIMIT = 6;
+const HOME_TASK_LIMIT = 5;
+
 export default function WorkspaceHomePage() {
     const t = useTranslate();
     const workspace = useWorkspace();
@@ -41,12 +46,15 @@ export default function WorkspaceHomePage() {
                         isError={projects.isError}
                         isLoading={projects.isLoading}
                         onCreate={() => setIsProjectModalOpen(true)}
+                        limit={HOME_PROJECT_LIMIT}
                     />
                     <TaskList
                         tasks={tasks.data ?? []}
                         isError={tasks.isError}
                         isLoading={tasks.isLoading}
                         onCreate={() => setIsTaskModalOpen(true)}
+                        limit={HOME_TASK_LIMIT}
+                        compact
                     />
                 </div>
             </main>

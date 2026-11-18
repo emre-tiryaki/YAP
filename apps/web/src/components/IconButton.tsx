@@ -90,7 +90,7 @@ export function IconButton({
                 <div
                     role="dialog"
                     aria-label={t("icon.change")}
-                    className="absolute top-full left-0 z-40 mt-2 w-80 rounded-lg border border-gray-200 bg-white p-3 shadow-lg"
+                    className="app-opaque absolute top-full left-0 z-40 mt-2 w-80 rounded-lg border border-gray-200 bg-white p-3 shadow-lg"
                 >
                     <IconPicker value={icon} onChange={select} />
                     {errorMessage && (

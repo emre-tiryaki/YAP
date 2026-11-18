@@ -8,12 +8,21 @@ import { PlanTaskCard } from "./PlanTaskCard";
 import { SectionHeader } from "./SectionHeader";
 import { TaskDialogs } from "./TaskDialogs";
 import { UpcomingTaskDrawer } from "./UpcomingTaskDrawer";
+import { ViewAllLink } from "./ViewAllLink";
 
 type TaskListProps = {
     tasks: Task[];
     isLoading: boolean;
     isError: boolean;
     onCreate: () => void;
+    // Shows only the first `limit` tasks, with a link to the tasks page.
+    limit?: number;
+    // Replaces the message shown when there are no tasks, e.g. for a filter.
+    emptyMessage?: string;
+    // Leaves out the section header, for a page that has its own title.
+    hideHeader?: boolean;
+    // One-line cards without the description, for a short preview.
+    compact?: boolean;
 };
 
 type TaskGroup = {
@@ -41,9 +50,14 @@ export function TaskList({
     isError,
     isLoading,
     onCreate,
+    limit,
+    emptyMessage,
+    hideHeader = false,
+    compact = false,
 }: TaskListProps) {
     const t = useTranslate();
     const format = useDateFormat();
+    const shown = limit === undefined ? tasks : tasks.slice(0, limit);
     const [openTask, setOpenTask] = useState<Task | null>(null);
     const [taskAction, setTaskAction] = useState<{
         task: Task;
@@ -64,10 +78,13 @@ export function TaskList({
 
     return (
         <section>
-            <SectionHeader
-                title={t("workspace.tasks.title")}
-                onCreate={onCreate}
-            />
+            {!hideHeader && (
+                <SectionHeader
+                    title={t("workspace.tasks.title")}
+                    href="/tasks"
+                    onCreate={onCreate}
+                />
+            )}
             {isLoading && (
                 <p className="text-sm text-gray-500">{t("common.loading")}</p>
             )}
@@ -76,12 +93,12 @@ export function TaskList({
             )}
             {!isLoading && !isError && tasks.length === 0 && (
                 <p className="text-sm text-gray-500">
-                    {t("workspace.tasks.empty")}
+                    {emptyMessage ?? t("workspace.tasks.empty")}
                 </p>
             )}
-            {tasks.length > 0 && (
+            {shown.length > 0 && (
                 <div className="flex flex-col gap-6">
-                    {groupByDueDay(tasks).map((group) => {
+                    {groupByDueDay(shown).map((group) => {
                         const isOverdue =
                             group.date !== null && daysFromToday(group.date) < 0;
                         return (
@@ -111,7 +128,7 @@ export function TaskList({
                                         >
                                             <PlanTaskCard
                                                 task={task}
-                                                layout="board"
+                                                layout={compact ? "list" : "board"}
                                                 isDraggable={false}
                                                 projectId={task.projectId}
                                                 planId={task.planId}
@@ -129,6 +146,10 @@ export function TaskList({
                         );
                     })}
                 </div>
+            )}
+
+            {shown.length < tasks.length && (
+                <ViewAllLink href="/tasks" total={tasks.length} />
             )}
 
             {openTask && (

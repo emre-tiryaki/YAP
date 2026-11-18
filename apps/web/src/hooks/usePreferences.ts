@@ -1,6 +1,9 @@
 import { useSyncExternalStore } from "react";
 import type {
   Accent,
+  Background,
+  BackgroundColor,
+  BackgroundImage,
   DateFormat,
   Density,
   Language,
@@ -9,6 +12,7 @@ import type {
   TimeFormat,
   WeekStart,
 } from "../types/settings";
+import { backgroundColors, backgroundImages } from "../util/backgrounds";
 
 // Read by the pre-paint script in index.html too; keep the key in sync.
 // Preferences only shape this device's interface, so like pins they live in
@@ -43,11 +47,45 @@ function defaults(): Preferences {
     theme: "system",
     accent: "neutral",
     density: "comfortable",
+    background: { kind: "none" },
   };
 }
 
 function pick<T>(allowed: readonly T[], value: unknown, fallback: T): T {
   return allowed.includes(value as T) ? (value as T) : fallback;
+}
+
+const hexColor = /^#[0-9a-f]{6}$/i;
+
+// Unknown or malformed values (e.g. a removed wallpaper) fall back to none.
+function pickBackground(value: unknown): Background {
+  const none: Background = { kind: "none" };
+  if (typeof value !== "object" || value === null) return none;
+  const v = value as Record<string, unknown>;
+  if (v.kind === "color") {
+    const color = pick<BackgroundColor | null>(backgroundColors, v.color, null);
+    return color ? { kind: "color", color } : none;
+  }
+  if (
+    v.kind === "customColor" &&
+    typeof v.color === "string" &&
+    hexColor.test(v.color)
+  ) {
+    return { kind: "customColor", color: v.color };
+  }
+  if (v.kind === "image") {
+    const image = pick<BackgroundImage | null>(backgroundImages, v.image, null);
+    return image ? { kind: "image", image } : none;
+  }
+  if (
+    v.kind === "custom" &&
+    typeof v.tint === "string" &&
+    hexColor.test(v.tint) &&
+    typeof v.version === "number"
+  ) {
+    return { kind: "custom", tint: v.tint, version: v.version };
+  }
+  return none;
 }
 
 const listeners = new Set<() => void>();
@@ -78,6 +116,7 @@ function read(): Preferences {
     theme: pick(themes, stored.theme, base.theme),
     accent: pick(accents, stored.accent, base.accent),
     density: pick(densities, stored.density, base.density),
+    background: pickBackground(stored.background),
   };
   return cache;
 }

@@ -1,0 +1,47 @@
+[
+  {
+    "id": "flow",
+    "name": {
+      "en": "Flow",
+      "tr": "Akış"
+    },
+    "dark": "#685356",
+    "light": "#ddbcb2"
+  },
+  {
+    "id": "plush",
+    "name": {
+      "en": "Plush",
+      "tr": "Peluş"
+    },
+    "light": "#d3aba2",
+    "dark": "#794c4a"
+  },
+  {
+    "id": "ruffle",
+    "name": {
+      "en": "Ruffle",
+      "tr": "Fırfır"
+    },
+    "light": "#ba98ad",
+    "dark": "#2f2433"
+  },
+  {
+    "id": "silk",
+    "name": {
+      "en": "Silk",
+      "tr": "İpek"
+    },
+    "dark": "#151515",
+    "light": "#cecece"
+  },
+  {
+    "id": "swirl",
+    "name": {
+      "en": "Swirl",
+      "tr": "Sarmal"
+    },
+    "dark": "#615d74",
+    "light": "#d7bdc5"
+  }
+]

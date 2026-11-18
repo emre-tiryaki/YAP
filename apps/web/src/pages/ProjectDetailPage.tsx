@@ -28,7 +28,7 @@ export default function ProjectDetailPage() {
         return <NotFoundPage />;
 
     const path: BreadcrumbItem[] = [
-        { label: t("sidebar.projects"), href: "/home" },
+        { label: t("sidebar.projects"), href: "/projects" },
         { label: project.data?.name ?? "", href: `/projects/${projectId}` },
     ].filter((item) => item.label);
 

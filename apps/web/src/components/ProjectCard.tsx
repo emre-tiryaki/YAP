@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { useTranslate } from "../hooks/useTranslate";
 import type { CardAction } from "../types/cardAction";
+import type { Pin } from "../types/pin";
 import type { Project } from "../types/project";
 import { cardAccent as accent, initials } from "../util/accent";
 import { CardMenu } from "./CardMenu";
@@ -9,11 +10,71 @@ import { ProjectDialogs } from "./ProjectDialogs";
 
 type ProjectCardProps = {
     project: Project;
+    // "row" is a compact line, "card" a large tile for a grid.
+    layout?: "row" | "card";
 };
 
-export function ProjectCard({ project }: ProjectCardProps) {
+export function ProjectCard({ project, layout = "row" }: ProjectCardProps) {
     const t = useTranslate();
     const [action, setAction] = useState<CardAction | null>(null);
+    const pin: Pin = {
+        kind: "project",
+        id: project.id,
+        label: project.name,
+        href: `/projects/${project.id}`,
+    };
+    const dialogs = (
+        <ProjectDialogs
+            project={project}
+            action={action}
+            onClose={() => setAction(null)}
+        />
+    );
+
+    if (layout === "card")
+        return (
+            <div className="relative h-full">
+                <Link
+                    to={`/projects/${project.id}`}
+                    className={`flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-accent ${accent.hoverBorder}`}
+                >
+                    <span
+                        aria-hidden
+                        className={`grid size-14 shrink-0 place-items-center rounded-xl font-semibold ${
+                            project.icon ? "text-4xl" : `text-lg ${accent.tile}`
+                        }`}
+                    >
+                        {project.icon || initials(project.name)}
+                    </span>
+                    <h3
+                        className="mt-4 truncate pr-6 text-lg leading-tight font-semibold text-gray-900"
+                        title={project.name}
+                    >
+                        {project.name}
+                    </h3>
+                    <p
+                        title={project.description || undefined}
+                        className={`mt-2 line-clamp-3 min-h-15 flex-1 text-sm break-words ${
+                            project.description
+                                ? "text-gray-600"
+                                : "text-gray-400 italic"
+                        }`}
+                    >
+                        {project.description || t("project.noDescription")}
+                    </p>
+                    <div className="mt-4 border-t border-gray-100 pt-3 text-xs text-gray-600">
+                        <span className="font-semibold text-gray-900 tabular-nums">
+                            {project.taskCount}
+                        </span>{" "}
+                        {t("workspace.projects.taskCount")}
+                    </div>
+                </Link>
+                <div className="absolute top-3 right-3">
+                    <CardMenu onSelect={setAction} pin={pin} />
+                </div>
+                {dialogs}
+            </div>
+        );
 
     return (
         <div className="relative">
@@ -55,21 +116,9 @@ export function ProjectCard({ project }: ProjectCardProps) {
                 </span>
             </Link>
             <div className="absolute top-1/2 right-3 -translate-y-1/2">
-                <CardMenu
-                    onSelect={setAction}
-                    pin={{
-                        kind: "project",
-                        id: project.id,
-                        label: project.name,
-                        href: `/projects/${project.id}`,
-                    }}
-                />
+                <CardMenu onSelect={setAction} pin={pin} />
             </div>
-            <ProjectDialogs
-                project={project}
-                action={action}
-                onClose={() => setAction(null)}
-            />
+            {dialogs}
         </div>
     );
 }

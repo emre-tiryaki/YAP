@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useBackground } from "./useBackground";
 import { usePreferences } from "./usePreferences";
 
 const darkQuery = "(prefers-color-scheme: dark)";
@@ -9,9 +10,11 @@ const darkQuery = "(prefers-color-scheme: dark)";
 // first paint so a dark page never flashes light.
 // The accent preference is mirrored to `data-accent` on <html>, which selects
 // the `--color-accent` palette in index.css, and the density preference to
-// `data-density`, which sets the `--spacing` scale there.
+// `data-density`, which sets the `--spacing` scale there. The background
+// preference is applied by useBackground.
 export function useTheme() {
   const { theme, accent, density } = usePreferences();
+  useBackground();
 
   useEffect(() => {
     document.documentElement.dataset.accent = accent;

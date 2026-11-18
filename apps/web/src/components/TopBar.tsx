@@ -10,7 +10,7 @@ type TopBarProps = {
 
 export function TopBar({ path }: TopBarProps) {
     return (
-        <header className="grid h-14 shrink-0 grid-cols-3 items-center border-b border-gray-200 bg-white px-6">
+        <header className="grid h-14 shrink-0 grid-cols-3 items-center border-b border-gray-200 app-topbar px-6">
             <nav aria-label="breadcrumb" className="min-w-0">
                 <ol className="flex min-w-0 items-center gap-1 text-sm">
                     {path.map((item, index) => {
