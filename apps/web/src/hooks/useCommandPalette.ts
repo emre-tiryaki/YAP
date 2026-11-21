@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 
-export type PalettePage = "root" | "status";
+export type PalettePage = "root" | "status" | "priority";
 
 // What the palette acts on besides the workspace: set by the task peek (or
 // task page) while it is mounted.

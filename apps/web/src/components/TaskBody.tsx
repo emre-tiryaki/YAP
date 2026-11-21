@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { FiCalendar, FiCheck, FiFlag, FiTag } from "react-icons/fi";
+import { FiAlertTriangle, FiCalendar, FiCheck, FiFlag, FiTag } from "react-icons/fi";
 import { Link } from "react-router";
 import { ApiError } from "../api/client";
 import { useChangeTaskStatus } from "../hooks/useChangeTaskStatus";
@@ -16,6 +16,7 @@ import { CommentSection } from "./CommentSection";
 import { DatePicker } from "./DatePicker";
 import { FormError } from "./FormError";
 import { Pill } from "./Pill";
+import { PrioritySelect } from "./PrioritySelect";
 import { PropertySelect } from "./PropertySelect";
 import { Skeleton } from "./Skeleton";
 import { SubtaskList } from "./SubtaskList";
@@ -68,6 +69,7 @@ export function TaskBody({ projectId, planId, task, statuses, full }: TaskBodyPr
     }, [task.id, task.title, projectId, planId]);
 
     useShortcut({ key: "s", inModal: true }, () => openPalette("status"));
+    useShortcut({ key: "p", inModal: true }, () => openPalette("priority"));
     useShortcut({ key: "d", inModal: true }, () => setDueDateRequest((n) => n + 1));
 
     function save(input: UpdateTaskInput) {
@@ -220,6 +222,16 @@ export function TaskBody({ projectId, planId, task, statuses, full }: TaskBodyPr
                                 />
                             ),
                         }))}
+                    />
+                </TaskPropertyRow>
+                <TaskPropertyRow
+                    icon={<FiAlertTriangle />}
+                    label={t("task.property.priority")}
+                >
+                    <PrioritySelect
+                        variant="ghost"
+                        value={task.priority}
+                        onChange={(priority) => save({ priority })}
                     />
                 </TaskPropertyRow>
                 <TaskPropertyRow

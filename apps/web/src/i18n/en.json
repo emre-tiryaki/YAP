@@ -644,5 +644,15 @@
     "palette.toggleSidebar": "Toggle sidebar",
     "palette.shortcuts": "Keyboard shortcuts",
     "palette.settings": "Settings",
-    "palette.search": "Search"
+    "palette.search": "Search",
+    "task.priority.urgent": "Urgent",
+    "task.priority.high": "High",
+    "task.priority.medium": "Medium",
+    "task.priority.low": "Low",
+    "task.priority.none": "No priority",
+    "task.property.priority": "Priority",
+    "palette.changePriority": "Change priority...",
+    "palette.placeholder.priority": "Pick a priority...",
+    "palette.group.priority": "Priority",
+    "settings.shortcuts.changePriority": "Change the priority of the open task"
 }

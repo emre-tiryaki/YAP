@@ -115,6 +115,7 @@ erDiagram
         TEXT title
         TEXT description
         TEXT position
+        TEXT priority
         DATETIME completed_at
         DATETIME created_at
         DATETIME updated_at
@@ -272,6 +273,7 @@ Rules:
 | A task's status must be in the task's plan. | `tasks (status_id, plan_id)` → `statuses (id, plan_id)`. |
 | A task's plan must be in the task's project. | `tasks (plan_id, project_id)` → `plans (id, project_id)`. |
 | A subtask and its parent are in the same project. | `tasks (parent_id, project_id)` → `tasks (id, project_id)`. The plan may differ. |
+| A task's priority is one of `urgent`, `high`, `medium`, `low`, `none`. | `tasks.priority` is `NOT NULL DEFAULT 'none'` with a `CHECK` on those values. The service rejects anything else with `ErrInvalidPriority` (invalid input, HTTP 400) on create, update and import. An export made before priorities existed has none, and its tasks import as `none`. |
 | A comment belongs to a task and an author of the same workspace. | `task_comments (task_id, workspace_id)` → `tasks (id, workspace_id)`, `task_comments (author_id, workspace_id)` → `memberships (id, workspace_id)`. |
 | A comment body is not empty. | `CHECK (length(body) > 0)`. |
 | A resource, its parent, its task links and its events belong to the same workspace. | Composite foreign keys on `(resource_id / parent_id, workspace_id)`. |
@@ -353,7 +355,7 @@ All of these rules are protected by unit tests.
 | project_teams  | Both     | Association between a project and a team | |
 | plans          | Both     | Board of a project, for the whole project or for one team | `team_id` is nullable; `archived_at` indicates archival. `icon` is an optional emoji (`NULL` = none). |
 | statuses       | Both     | Kanban columns belonging to a plan | `category` labels the column; it does not finish tasks. |
-| tasks          | Both     | Tasks | `plan_id` and `project_id` are both stored; `parent_id` identifies a subtask; `completed_at` is set while the task is finished. |
+| tasks          | Both     | Tasks | `plan_id` and `project_id` are both stored; `parent_id` identifies a subtask; `completed_at` is set while the task is finished; `priority` defaults to `none`. |
 | task_assignees | Both     | Person assignments to tasks | |
 | task_comments  | Both     | Comments on tasks | `author_id` is a membership; soft-deleted with `deleted_at`. |
 | resources      | Both     | Folders and files of a workspace | The bytes live on disk under `RESOURCES_PATH/<workspace_id>/<path>` (trashed items under `.yap-trash/<trash root id>/`); the rows are the source of truth for the tree. `revision` counts content changes. `deleted_at` marks a purged tombstone. |
@@ -411,7 +413,7 @@ Synchronization is not implemented at this stage; the schema has been designed w
 | Project-level access control | If introduced, the synchronization filter will move from the workspace level to the project level, creating a security boundary. A `projects.visibility` column can be added later. |
 | Multiple email addresses | Since `accounts.user_id` is unique, a user can have only one account. If needed, the `accounts` table can be split. |
 | Multiple owning teams | Handled through subtasks in separate team plans. |
-| Labels, priority, task numbers | Product features to be added at the relevant stage. |
+| Labels, task numbers | Product features to be added at the relevant stage. |
 | Per-resource access control | Would be a security boundary below the workspace: the server must not even send such rows or bytes to members without access. To add later as a `resource_permissions` table and a sync filter; resource bytes are only ever served through the API, so the disk layout can change without clients noticing. |
 | Resource content history (versions, diffs, restoring an older content) | The activity log records that a file changed and by whom, not what changed. |
 | A separate (NoSQL) store for the activity log | The log is low-volume thanks to edit merging; an append-only SQLite table is enough. Old events can be archived on the server if it ever grows too large. |

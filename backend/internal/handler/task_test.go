@@ -138,3 +138,33 @@ func TestTaskMethodNotAllowed(t *testing.T) {
 }
 
 func ptr(s string) *string { return &s }
+func TestTaskPriorityOverHTTP(t *testing.T) {
+	env := newTestEnv(t)
+	project := createProject(t, env, "Backend")
+
+	rec := env.do(t, http.MethodPost, "/api/projects/"+project.ID+"/tasks", `{"title":"T"}`)
+	wantStatus(t, rec, http.StatusCreated)
+	created := decode[taskResponse](t, rec)
+	if created.Priority != "none" {
+		t.Errorf("created priority = %q, want none", created.Priority)
+	}
+
+	rec = env.do(t, http.MethodPatch, "/api/tasks/"+created.ID, `{"priority":"urgent"}`)
+	wantStatus(t, rec, http.StatusOK)
+	if got := decode[planTaskResponse](t, rec); got.Priority != "urgent" {
+		t.Errorf("updated priority = %q, want urgent", got.Priority)
+	}
+
+	rec = env.do(t, http.MethodPatch, "/api/tasks/"+created.ID, `{"priority":"critical"}`)
+	wantStatus(t, rec, http.StatusBadRequest)
+
+	rec = env.do(t, http.MethodPost, "/api/projects/"+project.ID+"/tasks", `{"title":"T2","priority":"critical"}`)
+	wantStatus(t, rec, http.StatusBadRequest)
+
+	rec = env.do(t, http.MethodGet, "/api/projects/"+project.ID+"/plans/"+created.PlanID+"/tasks", "")
+	wantStatus(t, rec, http.StatusOK)
+	list := decode[[]planTaskResponse](t, rec)
+	if len(list) != 1 || list[0].Priority != "urgent" {
+		t.Errorf("plan tasks = %+v, want one urgent task", list)
+	}
+}

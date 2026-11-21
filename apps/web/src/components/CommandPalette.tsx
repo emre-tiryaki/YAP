@@ -1,6 +1,7 @@
 import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useMatch, useNavigate } from "react-router";
 import {
+    FiAlertTriangle,
     FiCheck,
     FiCheckSquare,
     FiCommand,
@@ -36,9 +37,10 @@ import { useProjects } from "../hooks/useProjects";
 import { useSearch } from "../hooks/useSearch";
 import { openSettings } from "../hooks/useSettingsDialog";
 import { openShortcutsDialog } from "../hooks/useShortcutsDialog";
-import { usePlanTasks, useSetTaskDone } from "../hooks/useTasks";
+import { usePlanTasks, useSetTaskDone, useUpdateTask } from "../hooks/useTasks";
 import { pushInfoToast } from "../hooks/useToasts";
 import { useTranslate, type TranslationKey } from "../hooks/useTranslate";
+import { priorities } from "../util/priority";
 import { toSearchGroups } from "../util/searchHits";
 import { CreatePlanForm } from "./CreatePlanForm";
 import { CreateProjectForm } from "./CreateProjectForm";
@@ -156,6 +158,7 @@ function PaletteDialog({ page, context, projectId, onCreate, onDelete }: Palette
         statuses.data ?? [],
     );
     const setDone = useSetTaskDone(context?.projectId ?? "", context?.planId ?? "");
+    const update = useUpdateTask();
     const needle = query.trim().toLowerCase();
     const search = useSearch(needle.length >= 2 ? query : "");
 
@@ -166,7 +169,20 @@ function PaletteDialog({ page, context, projectId, onCreate, onDelete }: Palette
     }
 
     const items: PaletteItem[] = [];
-    if (page === "status") {
+    if (page === "priority") {
+        for (const { value, label, Icon, color } of priorities) {
+            items.push({
+                id: `priority:${value}`,
+                group: t("palette.group.priority"),
+                label: t(label),
+                icon: <Icon aria-hidden className={color} />,
+                checked: task?.priority === value,
+                run: () =>
+                    task &&
+                    update.mutate({ taskId: task.id, input: { priority: value } }),
+            });
+        }
+    } else if (page === "status") {
         for (const status of statuses.data ?? []) {
             items.push({
                 id: `status:${status.id}`,
@@ -196,6 +212,15 @@ function PaletteDialog({ page, context, projectId, onCreate, onDelete }: Palette
                     shortcut: ["S"],
                     keepOpen: true,
                     run: () => setPalettePage("status"),
+                },
+                {
+                    id: "ctx:priority",
+                    group: group("palette.group.context"),
+                    label: t("palette.changePriority"),
+                    icon: <FiAlertTriangle aria-hidden />,
+                    shortcut: ["P"],
+                    keepOpen: true,
+                    run: () => setPalettePage("priority"),
                 },
                 {
                     id: "ctx:done",
@@ -391,7 +416,9 @@ function PaletteDialog({ page, context, projectId, onCreate, onDelete }: Palette
                         placeholder={t(
                             page === "status"
                                 ? "palette.placeholder.status"
-                                : "palette.placeholder",
+                                : page === "priority"
+                                  ? "palette.placeholder.priority"
+                                  : "palette.placeholder",
                         )}
                         aria-label={t("palette.search")}
                         autoComplete="off"

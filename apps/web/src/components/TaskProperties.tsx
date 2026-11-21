@@ -7,6 +7,7 @@ import type { PlanTask, TaskPropertyKey } from "../types/task";
 import { daysFromToday, fromDateInputValue, toDateInputValue } from "../util/date";
 import { DatePicker } from "./DatePicker";
 import { Pill } from "./Pill";
+import { PrioritySelect } from "./PrioritySelect";
 import { PropertySelect } from "./PropertySelect";
 
 type TaskPropertiesProps = {
@@ -55,6 +56,16 @@ export function TaskProperties({
                     projectId={projectId}
                     planId={planId}
                     statuses={statuses}
+                />
+            )}
+            {visible.has("priority") && !isTemp && (
+                <PrioritySelect
+                    variant="pill"
+                    iconOnly={task.priority === "none"}
+                    value={task.priority}
+                    onChange={(priority) =>
+                        update.mutate({ taskId: task.id, input: { priority } })
+                    }
                 />
             )}
             {visible.has("dueDate") && !isTemp && (

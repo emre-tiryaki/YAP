@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/emre-tiryaki/YAP/backend/internal/model"
 )
@@ -10,7 +11,9 @@ var (
 	ErrNotFound     = errors.New("not found")
 	ErrInvalidInput = errors.New("invalid input")
 	ErrConflict     = errors.New("conflict")
-	ErrForbidden    = errors.New("forbidden")
+	// ErrInvalidPriority is an invalid input: the priority is not a known one.
+	ErrInvalidPriority = fmt.Errorf("%w: priority", ErrInvalidInput)
+	ErrForbidden       = errors.New("forbidden")
 	// ErrStale means the caller changed an older revision than the stored one.
 	ErrStale = errors.New("stale revision")
 	// ErrTooLarge means a request body exceeded the allowed size.

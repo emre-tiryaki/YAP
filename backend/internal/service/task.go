@@ -28,7 +28,7 @@ type TaskRepository interface {
 	UpdatePlacement(ctx context.Context, q database.DBTX, workspaceID, taskID, statusID, pos, now string) error
 	SoftDeleteTree(ctx context.Context, q database.DBTX, workspaceID, taskID, now string) error
 	Get(ctx context.Context, q database.DBTX, workspaceID, taskID string) (model.Task, error)
-	Update(ctx context.Context, q database.DBTX, workspaceID, taskID, title, description string, dueDate *time.Time, now string) error
+	Update(ctx context.Context, q database.DBTX, workspaceID, taskID, title, description string, dueDate *time.Time, priority model.TaskPriority, now string) error
 	ListSubtasks(ctx context.Context, q database.DBTX, workspaceID, parentID string) ([]model.Task, error)
 	SetCompletedAt(ctx context.Context, q database.DBTX, workspaceID, taskID string, completedAt *time.Time, now string) error
 }
@@ -37,7 +37,9 @@ type CreateTaskInput struct {
 	Title       string
 	Description string
 	DueDate     *time.Time
-	PlanID      string
+	// Priority is optional; empty means none.
+	Priority model.TaskPriority
+	PlanID   string
 	// StatusID is optional; empty means the plan's first todo status.
 	StatusID string
 }
@@ -69,6 +71,14 @@ func (s *TaskService) Create(ctx context.Context, session model.Session, project
 		return model.Task{}, fmt.Errorf("%w: title is required", ErrInvalidInput)
 	}
 
+	priority := in.Priority
+	if priority == "" {
+		priority = model.PriorityNone
+	}
+	if !priority.Valid() {
+		return model.Task{}, ErrInvalidPriority
+	}
+
 	task := model.Task{
 		ID:          model.NewID(),
 		WorkspaceID: session.WorkspaceID,
@@ -77,6 +87,7 @@ func (s *TaskService) Create(ctx context.Context, session model.Session, project
 		Title:       title,
 		Description: strings.TrimSpace(in.Description),
 		DueDate:     in.DueDate,
+		Priority:    priority,
 	}
 
 	err := database.WithTx(ctx, s.db, func(tx *sql.Tx) error {
@@ -224,13 +235,17 @@ type UpdateTaskInput struct {
 	Description *string
 	DueDate     *time.Time
 	DueDateSet  bool
+	Priority    *model.TaskPriority
 }
 
-// Update changes the title, description and/or due date of a task. Its
+// Update changes the title, description, due date and/or priority of a task. Its
 // placement (plan, status, position) is left alone; use Move for that.
 func (s *TaskService) Update(ctx context.Context, session model.Session, taskID string, in UpdateTaskInput) (model.Task, error) {
-	if in.Title == nil && in.Description == nil && !in.DueDateSet {
+	if in.Title == nil && in.Description == nil && !in.DueDateSet && in.Priority == nil {
 		return model.Task{}, fmt.Errorf("%w: nothing to update", ErrInvalidInput)
+	}
+	if in.Priority != nil && !in.Priority.Valid() {
+		return model.Task{}, ErrInvalidPriority
 	}
 	if in.Title != nil && strings.TrimSpace(*in.Title) == "" {
 		return model.Task{}, fmt.Errorf("%w: title is required", ErrInvalidInput)
@@ -259,7 +274,10 @@ func (s *TaskService) Update(ctx context.Context, session model.Session, taskID 
 				task.DueDate = &due
 			}
 		}
-		return s.tasks.Update(ctx, tx, session.WorkspaceID, taskID, task.Title, task.Description, task.DueDate, nowUTC())
+		if in.Priority != nil {
+			task.Priority = *in.Priority
+		}
+		return s.tasks.Update(ctx, tx, session.WorkspaceID, taskID, task.Title, task.Description, task.DueDate, task.Priority, nowUTC())
 	})
 	if err != nil {
 		return model.Task{}, err

@@ -73,6 +73,7 @@ export function useCreateTask() {
                 statusCategory: statusCategory ?? "todo",
                 position: "",
                 dueDate: input.dueDate,
+                priority: input.priority ?? "none",
                 completedAt: null,
                 subtaskCount: 0,
                 doneSubtaskCount: 0,

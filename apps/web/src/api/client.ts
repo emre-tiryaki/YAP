@@ -20,6 +20,7 @@ import type {
     StatusCategory,
     Subtask,
     Task,
+    TaskPriority,
     UpdateTaskInput,
 } from "../types/task";
 import type { UpdateWorkspaceInput, Workspace } from "../types/workspace";
@@ -109,6 +110,7 @@ type TaskDto = {
     status_id: string;
     position: string;
     due_date: string | null;
+    priority: TaskPriority;
     status_category: StatusCategory;
     completed_at: string | null;
 };
@@ -143,6 +145,7 @@ type PlanTaskDto = {
     status_category: StatusCategory;
     position: string;
     due_date: string | null;
+    priority: TaskPriority;
     completed_at: string | null;
     // Sent for plan tasks; the upcoming list leaves them out.
     subtask_count?: number;
@@ -338,6 +341,7 @@ function toPlanTask(dto: PlanTaskDto): PlanTask {
         statusCategory: dto.status_category,
         position: dto.position,
         dueDate: dto.due_date ? new Date(dto.due_date) : null,
+        priority: dto.priority,
         completedAt: dto.completed_at ? new Date(dto.completed_at) : null,
         subtaskCount: dto.subtask_count ?? 0,
         doneSubtaskCount: dto.done_subtask_count ?? 0,
@@ -469,6 +473,7 @@ export async function createTask(
             title: input.title,
             description: input.description ?? "",
             due_date: input.dueDate ? input.dueDate.toISOString() : null,
+            priority: input.priority ?? "none",
             plan_id: input.planId ?? "",
             status_id: input.statusId ?? "",
         }),
@@ -612,6 +617,7 @@ export async function updateTask(
     if (input.description !== undefined) body.description = input.description;
     if (input.dueDate !== undefined)
         body.due_date = input.dueDate ? input.dueDate.toISOString() : null;
+    if (input.priority !== undefined) body.priority = input.priority;
     const dto = await request<PlanTaskDto>(`/api/tasks/${taskId}`, {
         method: "PATCH",
         body: JSON.stringify(body),

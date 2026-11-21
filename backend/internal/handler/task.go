@@ -41,6 +41,7 @@ type taskResponse struct {
 	StatusID       string  `json:"status_id"`
 	Position       string  `json:"position"`
 	DueDate        *string `json:"due_date"`
+	Priority       string  `json:"priority"`
 	StatusCategory string  `json:"status_category"`
 	CompletedAt    *string `json:"completed_at"`
 }
@@ -49,6 +50,7 @@ type createTaskRequest struct {
 	Title       string  `json:"title"`
 	Description string  `json:"description"`
 	DueDate     *string `json:"due_date"`
+	Priority    string  `json:"priority"`
 	PlanID      string  `json:"plan_id"`
 	StatusID    string  `json:"status_id"`
 }
@@ -61,6 +63,7 @@ type planTaskResponse struct {
 	StatusCategory   string  `json:"status_category"`
 	Position         string  `json:"position"`
 	DueDate          *string `json:"due_date"`
+	Priority         string  `json:"priority"`
 	CompletedAt      *string `json:"completed_at"`
 	SubtaskCount     int     `json:"subtask_count"`
 	DoneSubtaskCount int     `json:"done_subtask_count"`
@@ -110,6 +113,7 @@ func toTaskResponse(t model.Task) taskResponse {
 		Position:       t.Position,
 		StatusCategory: string(t.StatusCategory),
 		DueDate:        formatTime(t.DueDate),
+		Priority:       string(t.Priority),
 		CompletedAt:    formatTime(t.CompletedAt),
 	}
 }
@@ -123,6 +127,7 @@ func toPlanTaskResponse(t model.Task) planTaskResponse {
 		StatusCategory:   string(t.StatusCategory),
 		Position:         t.Position,
 		DueDate:          formatTime(t.DueDate),
+		Priority:         string(t.Priority),
 		CompletedAt:      formatTime(t.CompletedAt),
 		SubtaskCount:     t.SubtaskCount,
 		DoneSubtaskCount: t.DoneSubtaskCount,
@@ -176,6 +181,7 @@ func (h *TaskHandler) create(w http.ResponseWriter, r *http.Request) {
 		Title:       req.Title,
 		Description: req.Description,
 		DueDate:     due,
+		Priority:    model.TaskPriority(req.Priority),
 		PlanID:      req.PlanID,
 		StatusID:    req.StatusID,
 	})
@@ -243,6 +249,7 @@ type updateTaskRequest struct {
 	Title       *string         `json:"title"`
 	Description *string         `json:"description"`
 	DueDate     json.RawMessage `json:"due_date"`
+	Priority    *string         `json:"priority"`
 }
 
 func (h *TaskHandler) update(w http.ResponseWriter, r *http.Request) {
@@ -252,6 +259,10 @@ func (h *TaskHandler) update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in := service.UpdateTaskInput{Title: req.Title, Description: req.Description}
+	if req.Priority != nil {
+		priority := model.TaskPriority(*req.Priority)
+		in.Priority = &priority
+	}
 	if req.DueDate != nil {
 		var raw *string
 		if err := json.Unmarshal(req.DueDate, &raw); err != nil {

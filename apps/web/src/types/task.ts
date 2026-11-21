@@ -2,7 +2,14 @@ export type StatusCategory = "todo" | "in_progress" | "done";
 
 // Properties a task row or card can show inline; the display options (T13)
 // choose which.
-export type TaskPropertyKey = "status" | "dueDate" | "subtasks" | "comments";
+export type TaskPropertyKey =
+  | "status"
+  | "priority"
+  | "dueDate"
+  | "subtasks"
+  | "comments";
+
+export type TaskPriority = "urgent" | "high" | "medium" | "low" | "none";
 
 export type PlanTask = {
   id: string;
@@ -12,6 +19,7 @@ export type PlanTask = {
   statusCategory: StatusCategory;
   position: string;
   dueDate: Date | null;
+  priority: TaskPriority;
   // Set while the task is finished; independent of the status it sits in.
   completedAt: Date | null;
   subtaskCount: number;
@@ -29,6 +37,7 @@ export type Task = PlanTask & {
 export type CreateTaskInput = {
   title: string
   dueDate: Date | null
+  priority?: TaskPriority
   description?: string
   planId?: string
   statusId?: string
@@ -45,6 +54,7 @@ export type UpdateTaskInput = {
   title?: string
   description?: string
   dueDate?: Date | null
+  priority?: TaskPriority
 }
 
 // A direct child of a task, shown as a checklist item inside its parent.

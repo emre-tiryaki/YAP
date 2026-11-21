@@ -386,6 +386,13 @@ func (im *importer) tasks(ctx context.Context, tx *sql.Tx) error {
 			continue
 		}
 		t.ID = id
+		// Exports made before priorities existed carry none.
+		if t.Priority == "" {
+			t.Priority = string(model.PriorityNone)
+		}
+		if !model.TaskPriority(t.Priority).Valid() {
+			return fmt.Errorf("%w: task priority %q", ErrInvalidInput, t.Priority)
+		}
 		t.ProjectID = im.ids[t.ProjectID]
 		t.PlanID = im.ids[t.PlanID]
 		t.StatusID = im.ids[t.StatusID]

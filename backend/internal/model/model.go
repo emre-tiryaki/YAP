@@ -69,6 +69,26 @@ type Status struct {
 	Position    string
 }
 
+// TaskPriority orders tasks by urgency; PriorityNone means unset.
+type TaskPriority string
+
+const (
+	PriorityUrgent TaskPriority = "urgent"
+	PriorityHigh   TaskPriority = "high"
+	PriorityMedium TaskPriority = "medium"
+	PriorityLow    TaskPriority = "low"
+	PriorityNone   TaskPriority = "none"
+)
+
+// Valid reports whether p is one of the known priorities.
+func (p TaskPriority) Valid() bool {
+	switch p {
+	case PriorityUrgent, PriorityHigh, PriorityMedium, PriorityLow, PriorityNone:
+		return true
+	}
+	return false
+}
+
 type Task struct {
 	ID             string
 	WorkspaceID    string
@@ -82,6 +102,7 @@ type Task struct {
 	Position       string
 	StatusCategory StatusCategory
 	DueDate        *time.Time
+	Priority       TaskPriority
 	// CompletedAt is set while the task is finished. It does not depend on
 	// the task's status: moving a task between columns leaves it alone.
 	CompletedAt *time.Time
@@ -267,6 +288,8 @@ type ImportTask struct {
 	DueDate     *string `json:"due_date"`
 	CreatedAt   string  `json:"created_at"`
 	CompletedAt *string `json:"completed_at"`
+	// Empty in exports made before priorities existed.
+	Priority string `json:"priority"`
 }
 
 type ImportAssignee struct {

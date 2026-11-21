@@ -644,5 +644,15 @@
     "palette.toggleSidebar": "Kenar çubuğunu aç/kapat",
     "palette.shortcuts": "Klavye kısayolları",
     "palette.settings": "Ayarlar",
-    "palette.search": "Ara"
+    "palette.search": "Ara",
+    "task.priority.urgent": "Acil",
+    "task.priority.high": "Yüksek",
+    "task.priority.medium": "Orta",
+    "task.priority.low": "Düşük",
+    "task.priority.none": "Öncelik yok",
+    "task.property.priority": "Öncelik",
+    "palette.changePriority": "Önceliği değiştir...",
+    "palette.placeholder.priority": "Bir öncelik seçin...",
+    "palette.group.priority": "Öncelik",
+    "settings.shortcuts.changePriority": "Açık görevin önceliğini değiştir"
 }

@@ -41,6 +41,7 @@ export const shortcutGroups: ShortcutGroup[] = [
         title: "settings.shortcuts.group.tasks",
         items: [
             { label: "settings.shortcuts.changeStatus", keys: ["S"], global: true },
+            { label: "settings.shortcuts.changePriority", keys: ["P"], global: true },
             { label: "settings.shortcuts.dueDate", keys: ["D"], global: true },
             { label: "settings.shortcuts.sendComment", keys: ["mod", "Enter"], global: false },
         ],

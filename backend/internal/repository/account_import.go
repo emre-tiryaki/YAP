@@ -139,16 +139,16 @@ func (*AccountRepository) InsertStatus(ctx context.Context, q database.DBTX, wor
 func (*AccountRepository) InsertTask(ctx context.Context, q database.DBTX, workspaceID, createdBy string, t model.ImportTask, now string) error {
 	_, err := q.ExecContext(ctx,
 		`INSERT INTO tasks (id, workspace_id, project_id, plan_id, status_id, parent_id, created_by, title, description,
-		                    position, due_date, completed_at, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		                    position, due_date, priority, completed_at, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		 ON CONFLICT (id) DO UPDATE SET project_id = excluded.project_id, plan_id = excluded.plan_id,
 		     status_id = excluded.status_id, parent_id = excluded.parent_id, created_by = excluded.created_by,
 		     title = excluded.title, description = excluded.description, position = excluded.position,
-		     due_date = excluded.due_date, completed_at = excluded.completed_at, created_at = excluded.created_at,
+		     due_date = excluded.due_date, priority = excluded.priority, completed_at = excluded.completed_at, created_at = excluded.created_at,
 		     updated_at = excluded.updated_at, deleted_at = NULL
 		   WHERE tasks.workspace_id = excluded.workspace_id`,
 		t.ID, workspaceID, t.ProjectID, t.PlanID, t.StatusID, t.ParentID, createdBy, t.Title, t.Description,
-		t.Position, t.DueDate, t.CompletedAt, t.CreatedAt, now,
+		t.Position, t.DueDate, t.Priority, t.CompletedAt, t.CreatedAt, now,
 	)
 	if err != nil {
 		return fmt.Errorf("import task: %w", err)
