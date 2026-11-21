@@ -88,10 +88,10 @@ export function DatePicker({
             aria-haspopup="dialog"
             aria-expanded={isOpen}
             onClick={() => setIsOpen(!isOpen)}
-            className="flex w-full cursor-pointer items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-left text-sm hover:border-gray-400"
+            className="flex w-full cursor-pointer items-center gap-2 rounded-md border border-line-strong bg-surface-1 px-3 py-2 text-left text-sm hover:border-gray-400"
         >
-            <FiCalendar aria-hidden className="shrink-0 text-gray-500" />
-            <span className={selected ? "text-gray-900" : "text-gray-400"}>
+            <FiCalendar aria-hidden className="shrink-0 text-fg-subtle" />
+            <span className={selected ? "text-fg" : "text-fg-placeholder"}>
                 {selected ? format.date(selected) : t("datePicker.placeholder")}
             </span>
         </button>
@@ -100,7 +100,7 @@ export function DatePicker({
     return (
         <>
             {showLabel ? (
-                <label className="flex flex-col gap-1 text-sm text-gray-700">
+                <label className="flex flex-col gap-1 text-sm text-fg-muted">
                     {label}
                     {field}
                 </label>
@@ -239,7 +239,7 @@ function Calendar({
             aria-modal="false"
             aria-label={label}
             style={{ top: position.top, left: position.left, width: POPOVER_WIDTH }}
-            className="fixed z-[60] rounded-lg border border-gray-200 bg-white p-3 shadow-xl"
+            className="fixed z-[60] rounded-lg border border-line bg-surface-1 p-3 shadow-xl"
         >
             <div className="mb-2 flex items-center justify-between">
                 <button
@@ -247,14 +247,14 @@ function Calendar({
                     onClick={() => shift(0, -1)}
                     aria-label={t("datePicker.previousMonth")}
                     title={t("datePicker.previousMonth")}
-                    className="cursor-pointer rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+                    className="cursor-pointer rounded-md p-1.5 text-fg-subtle hover:bg-layer-1-hover hover:text-fg"
                 >
                     <FiChevronLeft aria-hidden />
                 </button>
                 <p
                     id={titleId}
                     aria-live="polite"
-                    className="text-sm font-semibold text-gray-900 capitalize"
+                    className="text-sm font-semibold text-fg capitalize"
                 >
                     {focused.toLocaleDateString(format.locale, {
                         month: "long",
@@ -266,7 +266,7 @@ function Calendar({
                     onClick={() => shift(0, 1)}
                     aria-label={t("datePicker.nextMonth")}
                     title={t("datePicker.nextMonth")}
-                    className="cursor-pointer rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+                    className="cursor-pointer rounded-md p-1.5 text-fg-subtle hover:bg-layer-1-hover hover:text-fg"
                 >
                     <FiChevronRight aria-hidden />
                 </button>
@@ -283,7 +283,7 @@ function Calendar({
                     <span
                         key={name}
                         role="columnheader"
-                        className="py-1 text-xs font-medium text-gray-400"
+                        className="py-1 text-xs font-medium text-fg-placeholder"
                     >
                         {name}
                     </span>
@@ -303,8 +303,8 @@ function Calendar({
                             aria-current={sameDay(day, today) ? "date" : undefined}
                             aria-label={format.date(day)}
                             onClick={() => onSelect(day)}
-                            className={`size-9 cursor-pointer rounded-md text-sm hover:bg-gray-100 aria-[current=date]:font-bold aria-selected:bg-accent aria-selected:text-accent-fg ${
-                                isOtherMonth ? "text-gray-300" : "text-gray-700"
+                            className={`size-9 cursor-pointer rounded-md text-sm hover:bg-layer-1-hover aria-[current=date]:font-bold aria-selected:bg-accent aria-selected:text-accent-fg ${
+                                isOtherMonth ? "text-line-strong" : "text-fg-muted"
                             }`}
                         >
                             {day.getDate()}
@@ -313,11 +313,11 @@ function Calendar({
                 })}
             </div>
 
-            <div className="mt-2 flex justify-between border-t border-gray-100 pt-2">
+            <div className="mt-2 flex justify-between border-t border-line pt-2">
                 <button
                     type="button"
                     onClick={() => onSelect(today)}
-                    className="cursor-pointer rounded-md px-2 py-1 text-sm text-gray-700 hover:bg-gray-100"
+                    className="cursor-pointer rounded-md px-2 py-1 text-sm text-fg-muted hover:bg-layer-1-hover"
                 >
                     {t("datePicker.today")}
                 </button>
@@ -325,7 +325,7 @@ function Calendar({
                     type="button"
                     onClick={() => onSelect(null)}
                     disabled={selected === null}
-                    className="cursor-pointer rounded-md px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent"
+                    className="cursor-pointer rounded-md px-2 py-1 text-sm text-fg-subtle hover:bg-layer-1-hover disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent"
                 >
                     {t("datePicker.clear")}
                 </button>

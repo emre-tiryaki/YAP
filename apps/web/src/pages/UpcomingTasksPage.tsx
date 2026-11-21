@@ -52,7 +52,7 @@ export default function UpcomingTasksPage() {
                     <h1 className="text-2xl font-bold">
                         {t("workspace.tasks.title")}
                         {tasks.data && (
-                            <span className="ml-2 text-base font-normal text-gray-400 tabular-nums">
+                            <span className="ml-2 text-base font-normal text-fg-placeholder tabular-nums">
                                 {shown.length}
                             </span>
                         )}

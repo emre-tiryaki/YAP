@@ -75,7 +75,7 @@ export default function ResourcesPage({ view = "browse" }: { view?: "browse" | "
 
     let body: ReactNode;
     if (resources.isLoading) {
-        body = <p className="p-6 text-sm text-gray-400">{t("common.loading")}</p>;
+        body = <p className="p-6 text-sm text-fg-placeholder">{t("common.loading")}</p>;
     } else if (resources.isError) {
         body = (
             <div className="p-6">
@@ -86,9 +86,9 @@ export default function ResourcesPage({ view = "browse" }: { view?: "browse" | "
         body = <TrashPane items={trash.data ?? []} isLoading={trash.isLoading} />;
     } else if (resourceId && !current) {
         body = fallback.isLoading ? (
-            <p className="p-6 text-sm text-gray-400">{t("common.loading")}</p>
+            <p className="p-6 text-sm text-fg-placeholder">{t("common.loading")}</p>
         ) : (
-            <p className="p-6 text-sm text-gray-500">{t("resources.error.notFound")}</p>
+            <p className="p-6 text-sm text-fg-subtle">{t("resources.error.notFound")}</p>
         );
     } else if (current?.isRepository && !current.trashedAt) {
         body = (
@@ -121,7 +121,7 @@ export default function ResourcesPage({ view = "browse" }: { view?: "browse" | "
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <PageHeader breadcrumb={breadcrumb} />
             <div className="flex min-h-0 flex-1">
-                <aside style={{ width }} className="flex shrink-0 flex-col border-r border-gray-200 bg-gray-50">
+                <aside style={{ width }} className="flex shrink-0 flex-col border-r border-line bg-layer-1">
                     <ResourceTree
                         index={index}
                         selectedId={view === "trash" ? undefined : current?.trashedAt ? undefined : (current?.id ?? null)}
@@ -138,7 +138,7 @@ export default function ResourcesPage({ view = "browse" }: { view?: "browse" | "
                         <div
                             role={ops.notice ? "alert" : "status"}
                             className={`flex items-center gap-3 border-b px-4 py-2 text-sm ${
-                                ops.notice ? "border-red-200 bg-red-50 text-red-700" : "border-gray-200 bg-gray-50 text-gray-600"
+                                ops.notice ? "border-red-200 bg-red-50 text-red-700" : "border-line bg-layer-1 text-fg-muted"
                             }`}
                         >
                             <span className="flex-1">{ops.notice ?? ops.busy}</span>
@@ -232,12 +232,12 @@ function FolderPane({ folder, index, ops, mode, onModeChange, menuItems, onDrop,
     ];
 
     const toolButton =
-        "flex cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-gray-700 hover:bg-gray-100 disabled:cursor-default disabled:opacity-40";
+        "flex cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-fg-muted hover:bg-layer-1-hover disabled:cursor-default disabled:opacity-40";
 
     return (
         <div className="flex min-h-0 flex-1 flex-col">
-            <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-gray-200 px-4 pt-3">
-                <h1 className="flex min-w-0 items-center gap-2 pb-2 text-lg font-semibold text-gray-900">
+            <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line px-4 pt-3">
+                <h1 className="flex min-w-0 items-center gap-2 pb-2 text-lg font-semibold text-fg">
                     {folder && <ResourceIcon resource={folder} isOpen className="text-xl" />}
                     <span className="truncate">{folder?.name ?? t("resources.title")}</span>
                     {folder && <ResourceMenu items={menuItems(folder)} isSubtle={false} />}
@@ -247,7 +247,7 @@ function FolderPane({ folder, index, ops, mode, onModeChange, menuItems, onDrop,
             </header>
             {tab === "content" && (
                 <>
-                    <div className="flex flex-wrap items-center gap-1 border-b border-gray-100 px-3 py-1.5">
+                    <div className="flex flex-wrap items-center gap-1 border-b border-line px-3 py-1.5">
                         <button type="button" className={toolButton} onClick={() => ops.startCreate("folder", folderId)}>
                             <FiFolderPlus aria-hidden />
                             {t("resources.newFolder")}
@@ -290,11 +290,11 @@ function FolderPane({ folder, index, ops, mode, onModeChange, menuItems, onDrop,
                         />
                         <span className="flex-1" />
                         {liveSelection.length > 1 && (
-                            <span className="px-2 text-xs text-gray-500">
+                            <span className="px-2 text-xs text-fg-subtle">
                                 {t("resources.selected").replace("{count}", String(liveSelection.length))}
                             </span>
                         )}
-                        <div role="radiogroup" aria-label={t("resources.view.label")} className="flex rounded-md border border-gray-300 p-0.5">
+                        <div role="radiogroup" aria-label={t("resources.view.label")} className="flex rounded-md border border-line-strong p-0.5">
                             {(
                                 [
                                     ["list", FiList, "resources.view.list"],
@@ -309,7 +309,7 @@ function FolderPane({ folder, index, ops, mode, onModeChange, menuItems, onDrop,
                                     aria-label={t(label)}
                                     title={t(label)}
                                     onClick={() => onModeChange(value)}
-                                    className={`cursor-pointer rounded px-2 py-1 ${mode === value ? "bg-accent text-accent-fg" : "text-gray-600 hover:bg-gray-100"}`}
+                                    className={`cursor-pointer rounded px-2 py-1 ${mode === value ? "bg-accent text-accent-fg" : "text-fg-muted hover:bg-layer-1-hover"}`}
                                 >
                                     <Icon aria-hidden />
                                 </button>
@@ -371,14 +371,14 @@ function ItemPane({ resource, ops, menu }: ItemPaneProps) {
 
     return (
         <div className="flex min-h-0 flex-1 flex-col">
-            <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-gray-200 px-4 pt-3">
+            <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line px-4 pt-3">
                 <div className="min-w-0 pb-2">
-                    <h1 className="flex min-w-0 items-center gap-2 text-lg font-semibold text-gray-900">
+                    <h1 className="flex min-w-0 items-center gap-2 text-lg font-semibold text-fg">
                         <ResourceIcon resource={resource} className="text-xl" />
                         <span className="truncate">{resource.name}</span>
                         {!isTrashed && <ResourceMenu items={menu} isSubtle={false} />}
                     </h1>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-fg-subtle">
                         {resource.kind === "file" && `${formatSize(resource.size)} · `}
                         {t("resources.column.modified")}: {format.dateTime(resource.updatedAt)}
                     </p>
@@ -388,7 +388,7 @@ function ItemPane({ resource, ops, menu }: ItemPaneProps) {
                     <button
                         type="button"
                         onClick={() => ops.download(resource)}
-                        className="mb-2 flex cursor-pointer items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-100"
+                        className="mb-2 flex cursor-pointer items-center gap-1.5 rounded-md border border-line-strong px-3 py-1.5 text-sm hover:bg-layer-1-hover"
                     >
                         <FiDownload aria-hidden />
                         {t("resources.download")}
@@ -406,7 +406,7 @@ function ItemPane({ resource, ops, menu }: ItemPaneProps) {
                             type="button"
                             disabled={restore.isPending}
                             onClick={() => restore.mutate(resource.id)}
-                            className="cursor-pointer rounded-md border border-amber-300 bg-white px-3 py-1 hover:bg-amber-100"
+                            className="cursor-pointer rounded-md border border-amber-300 bg-surface-1 px-3 py-1 hover:bg-amber-100"
                         >
                             {t("resources.restore")}
                         </button>
@@ -417,7 +417,7 @@ function ItemPane({ resource, ops, menu }: ItemPaneProps) {
                 (resource.kind === "file" ? (
                     <FilePreview resource={resource} onDownload={() => ops.download(resource)} />
                 ) : (
-                    <p className="p-6 text-sm text-gray-500">{t("resources.trashedFolder")}</p>
+                    <p className="p-6 text-sm text-fg-subtle">{t("resources.trashedFolder")}</p>
                 ))}
             {tab === "activity" && (
                 <div className="flex-1 overflow-y-auto p-6">
@@ -444,9 +444,9 @@ function TrashPane({ items, isLoading }: { items: Resource[]; isLoading: boolean
 
     return (
         <div className="flex min-h-0 flex-1 flex-col">
-            <header className="flex items-center gap-4 border-b border-gray-200 px-4 py-3">
-                <h1 className="flex items-center gap-2 text-lg font-semibold text-gray-900">
-                    <FiTrash2 aria-hidden className="text-gray-500" />
+            <header className="flex items-center gap-4 border-b border-line px-4 py-3">
+                <h1 className="flex items-center gap-2 text-lg font-semibold text-fg">
+                    <FiTrash2 aria-hidden className="text-fg-subtle" />
                     {t("resources.trash")}
                 </h1>
                 <span className="flex-1" />
@@ -465,11 +465,11 @@ function TrashPane({ items, isLoading }: { items: Resource[]; isLoading: boolean
                 </p>
             )}
             <div className="flex-1 overflow-y-auto p-4">
-                {isLoading && <p className="text-sm text-gray-400">{t("common.loading")}</p>}
-                {!isLoading && items.length === 0 && <p className="text-sm text-gray-400">{t("resources.trash.nothing")}</p>}
+                {isLoading && <p className="text-sm text-fg-placeholder">{t("common.loading")}</p>}
+                {!isLoading && items.length === 0 && <p className="text-sm text-fg-placeholder">{t("resources.trash.nothing")}</p>}
                 {items.length > 0 && (
                     <table className="w-full table-fixed text-left text-sm">
-                        <thead className="border-b border-gray-200 text-xs text-gray-500">
+                        <thead className="border-b border-line text-xs text-fg-subtle">
                             <tr>
                                 <th scope="col" className="px-3 py-2 font-medium">{t("resources.column.name")}</th>
                                 <th scope="col" className="w-44 px-3 py-2 font-medium">{t("resources.column.trashed")}</th>
@@ -478,19 +478,19 @@ function TrashPane({ items, isLoading }: { items: Resource[]; isLoading: boolean
                         </thead>
                         <tbody>
                             {items.map((r) => (
-                                <tr key={r.id} className="hover:bg-gray-50">
+                                <tr key={r.id} className="hover:bg-layer-2-hover">
                                     <td className="px-3 py-1.5">
                                         <span className="flex min-w-0 items-center gap-2">
                                             <ResourceIcon resource={r} className="text-base" />
                                             <span className="truncate" title={r.name}>{r.name}</span>
                                         </span>
                                     </td>
-                                    <td className="px-3 py-1.5 text-gray-500">{r.trashedAt && format.dateTime(r.trashedAt)}</td>
+                                    <td className="px-3 py-1.5 text-fg-subtle">{r.trashedAt && format.dateTime(r.trashedAt)}</td>
                                     <td className="px-3 py-1.5 text-right">
                                         <button
                                             type="button"
                                             onClick={() => restore.mutate(r.id)}
-                                            className="mr-2 inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-gray-700 hover:bg-gray-100"
+                                            className="mr-2 inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-fg-muted hover:bg-layer-1-hover"
                                         >
                                             <FiRotateCcw aria-hidden />
                                             {t("resources.restore")}

@@ -89,7 +89,7 @@ export function TaskList({
                 />
             )}
             {isLoading && (
-                <p className="text-sm text-gray-500">{t("common.loading")}</p>
+                <p className="text-sm text-fg-subtle">{t("common.loading")}</p>
             )}
             {isError && (
                 <p className="text-sm text-red-600">{t("common.error")}</p>
@@ -124,7 +124,7 @@ export function TaskList({
                                     className={`mb-2 flex items-center gap-2 text-xs font-semibold tracking-wide uppercase ${
                                         isOverdue
                                             ? "text-red-600"
-                                            : "text-gray-500"
+                                            : "text-fg-subtle"
                                     }`}
                                 >
                                     {groupLabel(group.date)}
@@ -133,7 +133,7 @@ export function TaskList({
                                             {t("workspace.tasks.overdue")}
                                         </span>
                                     )}
-                                    <span className="font-normal text-gray-400">
+                                    <span className="font-normal text-fg-placeholder">
                                         {group.tasks.length}
                                     </span>
                                 </h3>

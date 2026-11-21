@@ -30,6 +30,7 @@ import {
     updatePreferences,
     usePreferences,
 } from "../hooks/usePreferences";
+import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useProjects } from "../hooks/useProjects";
 import { useShortcut } from "../hooks/useShortcut";
 import { useSidebarExpanded } from "../hooks/useSidebarExpanded";
@@ -83,7 +84,10 @@ export function Sidebar() {
     const projects = useProjects();
     const workspace = useWorkspace();
     const expandedIds = useSidebarExpanded();
-    const { sidebarCollapsed: collapsed, sidebarWidth } = usePreferences();
+    const { sidebarCollapsed, sidebarWidth } = usePreferences();
+    // Narrow screens always get the icon rail.
+    const isNarrow = useMediaQuery("(max-width: 767px)");
+    const collapsed = sidebarCollapsed || isNarrow;
     // The width while the handle is dragged; saved on release.
     const [dragWidth, setDragWidth] = useState<number | null>(null);
     const [dragStart, setDragStart] = useState<{ x: number; width: number } | null>(
@@ -164,7 +168,9 @@ export function Sidebar() {
                     <button
                         type="button"
                         onClick={() =>
-                            updatePreferences({ sidebarCollapsed: !collapsed })
+                            updatePreferences({
+                                sidebarCollapsed: !sidebarCollapsed,
+                            })
                         }
                         aria-label={collapseLabel}
                         aria-expanded={!collapsed}

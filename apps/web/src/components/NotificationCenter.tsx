@@ -29,7 +29,7 @@ type IconType = ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
 const icons: Record<AppNotificationKind, { Icon: IconType; tone: string }> = {
     dueSoon: { Icon: FiClock, tone: "text-accent" },
     overdue: { Icon: FiAlertCircle, tone: "text-red-600" },
-    comment: { Icon: FiMessageSquare, tone: "text-gray-500" },
+    comment: { Icon: FiMessageSquare, tone: "text-fg-subtle" },
     info: { Icon: FiCheck, tone: "text-accent" },
 };
 
@@ -132,11 +132,11 @@ function Toast({ toast }: { toast: AppNotification }) {
         <>
             <Icon aria-hidden className={`mt-0.5 shrink-0 ${tone}`} />
             <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium text-gray-900">
+                <span className="block truncate text-sm font-medium text-fg">
                     {toast.title}
                 </span>
                 {toast.body && (
-                    <span className="line-clamp-2 block text-xs text-gray-500">
+                    <span className="line-clamp-2 block text-xs text-fg-subtle">
                         {toast.body}
                     </span>
                 )}
@@ -145,7 +145,7 @@ function Toast({ toast }: { toast: AppNotification }) {
     );
 
     return (
-        <div className="flex items-start gap-1 rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
+        <div className="flex items-start gap-1 rounded-lg border border-line bg-surface-1 p-3 shadow-lg">
             {toast.href ? (
                 <button
                     type="button"
@@ -167,7 +167,7 @@ function Toast({ toast }: { toast: AppNotification }) {
                 onClick={() => dismissToast(toast.id)}
                 aria-label={t("common.close")}
                 title={t("common.close")}
-                className="shrink-0 cursor-pointer rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                className="shrink-0 cursor-pointer rounded p-1 text-fg-placeholder hover:bg-layer-1-hover hover:text-fg-muted"
             >
                 <FiX aria-hidden />
             </button>

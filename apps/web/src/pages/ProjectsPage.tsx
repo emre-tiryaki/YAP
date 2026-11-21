@@ -110,7 +110,7 @@ export default function ProjectsPage() {
                     <h1 className="text-2xl font-bold">
                         {t("workspace.projects.title")}
                         {projects.data && (
-                            <span className="ml-2 text-base font-normal text-gray-400 tabular-nums">
+                            <span className="ml-2 text-base font-normal text-fg-placeholder tabular-nums">
                                 {all.length}
                             </span>
                         )}
@@ -118,10 +118,10 @@ export default function ProjectsPage() {
                 </div>
 
                 <div className="mb-6 flex flex-wrap items-center gap-3">
-                    <div className="relative min-w-56 flex-1">
+                    <div className="relative min-w-40 flex-1">
                         <FiSearch
                             aria-hidden
-                            className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-gray-400"
+                            className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-fg-placeholder"
                         />
                         <input
                             type="search"
@@ -131,7 +131,7 @@ export default function ProjectsPage() {
                             }
                             placeholder={t("projects.search")}
                             aria-label={t("projects.search")}
-                            className="w-full rounded-md border border-gray-300 bg-white py-1.5 pr-3 pl-8 text-sm"
+                            className="w-full rounded-md border border-line-strong bg-surface-1 py-1.5 pr-3 pl-8 text-sm"
                         />
                     </div>
                     <PropertySelect
@@ -181,7 +181,7 @@ export default function ProjectsPage() {
                 </div>
 
                 {projects.isLoading && (
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-fg-subtle">
                         {t("common.loading")}
                     </p>
                 )}
@@ -192,8 +192,8 @@ export default function ProjectsPage() {
                     />
                 )}
                 {projects.isSuccess && shown.length === 0 && (
-                    <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-gray-300 p-8 text-center">
-                        <p className="text-sm text-gray-600">
+                    <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-line-strong p-8 text-center">
+                        <p className="text-sm text-fg-muted">
                             {isFiltered
                                 ? t("projects.noMatch")
                                 : t("workspace.projects.empty")}
@@ -212,7 +212,7 @@ export default function ProjectsPage() {
                                         { replace: true },
                                     )
                                 }
-                                className="cursor-pointer rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
+                                className="cursor-pointer rounded-md border border-line-strong px-3 py-1.5 text-sm text-fg-muted hover:bg-layer-1-hover"
                             >
                                 {t("projects.clearFilters")}
                             </button>

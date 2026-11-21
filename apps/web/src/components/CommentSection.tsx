@@ -59,7 +59,7 @@ export function CommentSection({ taskId }: CommentSectionProps) {
                 />
             )}
             {comments.isSuccess && items.length === 0 && (
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-fg-subtle">
                     {t("task.detail.commentsEmpty")}
                 </p>
             )}
@@ -77,7 +77,7 @@ export function CommentSection({ taskId }: CommentSectionProps) {
 
             <form
                 onSubmit={handleSubmit}
-                className="flex flex-col gap-2 rounded-lg border border-gray-300 bg-white p-2 focus-within:border-gray-500"
+                className="flex flex-col gap-2 rounded-lg border border-line-strong bg-surface-1 p-2 focus-within:border-gray-500"
             >
                 <textarea
                     aria-label={t("task.detail.commentPlaceholder")}
@@ -90,7 +90,7 @@ export function CommentSection({ taskId }: CommentSectionProps) {
                     className="field-sizing-content max-h-60 min-h-12 w-full resize-none px-1 text-sm focus:outline-none"
                 />
                 <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs text-fg-placeholder">
                         {t("task.detail.commentHint")}
                     </span>
                     <Button variant="primary" size="lg"
@@ -159,20 +159,20 @@ function CommentItem({ taskId, comment }: CommentItemProps) {
             </span>
             <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <div className="flex items-baseline gap-2">
-                    <span className="text-sm font-medium text-gray-900">
+                    <span className="text-sm font-medium text-fg">
                         {comment.authorName}
                     </span>
                     <time
                         dateTime={comment.createdAt.toISOString()}
                         title={format.dateTime(comment.createdAt)}
-                        className="text-xs text-gray-500"
+                        className="text-xs text-fg-subtle"
                     >
                         {when}
                     </time>
                     {isEdited && (
                         <span
                             title={format.dateTime(comment.updatedAt)}
-                            className="text-xs text-gray-400"
+                            className="text-xs text-fg-placeholder"
                         >
                             ({t("task.detail.commentEdited")})
                         </span>
@@ -184,7 +184,7 @@ function CommentItem({ taskId, comment }: CommentItemProps) {
                                 onClick={() => setIsEditing(true)}
                                 aria-label={t("task.detail.editComment")}
                                 title={t("task.detail.editComment")}
-                                className="cursor-pointer rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                                className="cursor-pointer rounded p-1 text-fg-placeholder hover:bg-layer-1-hover hover:text-fg-muted"
                             >
                                 <FiEdit2 aria-hidden className="size-3.5" />
                             </button>
@@ -193,7 +193,7 @@ function CommentItem({ taskId, comment }: CommentItemProps) {
                                 onClick={() => setIsConfirmingDelete(true)}
                                 aria-label={t("task.detail.deleteComment")}
                                 title={t("task.detail.deleteComment")}
-                                className="cursor-pointer rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                                className="cursor-pointer rounded p-1 text-fg-placeholder hover:bg-red-50 hover:text-red-600"
                             >
                                 <FiTrash2 aria-hidden className="size-3.5" />
                             </button>
@@ -218,7 +218,7 @@ function CommentItem({ taskId, comment }: CommentItemProps) {
                                 }
                                 submitOnModEnter(event);
                             }}
-                            className="field-sizing-content min-h-16 w-full resize-none rounded-md border border-gray-300 p-2 text-sm focus:border-gray-500 focus:outline-none"
+                            className="field-sizing-content min-h-16 w-full resize-none rounded-md border border-line-strong p-2 text-sm focus:border-gray-500 focus:outline-none"
                         />
                         <div className="flex gap-2">
                             <Button variant="primary" size="md"
@@ -230,7 +230,7 @@ function CommentItem({ taskId, comment }: CommentItemProps) {
                             <button
                                 type="button"
                                 onClick={cancelEdit}
-                                className="cursor-pointer rounded-md px-3 py-1 text-sm text-gray-600 hover:bg-gray-100"
+                                className="cursor-pointer rounded-md px-3 py-1 text-sm text-fg-muted hover:bg-layer-1-hover"
                             >
                                 {t("common.cancel")}
                             </button>
@@ -244,10 +244,10 @@ function CommentItem({ taskId, comment }: CommentItemProps) {
                         />
                     </form>
                 ) : (
-                    <div className="rounded-lg rounded-tl-none bg-gray-50 px-3 py-2">
+                    <div className="rounded-lg rounded-tl-none bg-layer-1 px-3 py-2">
                         <ExpandableText
                             text={comment.body}
-                            className="text-sm text-gray-800"
+                            className="text-sm text-fg"
                         />
                     </div>
                 )}
@@ -257,7 +257,7 @@ function CommentItem({ taskId, comment }: CommentItemProps) {
                         role="alert"
                         className="flex flex-wrap items-center gap-2 text-sm"
                     >
-                        <span className="text-gray-700">
+                        <span className="text-fg-muted">
                             {t("task.detail.deleteCommentConfirm")}
                         </span>
                         <button
@@ -274,7 +274,7 @@ function CommentItem({ taskId, comment }: CommentItemProps) {
                                 setIsConfirmingDelete(false);
                                 remove.reset();
                             }}
-                            className="cursor-pointer rounded-md px-2.5 py-1 text-xs text-gray-600 hover:bg-gray-100"
+                            className="cursor-pointer rounded-md px-2.5 py-1 text-xs text-fg-muted hover:bg-layer-1-hover"
                         >
                             {t("common.cancel")}
                         </button>

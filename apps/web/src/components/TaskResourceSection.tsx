@@ -25,33 +25,33 @@ export function TaskResourceSection({ taskId }: { taskId: string }) {
                 <button
                     type="button"
                     onClick={() => setIsPicking(true)}
-                    className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                    className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-sm text-fg-muted hover:bg-layer-1-hover hover:text-fg"
                 >
                     <FiPlus aria-hidden />
                     {t("resources.addToTask")}
                 </button>
             </div>
             {linked.isError && <p className="text-sm text-red-600">{t("common.error")}</p>}
-            {linked.data?.length === 0 && <p className="text-sm text-gray-400">{t("resources.taskEmpty")}</p>}
+            {linked.data?.length === 0 && <p className="text-sm text-fg-placeholder">{t("resources.taskEmpty")}</p>}
             {linked.data && linked.data.length > 0 && (
                 <ul className="flex flex-col gap-1">
                     {linked.data.map((r) => {
                         const location = pathTo(index, r.parentId).map((p) => p.name).join(" / ");
                         return (
-                            <li key={r.id} className="group flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-gray-50">
+                            <li key={r.id} className="group flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-layer-2-hover">
                                 <ResourceIcon resource={r} />
                                 <Link
                                     to={`/resources/${r.id}`}
-                                    className={`min-w-0 truncate hover:underline ${r.trashedAt ? "text-gray-400 line-through" : "text-gray-800"}`}
+                                    className={`min-w-0 truncate hover:underline ${r.trashedAt ? "text-fg-placeholder line-through" : "text-fg"}`}
                                 >
                                     {r.name}
                                 </Link>
                                 {r.trashedAt ? (
-                                    <span className="shrink-0 rounded bg-gray-100 px-1.5 text-xs text-gray-500">
+                                    <span className="shrink-0 rounded bg-layer-3 px-1.5 text-xs text-fg-subtle">
                                         {t("resources.inTrash")}
                                     </span>
                                 ) : (
-                                    location && <span className="min-w-0 truncate text-xs text-gray-400">{location}</span>
+                                    location && <span className="min-w-0 truncate text-xs text-fg-placeholder">{location}</span>
                                 )}
                                 <span className="flex-1" />
                                 <button
@@ -59,7 +59,7 @@ export function TaskResourceSection({ taskId }: { taskId: string }) {
                                     onClick={() => unlink.mutate({ taskId, resourceId: r.id })}
                                     aria-label={`${t("resources.unlink")}: ${r.name}`}
                                     title={t("resources.unlink")}
-                                    className="cursor-pointer rounded p-1 text-gray-400 opacity-0 group-hover:opacity-100 hover:bg-gray-200 hover:text-gray-900 focus:opacity-100"
+                                    className="cursor-pointer rounded p-1 text-fg-placeholder opacity-0 group-hover:opacity-100 hover:bg-layer-3-hover hover:text-fg focus:opacity-100"
                                 >
                                     <FiX aria-hidden />
                                 </button>

@@ -52,7 +52,7 @@ export function SubtaskList({ taskId }: SubtaskListProps) {
             className="flex flex-col gap-3"
         >
             {total > 0 && (
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-fg-subtle">
                     {t("task.detail.subtaskProgress")
                         .replace("{done}", String(done))
                         .replace("{total}", String(total))}
@@ -66,7 +66,7 @@ export function SubtaskList({ taskId }: SubtaskListProps) {
                     aria-valuemin={0}
                     aria-valuemax={100}
                     aria-valuenow={percent}
-                    className="h-1.5 overflow-hidden rounded-full bg-gray-100"
+                    className="h-1.5 overflow-hidden rounded-full bg-layer-3"
                 >
                     <div
                         className={`h-full rounded-full transition-all duration-300 ${percent === 100 ? "bg-green-500" : "bg-blue-500"}`}
@@ -114,7 +114,7 @@ export function SubtaskList({ taskId }: SubtaskListProps) {
             )}
 
             {subtasks.isSuccess && total === 0 && !isAdding && (
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-fg-subtle">
                     {t("task.detail.subtasksEmpty")}
                 </p>
             )}
@@ -123,7 +123,7 @@ export function SubtaskList({ taskId }: SubtaskListProps) {
                 <form onSubmit={handleAdd} className="flex items-center gap-2">
                     <span
                         aria-hidden
-                        className="size-4 shrink-0 rounded border border-gray-300"
+                        className="size-4 shrink-0 rounded border border-line-strong"
                     />
                     <input
                         aria-label={t("task.detail.subtaskTitle")}
@@ -143,7 +143,7 @@ export function SubtaskList({ taskId }: SubtaskListProps) {
                         onBlur={() => {
                             if (draft.trim() === "") setIsAdding(false);
                         }}
-                        className="min-w-0 flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-gray-500 focus:outline-none"
+                        className="min-w-0 flex-1 rounded-md border border-line-strong px-2 py-1.5 text-sm focus:border-gray-500 focus:outline-none"
                     />
                     <Button variant="primary" size="lg"
                         type="submit"
@@ -156,7 +156,7 @@ export function SubtaskList({ taskId }: SubtaskListProps) {
                 <button
                     type="button"
                     onClick={() => setIsAdding(true)}
-                    className="flex w-fit cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                    className="flex w-fit cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-sm text-fg-muted hover:bg-layer-1-hover hover:text-fg"
                 >
                     <FiPlus aria-hidden />
                     {t("task.detail.addSubtask")}
@@ -200,7 +200,7 @@ function SubtaskItem({
     }
 
     return (
-        <li className="group flex items-center gap-2 rounded-md px-1 py-0.5 hover:bg-gray-50">
+        <li className="group flex items-center gap-2 rounded-md px-1 py-0.5 hover:bg-layer-2-hover">
             <button
                 type="button"
                 role="checkbox"
@@ -211,7 +211,7 @@ function SubtaskItem({
                 className={`flex size-4 shrink-0 cursor-pointer items-center justify-center rounded border transition-colors ${
                     isDone
                         ? "border-green-600 bg-green-600 text-white"
-                        : "border-gray-400 bg-white hover:border-gray-600"
+                        : "border-gray-400 bg-surface-1 hover:border-gray-600"
                 }`}
             >
                 {isDone && <FiCheck aria-hidden className="size-3" />}
@@ -228,8 +228,8 @@ function SubtaskItem({
                         setTitle(subtask.title);
                     }
                 }}
-                className={`min-w-0 flex-1 rounded border border-transparent bg-transparent px-1.5 py-1 text-sm hover:border-gray-200 focus:border-gray-300 focus:bg-white focus:outline-none ${
-                    isDone ? "text-gray-400 line-through" : "text-gray-800"
+                className={`min-w-0 flex-1 rounded border border-transparent bg-transparent px-1.5 py-1 text-sm hover:border-line focus:border-line-strong focus:bg-surface-1 focus:outline-none ${
+                    isDone ? "text-fg-placeholder line-through" : "text-fg"
                 }`}
             />
             <button
@@ -237,7 +237,7 @@ function SubtaskItem({
                 onClick={onDelete}
                 aria-label={t("task.detail.deleteSubtask")}
                 title={t("task.detail.deleteSubtask")}
-                className="cursor-pointer rounded p-1 text-gray-400 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 hover:bg-red-50 hover:text-red-600 focus:opacity-100"
+                className="cursor-pointer rounded p-1 text-fg-placeholder opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 hover:bg-red-50 hover:text-red-600 focus:opacity-100"
             >
                 <FiTrash2 aria-hidden />
             </button>

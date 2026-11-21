@@ -76,9 +76,9 @@ export default function ProjectDetailPage() {
                             </div>
                             <aside
                                 aria-labelledby="project-activity"
-                                className="w-full shrink-0 rounded-lg border border-gray-200 bg-white p-5 xl:sticky xl:top-8 xl:w-80"
+                                className="w-full shrink-0 rounded-lg border border-line bg-surface-1 p-5 xl:sticky xl:top-8 xl:w-80"
                             >
-                                <h2 id="project-activity" className="mb-4 text-sm font-semibold text-gray-900">
+                                <h2 id="project-activity" className="mb-4 text-sm font-semibold text-fg">
                                     {t("project.activity.title")}
                                 </h2>
                                 <ResourceActivity
