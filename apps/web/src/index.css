@@ -17,6 +17,43 @@
     --color-accent: var(--color-gray-900);
     --color-accent-fg: var(--color-white);
 
+    /* Elevation: canvas (app frame) < surface (page panels) < layer (cards, rows). */
+    --color-canvas: var(--color-gray-100);
+    --color-surface-1: var(--color-white);
+    --color-surface-2: var(--color-gray-50);
+    --color-layer-1: var(--color-gray-50);
+    --color-layer-1-hover: var(--color-gray-100);
+    --color-layer-2: var(--color-white);
+    --color-layer-2-hover: var(--color-gray-50);
+    --color-layer-3: var(--color-gray-100);
+    --color-layer-3-hover: var(--color-gray-200);
+    /* Text */
+    --color-fg: var(--color-gray-900);
+    --color-fg-muted: var(--color-gray-600);
+    --color-fg-subtle: var(--color-gray-500);
+    --color-fg-placeholder: var(--color-gray-400);
+    /* Borders */
+    --color-line: var(--color-gray-200);
+    --color-line-strong: var(--color-gray-300);
+    /* Feedback */
+    --color-danger: var(--color-red-600);
+    --color-danger-subtle: var(--color-red-50);
+    --color-success: var(--color-emerald-600);
+    --color-success-subtle: var(--color-emerald-50);
+    --color-warning: var(--color-amber-600);
+    --color-warning-subtle: var(--color-amber-50);
+    --color-backdrop: oklch(0% 0 0 / 0.3);
+    /* Type: Plane-like compact scale */
+    --text-body-xs: 0.8125rem;
+    --text-body-xs--line-height: 1.54; /* 13px */
+    --text-caption: 0.75rem;
+    --text-caption--line-height: 1.2; /* 12px */
+    --text-caption-sm: 0.6875rem;
+    --text-caption-sm--line-height: 1.2; /* 11px */
+    /* Shadows: soft */
+    --shadow-raised: 0 1px 2px oklch(0% 0 0 / 0.06), 0 1px 3px oklch(0% 0 0 / 0.04);
+    --shadow-overlay: 0 4px 16px oklch(0% 0 0 / 0.12), 0 1px 3px oklch(0% 0 0 / 0.08);
+
     --animate-drawer-in: drawer-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
     --animate-drawer-out: drawer-out 180ms ease-in forwards;
     --animate-fade-in: fade-in 220ms ease-out;
@@ -53,6 +90,8 @@
 @layer theme {
     :root.dark {
         color-scheme: dark;
+        --color-backdrop: oklch(0% 0 0 / 0.7);
+        --color-canvas: oklch(15% 0.006 265);
 
         --color-white: oklch(19% 0.008 265);
         --color-gray-50: oklch(21.5% 0.009 265);
@@ -321,17 +360,38 @@
         --app-scrim: color-mix(in oklab, var(--app-white) 45%, transparent);
     }
     :root[data-bg] .app-surface,
+    :root[data-bg] .app-frame,
     :root[data-bg] .app-sidebar {
         --color-white: color-mix(in oklab, var(--app-white) var(--app-alpha-white), transparent);
         --color-gray-50: color-mix(in oklab, var(--app-gray-50) var(--app-alpha-50), transparent);
         --color-gray-100: color-mix(in oklab, var(--app-gray-100) var(--app-alpha-100), transparent);
         --color-gray-200: color-mix(in oklab, var(--app-gray-200) var(--app-alpha-200), transparent);
+        --color-surface-1: var(--color-white);
+        --color-surface-2: var(--color-gray-50);
+        --color-layer-1: var(--color-gray-50);
+        --color-layer-1-hover: var(--color-gray-100);
+        --color-layer-2: var(--color-white);
+        --color-layer-2-hover: var(--color-gray-50);
+        --color-layer-3: var(--color-gray-100);
+        --color-layer-3-hover: var(--color-gray-200);
+        --color-line: var(--color-gray-200);
+        --color-line-strong: var(--color-gray-300);
     }
     :root[data-bg] .app-opaque {
         --color-white: var(--app-white);
         --color-gray-50: var(--app-gray-50);
         --color-gray-100: var(--app-gray-100);
         --color-gray-200: var(--app-gray-200);
+        --color-surface-1: var(--color-white);
+        --color-surface-2: var(--color-gray-50);
+        --color-layer-1: var(--color-gray-50);
+        --color-layer-1-hover: var(--color-gray-100);
+        --color-layer-2: var(--color-white);
+        --color-layer-2-hover: var(--color-gray-50);
+        --color-layer-3: var(--color-gray-100);
+        --color-layer-3-hover: var(--color-gray-200);
+        --color-line: var(--color-gray-200);
+        --color-line-strong: var(--color-gray-300);
     }
 }
 
@@ -347,6 +407,7 @@
        and does not show. Not on accent buttons, whose text is the inverse
        color, nor inside opaque menus and dialogs. Plain colors need none. */
     :root:is([data-bg="image"], [data-bg="custom"]) .app-surface,
+    :root:is([data-bg="image"], [data-bg="custom"]) .app-frame,
     :root:is([data-bg="image"], [data-bg="custom"]) .app-sidebar {
         text-shadow:
             0 0 2px var(--app-white),
