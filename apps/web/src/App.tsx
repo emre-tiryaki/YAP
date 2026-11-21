@@ -4,6 +4,7 @@ import NotFoundPage from "./pages/NotFoundPage";
 import ProjectDetailPage from "./pages/ProjectDetailPage";
 import PlanDetailPage from "./pages/PlanDetailPage";
 import ResourcesPage from "./pages/ResourcesPage";
+import TaskPage from "./pages/TaskPage";
 import ProjectsPage from "./pages/ProjectsPage";
 import UpcomingTasksPage from "./pages/UpcomingTasksPage";
 import { useEffect } from "react";
@@ -48,6 +49,7 @@ function App() {
                   <Route path="/tasks" element={<UpcomingTasksPage />} />
                   <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
                   <Route path="/projects/:projectId/plans/:planId" element={<PlanDetailPage />} />
+                  <Route path="/projects/:projectId/plans/:planId/tasks/:taskId" element={<TaskPage />} />
                   <Route path="/resources" element={<ResourcesPage />} />
                   <Route path="/resources/trash" element={<ResourcesPage view="trash" />} />
                   <Route path="/resources/:resourceId" element={<ResourcesPage />} />

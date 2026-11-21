@@ -593,5 +593,18 @@
     "plan.group.collapse": "Daralt",
     "plan.group.expand": "Genişlet",
     "plan.layout.label": "Görünüm",
-    "task.overdue": "Gecikmiş"
+    "task.overdue": "Gecikmiş",
+    "task.peek.openFull": "Tam sayfada aç",
+    "task.peek.mode": "Önizleme biçimi",
+    "task.peek.mode.side": "Yan panel",
+    "task.peek.mode.modal": "Ortada pencere",
+    "task.peek.mode.full": "Tam ekran",
+    "task.peek.copyLink": "Bağlantıyı kopyala",
+    "task.peek.linkCopied": "Bağlantı kopyalandı",
+    "task.peek.more": "Diğer işlemler",
+    "task.peek.close": "Kapat",
+    "task.peek.notFound": "Bu görev artık yok.",
+    "task.section.toggle": "Bölümü göster veya gizle",
+    "task.property.dueDate": "Bitiş tarihi",
+    "task.property.category": "Kategori"
 }

@@ -171,10 +171,6 @@ export function TaskList({
             {openTask && (
                 <UpcomingTaskDrawer
                     task={openTask}
-                    onDelete={() => {
-                        setOpenTask(null);
-                        setTaskAction({ task: openTask, action: "delete" });
-                    }}
                     onClose={() => setOpenTask(null)}
                 />
             )}

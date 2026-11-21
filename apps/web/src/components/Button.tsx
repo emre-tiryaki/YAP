@@ -1,7 +1,7 @@
-import type { ButtonHTMLAttributes, ComponentType } from "react";
+import type { ComponentProps, ComponentType } from "react";
 import { FiLoader } from "react-icons/fi";
 
-type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+type ButtonProps = ComponentProps<"button"> & {
     variant?: "primary" | "secondary" | "ghost" | "danger";
     size?: "sm" | "md" | "lg";
     leadingIcon?: ComponentType<{ "aria-hidden"?: boolean }>;

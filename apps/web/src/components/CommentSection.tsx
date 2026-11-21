@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type KeyboardEvent } from "react";
-import { FiEdit2, FiMessageSquare, FiTrash2 } from "react-icons/fi";
+import { FiEdit2, FiTrash2 } from "react-icons/fi";
 import {
     useComments,
     useCreateComment,
@@ -45,23 +45,9 @@ export function CommentSection({ taskId }: CommentSectionProps) {
 
     return (
         <section
-            aria-labelledby="task-comments-heading"
+            aria-label={t("task.detail.comments")}
             className="flex flex-col gap-4"
         >
-            <div className="flex items-center gap-3">
-                <FiMessageSquare aria-hidden className="text-gray-500" />
-                <h3
-                    id="task-comments-heading"
-                    className="text-sm font-semibold text-gray-800"
-                >
-                    {t("task.detail.comments")}
-                </h3>
-                {items.length > 0 && (
-                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
-                        {items.length}
-                    </span>
-                )}
-            </div>
 
             {comments.isLoading && (
                 <Skeleton className="h-16" />

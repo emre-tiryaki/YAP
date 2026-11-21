@@ -593,5 +593,18 @@
     "plan.group.collapse": "Collapse",
     "plan.group.expand": "Expand",
     "plan.layout.label": "Layout",
-    "task.overdue": "Overdue"
+    "task.overdue": "Overdue",
+    "task.peek.openFull": "Open full page",
+    "task.peek.mode": "Peek mode",
+    "task.peek.mode.side": "Side peek",
+    "task.peek.mode.modal": "Center modal",
+    "task.peek.mode.full": "Full screen",
+    "task.peek.copyLink": "Copy link",
+    "task.peek.linkCopied": "Link copied",
+    "task.peek.more": "More actions",
+    "task.peek.close": "Close",
+    "task.peek.notFound": "This task no longer exists.",
+    "task.section.toggle": "Show or hide section",
+    "task.property.dueDate": "Due date",
+    "task.property.category": "Category"
 }

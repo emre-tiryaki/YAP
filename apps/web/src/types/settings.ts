@@ -51,6 +51,8 @@ export type Background =
   | { kind: "custom"; tint: string; version: number };
 
 // Per-device interface preferences.
+export type TaskPeekMode = "side" | "modal" | "full";
+
 export type Preferences = {
   language: Language;
   weekStart: WeekStart;
@@ -65,4 +67,6 @@ export type Preferences = {
   sidebarCollapsed: boolean;
   // Width in px of the expanded sidebar.
   sidebarWidth: number;
+  // How an opened task shows: a side panel, a centred dialog or nearly full screen.
+  taskPeekMode: TaskPeekMode;
 };

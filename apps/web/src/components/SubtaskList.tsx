@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { FiCheck, FiCheckSquare, FiPlus, FiTrash2 } from "react-icons/fi";
+import { FiCheck, FiPlus, FiTrash2 } from "react-icons/fi";
 import {
     useCreateSubtask,
     useDeleteTask,
@@ -48,25 +48,16 @@ export function SubtaskList({ taskId }: SubtaskListProps) {
 
     return (
         <section
-            aria-labelledby="task-subtasks-heading"
+            aria-label={t("task.detail.subtasks")}
             className="flex flex-col gap-3"
         >
-            <div className="flex items-center gap-3">
-                <FiCheckSquare aria-hidden className="text-gray-500" />
-                <h3
-                    id="task-subtasks-heading"
-                    className="text-sm font-semibold text-gray-800"
-                >
-                    {t("task.detail.subtasks")}
-                </h3>
-                {total > 0 && (
-                    <span className="text-xs text-gray-500">
-                        {t("task.detail.subtaskProgress")
-                            .replace("{done}", String(done))
-                            .replace("{total}", String(total))}
-                    </span>
-                )}
-            </div>
+            {total > 0 && (
+                <p className="text-xs text-gray-500">
+                    {t("task.detail.subtaskProgress")
+                        .replace("{done}", String(done))
+                        .replace("{total}", String(total))}
+                </p>
+            )}
 
             {total > 0 && (
                 <div

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FiPaperclip, FiPlus, FiX } from "react-icons/fi";
+import { FiPlus, FiX } from "react-icons/fi";
 import { Link } from "react-router";
 import { errorKey } from "../hooks/useResourceOperations";
 import { useLinkResource, useResources, useTaskResources, useUnlinkResource } from "../hooks/useResources";
@@ -20,14 +20,8 @@ export function TaskResourceSection({ taskId }: { taskId: string }) {
     const linkedIds = new Set((linked.data ?? []).map((r) => r.id));
 
     return (
-        <section aria-labelledby={`task-resources-${taskId}`} className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <FiPaperclip aria-hidden className="text-gray-500" />
-                    <h3 id={`task-resources-${taskId}`} className="text-sm font-semibold text-gray-800">
-                        {t("resources.title")}
-                    </h3>
-                </div>
+        <section aria-label={t("resources.title")} className="flex flex-col gap-2">
+            <div className="flex items-center justify-end">
                 <button
                     type="button"
                     onClick={() => setIsPicking(true)}

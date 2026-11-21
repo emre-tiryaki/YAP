@@ -8,6 +8,7 @@ import type {
   Density,
   Language,
   Preferences,
+  TaskPeekMode,
   Theme,
   TimeFormat,
   WeekStart,
@@ -28,6 +29,7 @@ const weekStarts: readonly WeekStart[] = ["monday", "sunday"];
 const dateFormats: readonly DateFormat[] = ["dmy", "mdy", "iso"];
 const timeFormats: readonly TimeFormat[] = ["24h", "12h"];
 const themes: readonly Theme[] = ["light", "dark", "system"];
+const taskPeekModes: readonly TaskPeekMode[] = ["side", "modal", "full"];
 const densities: readonly Density[] = ["comfortable", "compact"];
 export const accents: readonly Accent[] = [
   "neutral",
@@ -55,6 +57,7 @@ function defaults(): Preferences {
     // The sidebar used to keep this in its own key; read it once as the start value.
     sidebarCollapsed: localStorage.getItem("yap.sidebar.collapsed") === "true",
     sidebarWidth: SIDEBAR_DEFAULT_WIDTH,
+    taskPeekMode: "side",
   };
 }
 
@@ -135,6 +138,7 @@ function read(): Preferences {
             Math.max(SIDEBAR_MIN_WIDTH, Math.round(stored.sidebarWidth)),
           )
         : base.sidebarWidth,
+    taskPeekMode: pick(taskPeekModes, stored.taskPeekMode, base.taskPeekMode),
   };
   return cache;
 }

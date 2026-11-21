@@ -10,7 +10,7 @@ import { Modal } from "../components/Modal";
 import { TaskBoardDnd } from "../components/TaskBoardDnd";
 import { PlanHeader, PlanHeaderSkeleton } from "../components/PlanHeader";
 import { TaskDialogs } from "../components/TaskDialogs";
-import { TaskDetailModal } from "../components/TaskDetailModal";
+import { TaskPeek } from "../components/TaskPeek";
 import { FiPlus } from "react-icons/fi";
 import { HeaderAction } from "../components/HeaderAction";
 import { PageHeader } from "../components/PageHeader";
@@ -79,7 +79,6 @@ export default function PlanDetailPage() {
         setSeenTaskParam(taskParam);
         if (taskParam) setOpenTaskId(taskParam);
     }
-    const openTask = tasks.data?.find((task) => task.id === openTaskId);
 
     if (plan.error instanceof ApiError && plan.error.status === 404)
         return <NotFoundPage />;
@@ -292,17 +291,11 @@ export default function PlanDetailPage() {
                 onClose={closeDeleteStatus}
             />
 
-            {openTask && statuses.data && tasks.data && (
-                <TaskDetailModal
+            {openTaskId && (
+                <TaskPeek
                     projectId={projectId}
                     planId={planId}
-                    task={openTask}
-                    statuses={statuses.data}
-                    tasks={tasks.data}
-                    onDelete={() => {
-                        setOpenTaskId(null);
-                        setTaskAction({ task: openTask, action: "delete" });
-                    }}
+                    taskId={openTaskId}
                     onClose={() => {
                         setOpenTaskId(null);
                         if (searchParams.has("task"))
