@@ -583,5 +583,15 @@
     "sidebar.project.linkCopied": "Link copied",
     "sidebar.resize": "Resize sidebar",
     "sidebar.profile.theme": "Theme",
-    "sidebar.nav.label": "Main navigation"
+    "sidebar.nav.label": "Main navigation",
+    "task.dueDate.set": "Set due date",
+    "task.property.status": "Status",
+    "task.row.markDone": "Mark as done",
+    "task.row.markUndone": "Mark as not done",
+    "plan.quickAdd.add": "New task",
+    "plan.quickAdd.hint": "Press Enter to add, Esc to cancel",
+    "plan.group.collapse": "Collapse",
+    "plan.group.expand": "Expand",
+    "plan.layout.label": "Layout",
+    "task.overdue": "Overdue"
 }

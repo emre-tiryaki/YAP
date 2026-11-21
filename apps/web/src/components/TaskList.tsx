@@ -4,7 +4,7 @@ import { useTranslate } from "../hooks/useTranslate";
 import type { CardAction } from "../types/cardAction";
 import type { Task } from "../types/task";
 import { daysFromToday, toDateInputValue } from "../util/date";
-import { PlanTaskCard } from "./PlanTaskCard";
+import { KanbanCard } from "./KanbanCard";
 import { SectionHeader } from "./SectionHeader";
 import { TaskDialogs } from "./TaskDialogs";
 import { UpcomingTaskDrawer } from "./UpcomingTaskDrawer";
@@ -143,9 +143,8 @@ export function TaskList({
                                             key={task.id}
                                             onClick={() => setOpenTask(task)}
                                         >
-                                            <PlanTaskCard
+                                            <KanbanCard
                                                 task={task}
-                                                layout={compact ? "list" : "board"}
                                                 isDraggable={false}
                                                 projectId={task.projectId}
                                                 planId={task.planId}

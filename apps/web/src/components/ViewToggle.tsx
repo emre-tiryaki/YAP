@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import { FiColumns, FiList } from "react-icons/fi";
 import { useTranslate } from "../hooks/useTranslate";
+import { Tooltip } from "./Tooltip";
 
 export type BoardView = "board" | "list";
 
@@ -18,6 +19,8 @@ type ViewToggleProps<T extends string> = {
     options?: readonly ViewOption<T>[];
     // Accessible name of the group; defaults to the plan view label.
     label?: string;
+    // Shows only the icons; the labels stay as accessible names and tooltips.
+    iconOnly?: boolean;
 };
 
 export function ViewToggle<T extends string = BoardView>({
@@ -25,6 +28,7 @@ export function ViewToggle<T extends string = BoardView>({
     onChange,
     options,
     label,
+    iconOnly = false,
 }: ViewToggleProps<T>) {
     const t = useTranslate();
     const boardOptions = [
@@ -38,23 +42,35 @@ export function ViewToggle<T extends string = BoardView>({
             aria-label={label ?? t("plan.view.label")}
             className="inline-flex rounded-md border border-line-strong bg-layer-2 p-0.5"
         >
-            {(options ?? boardOptions).map(({ view, label, Icon }) => (
-                <button
-                    key={view}
-                    type="button"
-                    role="radio"
-                    aria-checked={value === view}
-                    onClick={() => onChange(view)}
-                    className={`flex cursor-pointer items-center gap-1.5 rounded px-3 py-1 text-sm ${
-                        value === view
-                            ? "bg-accent text-accent-fg"
-                            : "text-fg-muted hover:bg-layer-1-hover"
-                    }`}
-                >
-                    {Icon && <Icon aria-hidden />}
-                    {label}
-                </button>
-            ))}
+            {(options ?? boardOptions).map(({ view, label, Icon }) => {
+                const button = (
+                    <button
+                        key={view}
+                        type="button"
+                        role="radio"
+                        aria-checked={value === view}
+                        aria-label={iconOnly ? label : undefined}
+                        onClick={() => onChange(view)}
+                        className={`flex cursor-pointer items-center gap-1.5 rounded text-sm ${
+                            iconOnly ? "px-2 py-1" : "px-3 py-1"
+                        } ${
+                            value === view
+                                ? "bg-accent text-accent-fg"
+                                : "text-fg-muted hover:bg-layer-1-hover"
+                        }`}
+                    >
+                        {Icon && <Icon aria-hidden />}
+                        {!iconOnly && label}
+                    </button>
+                );
+                return iconOnly ? (
+                    <Tooltip key={view} label={label}>
+                        {button}
+                    </Tooltip>
+                ) : (
+                    button
+                );
+            })}
         </div>
     );
 }

@@ -1,5 +1,14 @@
+import type { TaskPropertyKey } from "../types/task";
+
 // How completed tasks are shown inside a status (see the "Categories"
 // settings). Plain functions so the board and the list share them.
+
+export const allTaskProperties: ReadonlySet<TaskPropertyKey> = new Set([
+    "status",
+    "dueDate",
+    "subtasks",
+    "comments",
+]);
 
 export type TaskViewOptions = {
     hideDone: boolean;

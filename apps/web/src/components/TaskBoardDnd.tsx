@@ -16,30 +16,30 @@ import {
 } from "@dnd-kit/core";
 import {
     arrayMove,
-    horizontalListSortingStrategy,
-    SortableContext,
     sortableKeyboardCoordinates,
-    verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { FiPlus } from "react-icons/fi";
-import { useTranslate } from "../hooks/useTranslate";
 import { useCurrentUserSettings } from "../hooks/useUserSettings";
 import type { CardAction } from "../types/cardAction";
 import type { Status } from "../types/status";
-import type { PlanTask, StatusCategory } from "../types/task";
+import type { PlanTask, StatusCategory, TaskPropertyKey } from "../types/task";
+import { groupTasks } from "../util/taskGroups";
 import {
-    arrangeTasks,
+    allTaskProperties,
     storedIndex,
     type TaskViewOptions,
 } from "../util/taskView";
-import { PlanTaskCard } from "./PlanTaskCard";
-import { StatusColumn } from "./StatusColumn";
+import { KanbanCard } from "./KanbanCard";
+import { KanbanLayout } from "./KanbanLayout";
+import { ListLayout } from "./ListLayout";
+import { ListRow } from "./ListRow";
 import type { BoardView } from "./ViewToggle";
 
 // Task IDs per status ID, in display order.
 type Columns = Record<string, string[]>;
 
-type PlanBoardProps = {
+type TaskBoardDndProps = {
+    projectId: string;
+    planId: string;
     statuses: Status[];
     tasks: PlanTask[];
     layout: BoardView;
@@ -50,27 +50,26 @@ type PlanBoardProps = {
         index: number;
     }) => void;
     onMoveStatus: (move: { statusId: string; index: number }) => void;
-    onAddTask: (statusId: string) => void;
     onTaskAction: (task: PlanTask, action: CardAction) => void;
     onOpenTask: (task: PlanTask) => void;
+    // The task open in the peek, highlighted in the list.
+    activeTaskId: string | null;
+    // Phase 1 shows every property; the display options make it configurable.
+    visible?: ReadonlySet<TaskPropertyKey>;
     onCreateStatus: () => void;
     onEditStatus: (status: Status) => void;
 };
 
-// Columns in display order: the server's order with the completed-task
-// settings applied.
+// Task ids per status in display order: the server's order with the
+// completed-task settings applied.
 function toColumns(
     statuses: Status[],
     tasks: PlanTask[],
     view: TaskViewOptions,
 ): Columns {
     const columns: Columns = {};
-    for (const status of statuses) {
-        columns[status.id] = arrangeTasks(
-            tasks.filter((task) => task.statusId === status.id),
-            view,
-        ).map((task) => task.id);
-    }
+    for (const group of groupTasks(tasks, statuses, view))
+        columns[group.id] = group.tasks.map((task) => task.id);
     return columns;
 }
 
@@ -98,24 +97,32 @@ function findColumn(columns: Columns, id: UniqueIdentifier) {
     );
 }
 
-export function PlanBoard({
+export function TaskBoardDnd({
+    projectId,
+    planId,
     statuses,
     tasks,
     layout,
     onMove,
     onMoveStatus,
-    onAddTask,
     onTaskAction,
     onOpenTask,
+    activeTaskId,
+    visible = allTaskProperties,
     onCreateStatus,
     onEditStatus,
-}: PlanBoardProps) {
-    const t = useTranslate();
+}: TaskBoardDndProps) {
     const sensors = useSensors(
         // A small distance keeps clicks on buttons inside cards working.
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+        // Space picks a task up (Enter opens it).
         useSensor(KeyboardSensor, {
             coordinateGetter: sortableKeyboardCoordinates,
+            keyboardCodes: {
+                start: ["Space"],
+                cancel: ["Escape"],
+                end: ["Space", "Enter"],
+            },
         }),
     );
     const [activeId, setActiveId] = useState<string | null>(null);
@@ -241,7 +248,20 @@ export function PlanBoard({
         setOverride(null);
     }
 
-    const isBoard = layout === "board";
+    const tasksByStatus: Record<string, PlanTask[]> = {};
+    const hiddenByStatus: Record<string, number> = {};
+    for (const status of orderedStatuses) {
+        tasksByStatus[status.id] = (columns[status.id] ?? []).flatMap((id) => {
+            const task = taskById.get(id);
+            return task ? [task] : [];
+        });
+        hiddenByStatus[status.id] = hideDone
+            ? tasks.filter(
+                  (task) =>
+                      task.statusId === status.id && task.completedAt !== null,
+              ).length
+            : 0;
+    }
 
     return (
         <DndContext
@@ -252,65 +272,57 @@ export function PlanBoard({
             onDragEnd={handleDragEnd}
             onDragCancel={handleDragCancel}
         >
-            <div
-                className={
-                    isBoard
-                        ? "flex items-start gap-4 overflow-x-auto pb-4"
-                        : "flex flex-col gap-4"
-                }
-            >
-                <SortableContext
-                    items={orderedStatuses.map((status) => status.id)}
-                    strategy={
-                        isBoard
-                            ? horizontalListSortingStrategy
-                            : verticalListSortingStrategy
-                    }
-                >
-                    {orderedStatuses.map((status) => (
-                        <StatusColumn
-                            key={status.id}
-                            status={status}
-                            layout={layout}
-                            tasks={(columns[status.id] ?? []).flatMap((id) => {
-                                const task = taskById.get(id);
-                                return task ? [task] : [];
-                            })}
-                            hiddenCount={
-                                hideDone
-                                    ? tasks.filter(
-                                          (task) =>
-                                              task.statusId === status.id &&
-                                              task.completedAt !== null,
-                                      ).length
-                                    : 0
-                            }
-                            onAddTask={() => onAddTask(status.id)}
-                            onEdit={() => onEditStatus(status)}
-                            onTaskAction={onTaskAction}
-                            onOpenTask={onOpenTask}
-                        />
-                    ))}
-                </SortableContext>
-                <button
-                    type="button"
-                    onClick={onCreateStatus}
-                    className={`flex cursor-pointer items-center justify-center gap-1 rounded-lg border border-dashed border-gray-300 text-sm text-gray-500 hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900 ${
-                        isBoard ? "h-12 w-72 shrink-0" : "w-full py-3"
-                    }`}
-                >
-                    <FiPlus aria-hidden />
-                    {t("plan.status.add")}
-                </button>
-            </div>
+            {layout === "board" ? (
+                <KanbanLayout
+                    projectId={projectId}
+                    planId={planId}
+                    statuses={orderedStatuses}
+                    tasksByStatus={tasksByStatus}
+                    hiddenByStatus={hiddenByStatus}
+                    visible={visible}
+                    onTaskAction={onTaskAction}
+                    onOpenTask={onOpenTask}
+                    onCreateStatus={onCreateStatus}
+                    onEditStatus={onEditStatus}
+                />
+            ) : (
+                <ListLayout
+                    projectId={projectId}
+                    planId={planId}
+                    statuses={orderedStatuses}
+                    tasksByStatus={tasksByStatus}
+                    hiddenByStatus={hiddenByStatus}
+                    visible={visible}
+                    activeTaskId={activeTaskId}
+                    onTaskAction={onTaskAction}
+                    onOpenTask={onOpenTask}
+                    onCreateStatus={onCreateStatus}
+                />
+            )}
             <DragOverlay>
-                {activeTask && (
-                    <PlanTaskCard
-                        task={activeTask}
-                        layout={layout}
-                        isOverlay
-                    />
-                )}
+                {activeTask &&
+                    (layout === "board" ? (
+                        <KanbanCard
+                            task={activeTask}
+                            statuses={statuses}
+                            projectId={projectId}
+                            planId={planId}
+                            visible={visible}
+                            isOverlay
+                        />
+                    ) : (
+                        <ul>
+                            <ListRow
+                                task={activeTask}
+                                projectId={projectId}
+                                planId={planId}
+                                statuses={statuses}
+                                visible={visible}
+                                isActive={false}
+                                isOverlay
+                            />
+                        </ul>
+                    ))}
             </DragOverlay>
         </DndContext>
     );

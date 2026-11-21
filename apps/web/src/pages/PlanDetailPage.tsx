@@ -7,10 +7,12 @@ import { CreateStatusForm } from "../components/CreateStatusForm";
 import { EditStatusForm } from "../components/EditStatusForm";
 import { InlineError } from "../components/InlineError";
 import { Modal } from "../components/Modal";
-import { PlanBoard } from "../components/PlanBoard";
+import { TaskBoardDnd } from "../components/TaskBoardDnd";
 import { PlanHeader, PlanHeaderSkeleton } from "../components/PlanHeader";
 import { TaskDialogs } from "../components/TaskDialogs";
 import { TaskDetailModal } from "../components/TaskDetailModal";
+import { FiPlus } from "react-icons/fi";
+import { HeaderAction } from "../components/HeaderAction";
 import { PageHeader } from "../components/PageHeader";
 import type { BreadcrumbItem } from "../types/breadcrumb";
 import { ViewToggle, type BoardView } from "../components/ViewToggle";
@@ -109,7 +111,9 @@ export default function PlanDetailPage() {
             <PageHeader
                 breadcrumb={breadcrumb}
                 actions={
+                    <>
                     <ViewToggle
+                        iconOnly
                         value={view}
                         onChange={(next) =>
                             setSearchParams(next === "board" ? {} : { view: next }, {
@@ -117,6 +121,16 @@ export default function PlanDetailPage() {
                             })
                         }
                     />
+                    <HeaderAction
+                        variant="primary"
+                        icon={FiPlus}
+                        label={t("plan.task.create.title")}
+                        disabled={firstStatusId === undefined}
+                        onClick={() => {
+                            if (firstStatusId) setNewTaskStatusId(firstStatusId);
+                        }}
+                    />
+                    </>
                 }
             />
             <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto p-8">
@@ -177,7 +191,10 @@ export default function PlanDetailPage() {
                             />
                         )}
                         {statuses.data && tasks.data && (
-                            <PlanBoard
+                            <TaskBoardDnd
+                                projectId={projectId}
+                                planId={planId}
+                                activeTaskId={openTaskId}
                                 statuses={statuses.data}
                                 tasks={tasks.data}
                                 layout={view}
@@ -185,7 +202,6 @@ export default function PlanDetailPage() {
                                 onMoveStatus={(move) =>
                                     moveStatus.mutate(move)
                                 }
-                                onAddTask={setNewTaskStatusId}
                                 onTaskAction={(task, action) =>
                                     setTaskAction({ task, action })
                                 }

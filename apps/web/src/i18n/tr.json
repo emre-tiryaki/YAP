@@ -583,5 +583,15 @@
     "sidebar.project.linkCopied": "Bağlantı kopyalandı",
     "sidebar.resize": "Kenar çubuğunu yeniden boyutlandır",
     "sidebar.profile.theme": "Tema",
-    "sidebar.nav.label": "Ana gezinme"
+    "sidebar.nav.label": "Ana gezinme",
+    "task.dueDate.set": "Bitiş tarihi belirle",
+    "task.property.status": "Durum",
+    "task.row.markDone": "Tamamlandı olarak işaretle",
+    "task.row.markUndone": "Tamamlanmadı olarak işaretle",
+    "plan.quickAdd.add": "Yeni görev",
+    "plan.quickAdd.hint": "Eklemek için Enter, iptal için Esc",
+    "plan.group.collapse": "Daralt",
+    "plan.group.expand": "Genişlet",
+    "plan.layout.label": "Görünüm",
+    "task.overdue": "Gecikmiş"
 }

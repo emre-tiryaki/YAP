@@ -24,6 +24,8 @@ import { relabelPin, unpinWhere } from "./usePins";
 type CreateTaskVariables = {
     projectId: string;
     input: CreateTaskInput;
+    // Category of the target status, used for the temporary row only.
+    statusCategory?: StatusCategory;
 };
 
 export type MoveTaskVariables = MoveTaskInput & {
@@ -56,7 +58,36 @@ export function useCreateTask() {
     return useMutation({
         mutationFn: ({ projectId, input }: CreateTaskVariables) =>
             createTask(projectId, input),
-        onSuccess: () => invalidateTaskViews(queryClient),
+        // A task created into a plan shows in that plan's lists at once as a
+        // temporary row ("temp-" id); the refetch replaces it with the real one.
+        onMutate: async ({ projectId, input, statusCategory }) => {
+            if (!input.planId || !input.statusId) return undefined;
+            const key = planTasksKey(projectId, input.planId);
+            await queryClient.cancelQueries({ queryKey: key });
+            const previous = queryClient.getQueryData<PlanTask[]>(key);
+            const temp: PlanTask = {
+                id: `temp-${crypto.randomUUID()}`,
+                title: input.title,
+                description: input.description ?? "",
+                statusId: input.statusId,
+                statusCategory: statusCategory ?? "todo",
+                position: "",
+                dueDate: input.dueDate,
+                completedAt: null,
+                subtaskCount: 0,
+                doneSubtaskCount: 0,
+                commentCount: 0,
+            };
+            queryClient.setQueryData<PlanTask[]>(key, (old) =>
+                old ? [...old, temp] : old,
+            );
+            return { key, previous };
+        },
+        onError: (_error, _variables, context) => {
+            if (context?.previous)
+                queryClient.setQueryData(context.key, context.previous);
+        },
+        onSettled: () => invalidateTaskViews(queryClient),
     });
 }
 

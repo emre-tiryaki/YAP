@@ -17,6 +17,7 @@ import {
     toDateInputValue,
 } from "../util/date";
 import { useDismiss } from "../hooks/useDismiss";
+import { Tooltip } from "./Tooltip";
 
 type DatePickerProps = {
     label: string;
@@ -26,6 +27,9 @@ type DatePickerProps = {
     // Shows the label above the field like TextInput; otherwise it is only
     // the accessible name.
     showLabel?: boolean;
+    // A compact pill for task rows and cards: the date next to a calendar
+    // icon (icon only while empty), red when `overdue`.
+    pill?: { overdue: boolean };
 };
 
 const POPOVER_WIDTH = 288;
@@ -38,6 +42,7 @@ export function DatePicker({
     value,
     onChange,
     showLabel = false,
+    pill,
 }: DatePickerProps) {
     const t = useTranslate();
     const format = useDateFormat();
@@ -45,7 +50,29 @@ export function DatePicker({
     const triggerRef = useRef<HTMLButtonElement>(null);
     const selected = fromDateInputValue(value);
 
-    const field = (
+    const pillField = pill && (
+        <Tooltip label={selected ? label : t("task.dueDate.set")}>
+            <button
+                ref={triggerRef}
+                type="button"
+                aria-label={label}
+                aria-haspopup="dialog"
+                aria-expanded={isOpen}
+                onClick={(event) => {
+                    event.stopPropagation();
+                    setIsOpen(!isOpen);
+                }}
+                className={`inline-flex h-6 cursor-pointer items-center gap-1 rounded-md border border-line bg-layer-2 px-1.5 text-caption hover:bg-layer-2-hover focus-visible:outline-2 focus-visible:outline-accent ${
+                    pill.overdue ? "text-danger" : "text-fg-muted"
+                }`}
+            >
+                <FiCalendar aria-hidden />
+                {selected && format.date(selected)}
+            </button>
+        </Tooltip>
+    );
+
+    const field = pillField || (
         <button
             ref={triggerRef}
             type="button"

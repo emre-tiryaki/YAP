@@ -1,5 +1,9 @@
 export type StatusCategory = "todo" | "in_progress" | "done";
 
+// Properties a task row or card can show inline; the display options (T13)
+// choose which.
+export type TaskPropertyKey = "status" | "dueDate" | "subtasks" | "comments";
+
 export type PlanTask = {
   id: string;
   title: string;
