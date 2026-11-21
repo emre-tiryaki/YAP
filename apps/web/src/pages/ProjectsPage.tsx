@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router";
-import { FiGrid, FiList, FiSearch } from "react-icons/fi";
-import { TopBar } from "../components/TopBar";
+import { FiGrid, FiList, FiPlus, FiSearch } from "react-icons/fi";
+import { HeaderAction } from "../components/HeaderAction";
+import { PageHeader } from "../components/PageHeader";
 import { Modal } from "../components/Modal";
 import { ProjectCard } from "../components/ProjectCard";
 import { CreateProjectForm } from "../components/CreateProjectForm";
@@ -11,7 +12,6 @@ import { useProjects } from "../hooks/useProjects";
 import { useTranslate } from "../hooks/useTranslate";
 import type { BreadcrumbItem } from "../types/breadcrumb";
 import type { Project } from "../types/project";
-import { Button } from "../components/Button";
 import { PropertySelect } from "../components/PropertySelect";
 
 type ProjectView = "list" | "cards";
@@ -87,15 +87,25 @@ export default function ProjectsPage() {
         .sort(compare(sort));
     const isFiltered = needle !== "" || filter !== "all";
 
-    const path: BreadcrumbItem[] = [
-        { label: t("sidebar.home"), href: "/home" },
-        { label: t("workspace.projects.title"), href: "/projects" },
+    const breadcrumb: BreadcrumbItem[] = [
+        { label: t("sidebar.home"), to: "/home" },
+        { label: t("workspace.projects.title"), to: "/projects" },
     ];
 
     return (
-        <div className="flex min-w-0 flex-1 flex-col">
-            <TopBar path={path} />
-            <main className="flex-1 p-8">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <PageHeader
+                breadcrumb={breadcrumb}
+                actions={
+                    <HeaderAction
+                        variant="primary"
+                        icon={FiPlus}
+                        label={t("workspace.projects.create.title")}
+                        onClick={() => setIsCreateOpen(true)}
+                    />
+                }
+            />
+            <main className="flex-1 overflow-auto p-8">
                 <div className="mb-6 flex items-center justify-between gap-4">
                     <h1 className="text-2xl font-bold">
                         {t("workspace.projects.title")}
@@ -105,12 +115,6 @@ export default function ProjectsPage() {
                             </span>
                         )}
                     </h1>
-                    <Button variant="primary" size="lg"
-                        type="button"
-                        onClick={() => setIsCreateOpen(true)}
-                    >
-                        + {t("workspace.projects.create.title")}
-                    </Button>
                 </div>
 
                 <div className="mb-6 flex flex-wrap items-center gap-3">

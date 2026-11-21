@@ -12,7 +12,8 @@ export type RecentComment = {
     createdAt: Date;
 };
 
-export type AppNotificationKind = "dueSoon" | "overdue" | "comment";
+// "info" is a plain confirmation, e.g. after copying a link.
+export type AppNotificationKind = "dueSoon" | "overdue" | "comment" | "info";
 
 // A notification shown in the app (and as a system notification when the
 // browser allows it).

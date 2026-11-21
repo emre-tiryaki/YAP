@@ -63,4 +63,6 @@ export type Preferences = {
   background: Background;
   // Sidebar shown as an icon rail.
   sidebarCollapsed: boolean;
+  // Width in px of the expanded sidebar.
+  sidebarWidth: number;
 };

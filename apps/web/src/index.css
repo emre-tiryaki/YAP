@@ -396,11 +396,17 @@
 }
 
 @layer components {
-    .app-sidebar {
-        background-color: var(--color-gray-50);
+    /* The grey gutter around the sidebar and the page frame; transparent
+       over a background so the picture shows through it. */
+    .app-canvas {
+        background-color: var(--color-canvas);
     }
-    .app-topbar {
-        background-color: var(--color-white);
+    :root[data-bg] .app-canvas {
+        background-color: transparent;
+    }
+    /* The sidebar has no fill of its own: it sits on the canvas. */
+    .app-sidebar {
+        background-color: transparent;
     }
     /* Text placed straight on the picture (headings, date labels, links)
        gets a soft halo of the surface color; on cards it matches the card

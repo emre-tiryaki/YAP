@@ -13,7 +13,7 @@ import { ResourceMenu } from "../components/ResourceMenu";
 import { RepositoryPane } from "../components/RepositoryPane";
 import { ResourceTree } from "../components/ResourceTree";
 import { Tabs } from "../components/Tabs";
-import { TopBar } from "../components/TopBar";
+import { PageHeader } from "../components/PageHeader";
 import { useDateFormat } from "../hooks/useDateFormat";
 import { useResourceMenuItems } from "../hooks/useResourceMenuItems";
 import { errorKey, useResourceOperations, type ResourceOperations } from "../hooks/useResourceOperations";
@@ -66,11 +66,11 @@ export default function ResourcesPage({ view = "browse" }: { view?: "browse" | "
     }
 
     const folderPath = pathTo(index, current?.trashedAt ? null : (current?.id ?? null));
-    const path: BreadcrumbItem[] = [
-        { label: t("resources.title"), href: "/resources" },
-        ...(view === "trash" ? [{ label: t("resources.trash"), href: "/resources/trash" }] : []),
-        ...folderPath.map((r) => ({ label: r.name, href: `/resources/${r.id}` })),
-        ...(current?.trashedAt ? [{ label: current.name, href: `/resources/${current.id}` }] : []),
+    const breadcrumb: BreadcrumbItem[] = [
+        { label: t("resources.title"), to: "/resources" },
+        ...(view === "trash" ? [{ label: t("resources.trash"), to: "/resources/trash" }] : []),
+        ...folderPath.map((r) => ({ label: r.name, to: `/resources/${r.id}` })),
+        ...(current?.trashedAt ? [{ label: current.name, to: `/resources/${current.id}` }] : []),
     ];
 
     let body: ReactNode;
@@ -118,8 +118,8 @@ export default function ResourcesPage({ view = "browse" }: { view?: "browse" | "
     }
 
     return (
-        <div className="flex h-screen min-w-0 flex-1 flex-col">
-            <TopBar path={path} />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <PageHeader breadcrumb={breadcrumb} />
             <div className="flex min-h-0 flex-1">
                 <aside style={{ width }} className="flex shrink-0 flex-col border-r border-gray-200 bg-gray-50">
                     <ResourceTree

@@ -11,7 +11,7 @@ import { PlanBoard } from "../components/PlanBoard";
 import { PlanHeader, PlanHeaderSkeleton } from "../components/PlanHeader";
 import { TaskDialogs } from "../components/TaskDialogs";
 import { TaskDetailModal } from "../components/TaskDetailModal";
-import { TopBar } from "../components/TopBar";
+import { PageHeader } from "../components/PageHeader";
 import type { BreadcrumbItem } from "../types/breadcrumb";
 import { ViewToggle, type BoardView } from "../components/ViewToggle";
 import {
@@ -82,12 +82,12 @@ export default function PlanDetailPage() {
     if (plan.error instanceof ApiError && plan.error.status === 404)
         return <NotFoundPage />;
 
-    const path: BreadcrumbItem[] = [
-        { label: t("sidebar.projects"), href: "/home" },
-        { label: project.data?.name ?? "", href: `/projects/${projectId}` },
+    const breadcrumb: BreadcrumbItem[] = [
+        { label: t("sidebar.projects"), to: "/projects" },
+        { label: project.data?.name ?? "", to: `/projects/${projectId}` },
         {
             label: plan.data?.name ?? "",
-            href: `/projects/${projectId}/plans/${planId}`,
+            to: `/projects/${projectId}/plans/${planId}`,
         },
     ].filter((item) => item.label);
 
@@ -105,9 +105,21 @@ export default function PlanDetailPage() {
     const boardError = statuses.isError || tasks.isError;
 
     return (
-        <div className="flex min-w-0 flex-1 flex-col">
-            <TopBar path={path} />
-            <main className="flex min-w-0 flex-1 flex-col p-8">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <PageHeader
+                breadcrumb={breadcrumb}
+                actions={
+                    <ViewToggle
+                        value={view}
+                        onChange={(next) =>
+                            setSearchParams(next === "board" ? {} : { view: next }, {
+                                replace: true,
+                            })
+                        }
+                    />
+                }
+            />
+            <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto p-8">
                 {plan.isLoading && <PlanHeaderSkeleton />}
                 {plan.isError && (
                     <InlineError
@@ -128,19 +140,6 @@ export default function PlanDetailPage() {
 
                 {plan.data && (
                     <>
-                        <div className="mb-4 flex items-center justify-between">
-                            <ViewToggle
-                                value={view}
-                                onChange={(next) =>
-                                    setSearchParams(
-                                        next === "board"
-                                            ? {}
-                                            : { view: next },
-                                        { replace: true },
-                                    )
-                                }
-                            />
-                        </div>
                         {moveTask.isError && (
                             <div className="mb-4">
                                 <InlineError

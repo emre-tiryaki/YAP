@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { TopBar } from "../components/TopBar";
+import { PageHeader } from "../components/PageHeader";
 import type { BreadcrumbItem } from "../types/breadcrumb";
 import { Modal } from "../components/Modal";
 import { useShortcut } from "../hooks/useShortcut";
@@ -27,15 +27,15 @@ export default function WorkspaceHomePage() {
     useShortcut({ key: "n" }, () => setIsTaskModalOpen(true));
 
     const projectItems = projects.data ?? [];
-    const path: BreadcrumbItem[] = [
-        { label: t("sidebar.home"), href: "/home" },
-        { label: workspace.data?.name ?? "", href: "/home" },
+    const breadcrumb: BreadcrumbItem[] = [
+        { label: t("sidebar.home"), to: "/home" },
+        { label: workspace.data?.name ?? "", to: "/home" },
     ].filter((item) => item.label);
 
     return (
-        <div className="flex min-w-0 flex-1 flex-col">
-            <TopBar path={path} />
-            <main className="flex-1 p-8">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <PageHeader breadcrumb={breadcrumb} />
+            <main className="flex-1 overflow-auto p-8">
                 <h1 className="mb-8 text-2xl font-bold">
                     {t("workspace.welcome")}
                     {workspace.data && `, ${workspace.data.username}`}

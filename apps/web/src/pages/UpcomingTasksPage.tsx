@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router";
-import { TopBar } from "../components/TopBar";
+import { FiPlus } from "react-icons/fi";
+import { HeaderAction } from "../components/HeaderAction";
+import { PageHeader } from "../components/PageHeader";
 import { Modal } from "../components/Modal";
 import { TaskList } from "../components/TaskList";
 import { CreateTaskForm } from "../components/CreateTaskForm";
@@ -9,7 +11,6 @@ import { useShortcut } from "../hooks/useShortcut";
 import { useUpcomingTasks } from "../hooks/useTasks";
 import { useTranslate } from "../hooks/useTranslate";
 import type { BreadcrumbItem } from "../types/breadcrumb";
-import { Button } from "../components/Button";
 import { PropertySelect } from "../components/PropertySelect";
 
 export default function UpcomingTasksPage() {
@@ -28,15 +29,25 @@ export default function UpcomingTasksPage() {
         ? allTasks.filter((task) => task.projectId === projectId)
         : allTasks;
 
-    const path: BreadcrumbItem[] = [
-        { label: t("sidebar.home"), href: "/home" },
-        { label: t("workspace.tasks.title"), href: "/tasks" },
+    const breadcrumb: BreadcrumbItem[] = [
+        { label: t("sidebar.home"), to: "/home" },
+        { label: t("workspace.tasks.title"), to: "/tasks" },
     ];
 
     return (
-        <div className="flex min-w-0 flex-1 flex-col">
-            <TopBar path={path} />
-            <main className="mx-auto w-full max-w-4xl flex-1 p-8">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <PageHeader
+                breadcrumb={breadcrumb}
+                actions={
+                    <HeaderAction
+                        variant="primary"
+                        icon={FiPlus}
+                        label={t("workspace.tasks.create.title")}
+                        onClick={() => setIsCreateOpen(true)}
+                    />
+                }
+            />
+            <main className="mx-auto w-full max-w-4xl flex-1 overflow-auto p-8">
                 <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
                     <h1 className="text-2xl font-bold">
                         {t("workspace.tasks.title")}
@@ -66,12 +77,6 @@ export default function UpcomingTasksPage() {
                                 })),
                             ]}
                         />
-                        <Button variant="primary" size="lg"
-                            type="button"
-                            onClick={() => setIsCreateOpen(true)}
-                        >
-                            + {t("workspace.tasks.create.title")}
-                        </Button>
                     </div>
                 </div>
                 <TaskList

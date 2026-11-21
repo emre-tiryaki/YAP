@@ -1,6 +1,6 @@
 import { useEffect, useState, type ComponentType } from "react";
 import { useNavigate } from "react-router";
-import { FiAlertCircle, FiClock, FiMessageSquare, FiX } from "react-icons/fi";
+import { FiAlertCircle, FiCheck, FiClock, FiMessageSquare, FiX } from "react-icons/fi";
 import { useRecentComments } from "../hooks/useComments";
 import { useDateFormat } from "../hooks/useDateFormat";
 import { useUpcomingTasks } from "../hooks/useTasks";
@@ -30,6 +30,7 @@ const icons: Record<AppNotificationKind, { Icon: IconType; tone: string }> = {
     dueSoon: { Icon: FiClock, tone: "text-accent" },
     overdue: { Icon: FiAlertCircle, tone: "text-red-600" },
     comment: { Icon: FiMessageSquare, tone: "text-gray-500" },
+    info: { Icon: FiCheck, tone: "text-accent" },
 };
 
 // Watches the user's tasks and new comments and shows the notifications the

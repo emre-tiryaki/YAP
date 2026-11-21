@@ -19,6 +19,10 @@ import { backgroundColors, backgroundImages } from "../util/backgrounds";
 // localStorage rather than the database.
 const STORAGE_KEY = "yap.preferences";
 
+export const SIDEBAR_MIN_WIDTH = 220;
+export const SIDEBAR_MAX_WIDTH = 360;
+export const SIDEBAR_DEFAULT_WIDTH = 248;
+
 const languages: readonly Language[] = ["en", "tr"];
 const weekStarts: readonly WeekStart[] = ["monday", "sunday"];
 const dateFormats: readonly DateFormat[] = ["dmy", "mdy", "iso"];
@@ -50,6 +54,7 @@ function defaults(): Preferences {
     background: { kind: "none" },
     // The sidebar used to keep this in its own key; read it once as the start value.
     sidebarCollapsed: localStorage.getItem("yap.sidebar.collapsed") === "true",
+    sidebarWidth: SIDEBAR_DEFAULT_WIDTH,
   };
 }
 
@@ -123,6 +128,13 @@ function read(): Preferences {
       typeof stored.sidebarCollapsed === "boolean"
         ? stored.sidebarCollapsed
         : base.sidebarCollapsed,
+    sidebarWidth:
+      typeof stored.sidebarWidth === "number"
+        ? Math.min(
+            SIDEBAR_MAX_WIDTH,
+            Math.max(SIDEBAR_MIN_WIDTH, Math.round(stored.sidebarWidth)),
+          )
+        : base.sidebarWidth,
   };
   return cache;
 }

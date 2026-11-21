@@ -4,7 +4,9 @@ import { useTranslate } from "../hooks/useTranslate";
 import { useProject, useProjectPlans } from "../hooks/useProjects";
 import { ApiError } from "../api/client";
 import NotFoundPage from "./NotFoundPage";
-import { TopBar } from "../components/TopBar";
+import { FiPlus } from "react-icons/fi";
+import { HeaderAction } from "../components/HeaderAction";
+import { PageHeader } from "../components/PageHeader";
 import type { BreadcrumbItem } from "../types/breadcrumb";
 import {
     ProjectHeader,
@@ -27,15 +29,25 @@ export default function ProjectDetailPage() {
     if (project.error instanceof ApiError && project.error.status === 404)
         return <NotFoundPage />;
 
-    const path: BreadcrumbItem[] = [
-        { label: t("sidebar.projects"), href: "/projects" },
-        { label: project.data?.name ?? "", href: `/projects/${projectId}` },
+    const breadcrumb: BreadcrumbItem[] = [
+        { label: t("sidebar.projects"), to: "/projects" },
+        { label: project.data?.name ?? "", to: `/projects/${projectId}` },
     ].filter((item) => item.label);
 
     return (
-        <div className="flex min-w-0 flex-1 flex-col">
-            <TopBar path={path} />
-            <main className="flex-1 p-8">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <PageHeader
+                breadcrumb={breadcrumb}
+                actions={
+                    <HeaderAction
+                        variant="primary"
+                        icon={FiPlus}
+                        label={t("project.plans.create.title")}
+                        onClick={() => setIsPlanModalOpen(true)}
+                    />
+                }
+            />
+            <main className="flex-1 overflow-auto p-8">
                 {project.isLoading && <ProjectHeaderSkeleton />}
                 {project.isError && (
                     <InlineError

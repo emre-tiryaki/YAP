@@ -573,5 +573,15 @@
     "common.noOptions": "No options",
     "settings.shortcuts.group.general": "General",
     "settings.shortcuts.group.resources": "Resources",
-    "settings.shortcuts.group.tasks": "Tasks"
+    "settings.shortcuts.group.tasks": "Tasks",
+    "sidebar.newTask": "New task",
+    "sidebar.project.overview": "Overview",
+    "sidebar.project.expand": "Expand project",
+    "sidebar.project.collapse": "Collapse project",
+    "sidebar.project.menu": "Project actions",
+    "sidebar.project.copyLink": "Copy link",
+    "sidebar.project.linkCopied": "Link copied",
+    "sidebar.resize": "Resize sidebar",
+    "sidebar.profile.theme": "Theme",
+    "sidebar.nav.label": "Main navigation"
 }

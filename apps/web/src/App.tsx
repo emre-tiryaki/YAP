@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router"
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from "react-router"
 import WorkspaceHomePage from "./pages/WorkspaceHomePage"
 import NotFoundPage from "./pages/NotFoundPage";
 import ProjectDetailPage from "./pages/ProjectDetailPage";
@@ -7,23 +7,28 @@ import ResourcesPage from "./pages/ResourcesPage";
 import ProjectsPage from "./pages/ProjectsPage";
 import UpcomingTasksPage from "./pages/UpcomingTasksPage";
 import { useEffect } from "react";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Sidebar } from "./components/SideBar";
 import { NotificationCenter } from "./components/NotificationCenter";
 import { usePreferences } from "./hooks/usePreferences";
 import { useTheme } from "./hooks/useTheme";
 
-// Shared shell: the sidebar stays mounted across page navigations. The page
-// sits on `app-surface`, which turns translucent over a background picture.
+// Shared shell: a grey canvas with the sidebar on it and the page in a
+// rounded frame. The sidebar stays mounted across navigations; the frame
+// (`app-frame`) turns translucent over a background picture.
 function AppLayout() {
-  return (
-      <div className="flex min-h-screen">
-          <Sidebar />
-          <div className="app-surface flex min-w-0 flex-1">
-              <Outlet />
-          </div>
-          <NotificationCenter />
-      </div>
-  );
+    const { pathname } = useLocation();
+    return (
+        <div className="app-canvas flex h-screen gap-2 bg-canvas p-2">
+            <Sidebar />
+            <div className="app-frame flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-line bg-surface-1">
+                <ErrorBoundary key={pathname}>
+                    <Outlet />
+                </ErrorBoundary>
+            </div>
+            <NotificationCenter />
+        </div>
+    );
 }
 
 function App() {

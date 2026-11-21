@@ -573,5 +573,15 @@
     "common.noOptions": "Seçenek yok",
     "settings.shortcuts.group.general": "Genel",
     "settings.shortcuts.group.resources": "Kaynaklar",
-    "settings.shortcuts.group.tasks": "Görevler"
+    "settings.shortcuts.group.tasks": "Görevler",
+    "sidebar.newTask": "Yeni görev",
+    "sidebar.project.overview": "Genel bakış",
+    "sidebar.project.expand": "Projeyi genişlet",
+    "sidebar.project.collapse": "Projeyi daralt",
+    "sidebar.project.menu": "Proje işlemleri",
+    "sidebar.project.copyLink": "Bağlantıyı kopyala",
+    "sidebar.project.linkCopied": "Bağlantı kopyalandı",
+    "sidebar.resize": "Kenar çubuğunu yeniden boyutlandır",
+    "sidebar.profile.theme": "Tema",
+    "sidebar.nav.label": "Ana gezinme"
 }
