@@ -90,13 +90,13 @@ func (*AccountRepository) PlanNames(ctx context.Context, q database.DBTX, worksp
 // workspace with the same id.
 func (*AccountRepository) InsertProject(ctx context.Context, q database.DBTX, workspaceID string, p model.ImportProject, now string) error {
 	_, err := q.ExecContext(ctx,
-		`INSERT INTO projects (id, workspace_id, name, description, icon, created_at, updated_at, archived_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		`INSERT INTO projects (id, workspace_id, name, description, icon, identifier, created_at, updated_at, archived_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		 ON CONFLICT (id) DO UPDATE SET name = excluded.name, description = excluded.description,
-		     icon = excluded.icon, created_at = excluded.created_at, updated_at = excluded.updated_at,
-		     archived_at = excluded.archived_at, deleted_at = NULL
+		     icon = excluded.icon, identifier = excluded.identifier, created_at = excluded.created_at,
+		     updated_at = excluded.updated_at, archived_at = excluded.archived_at, deleted_at = NULL
 		   WHERE projects.workspace_id = excluded.workspace_id`,
-		p.ID, workspaceID, p.Name, p.Description, p.Icon, p.CreatedAt, now, p.ArchivedAt,
+		p.ID, workspaceID, p.Name, p.Description, p.Icon, p.Identifier, p.CreatedAt, now, p.ArchivedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("import project: %w", err)
@@ -136,11 +136,35 @@ func (*AccountRepository) InsertStatus(ctx context.Context, q database.DBTX, wor
 	return nil
 }
 
-func (*AccountRepository) InsertTask(ctx context.Context, q database.DBTX, workspaceID, createdBy string, t model.ImportTask, now string) error {
+// LiveIdentifiers returns the identifiers of the workspace's live projects.
+func (*AccountRepository) LiveIdentifiers(ctx context.Context, q database.DBTX, workspaceID string) (map[string]bool, error) {
+	return (&ProjectRepository{}).Identifiers(ctx, q, workspaceID)
+}
+
+// TaskNumber returns the number of a task row that exists (live or deleted),
+// or 0 when there is no such row or it has none.
+func (*AccountRepository) TaskNumber(ctx context.Context, q database.DBTX, taskID string) (int, error) {
+	var number sql.NullInt64
+	err := q.QueryRowContext(ctx, `SELECT number FROM tasks WHERE id = ?`, taskID).Scan(&number)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("task number: %w", err)
+	}
+	return int(number.Int64), nil
+}
+
+// ReserveTaskNumber takes the next task number of a project.
+func (*AccountRepository) ReserveTaskNumber(ctx context.Context, q database.DBTX, workspaceID, projectID, now string) (int, error) {
+	return (&TaskRepository{}).ReserveNumber(ctx, q, workspaceID, projectID, now)
+}
+
+func (*AccountRepository) InsertTask(ctx context.Context, q database.DBTX, workspaceID, createdBy string, t model.ImportTask, number int, now string) error {
 	_, err := q.ExecContext(ctx,
 		`INSERT INTO tasks (id, workspace_id, project_id, plan_id, status_id, parent_id, created_by, title, description,
-		                    position, due_date, priority, completed_at, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		                    position, due_date, priority, number, completed_at, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		 ON CONFLICT (id) DO UPDATE SET project_id = excluded.project_id, plan_id = excluded.plan_id,
 		     status_id = excluded.status_id, parent_id = excluded.parent_id, created_by = excluded.created_by,
 		     title = excluded.title, description = excluded.description, position = excluded.position,
@@ -148,7 +172,7 @@ func (*AccountRepository) InsertTask(ctx context.Context, q database.DBTX, works
 		     updated_at = excluded.updated_at, deleted_at = NULL
 		   WHERE tasks.workspace_id = excluded.workspace_id`,
 		t.ID, workspaceID, t.ProjectID, t.PlanID, t.StatusID, t.ParentID, createdBy, t.Title, t.Description,
-		t.Position, t.DueDate, t.Priority, t.CompletedAt, t.CreatedAt, now,
+		t.Position, t.DueDate, t.Priority, number, t.CompletedAt, t.CreatedAt, now,
 	)
 	if err != nil {
 		return fmt.Errorf("import task: %w", err)

@@ -12,6 +12,7 @@ import { useTranslate } from "../hooks/useTranslate";
 import type { Status } from "../types/status";
 import type { PlanTask, UpdateTaskInput } from "../types/task";
 import { fromDateInputValue, toDateInputValue } from "../util/date";
+import { taskKey } from "../util/taskKey";
 import { CommentSection } from "./CommentSection";
 import { DatePicker } from "./DatePicker";
 import { FormError } from "./FormError";
@@ -55,6 +56,7 @@ export function TaskBody({ projectId, planId, task, statuses, full }: TaskBodyPr
     // Bumped by the D shortcut to open the due date calendar.
     const [dueDateRequest, setDueDateRequest] = useState(0);
     const isDone = task.completedAt !== null;
+    const key = taskKey(project.data?.identifier ?? "", task.number);
 
     // The palette offers this task's actions while it is open.
     useEffect(() => {
@@ -113,6 +115,12 @@ export function TaskBody({ projectId, planId, task, statuses, full }: TaskBodyPr
                 >
                     {plan.data?.name}
                 </Link>
+                {key && (
+                    <>
+                        <span aria-hidden>▸</span>
+                        <span>{key}</span>
+                    </>
+                )}
             </p>
 
             <div className="flex items-start gap-3">

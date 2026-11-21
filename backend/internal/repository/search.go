@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/emre-tiryaki/YAP/backend/internal/database"
@@ -90,6 +91,30 @@ func (*SearchRepository) SearchTasks(ctx context.Context, q database.DBTX, works
 			&t.ParentID, &t.Title, &t.Done)
 		return t, err
 	})
+}
+
+// TaskByKey finds the live task with the given project identifier and number.
+func (*SearchRepository) TaskByKey(ctx context.Context, q database.DBTX, workspaceID, identifier string, number int) (model.SearchTask, bool, error) {
+	var t model.SearchTask
+	err := q.QueryRowContext(ctx,
+		`SELECT t.id, t.project_id, p.name, t.plan_id, pl.name,
+		        COALESCE(t.parent_id, ''), t.title, t.completed_at IS NOT NULL
+		 FROM tasks t
+		 JOIN projects p ON p.id = t.project_id AND p.workspace_id = t.workspace_id
+		 JOIN plans pl ON pl.id = t.plan_id AND pl.project_id = t.project_id
+		 LEFT JOIN tasks parent ON parent.id = t.parent_id
+		 WHERE t.workspace_id = ? AND p.identifier = ? AND t.number = ?
+		   AND t.deleted_at IS NULL AND p.deleted_at IS NULL AND pl.deleted_at IS NULL
+		   AND (t.parent_id IS NULL OR parent.deleted_at IS NULL)`,
+		workspaceID, identifier, number,
+	).Scan(&t.ID, &t.ProjectID, &t.ProjectName, &t.PlanID, &t.PlanName, &t.ParentID, &t.Title, &t.Done)
+	if errors.Is(err, sql.ErrNoRows) {
+		return model.SearchTask{}, false, nil
+	}
+	if err != nil {
+		return model.SearchTask{}, false, fmt.Errorf("task by key: %w", err)
+	}
+	return t, true, nil
 }
 
 // SearchResources matches the names of live (not trashed, not purged) files

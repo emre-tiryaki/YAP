@@ -7,6 +7,7 @@ import {
     FiCommand,
     FiFlag,
     FiFolder,
+    FiHash,
     FiHome,
     FiLink,
     FiMonitor,
@@ -41,6 +42,7 @@ import { usePlanTasks, useSetTaskDone, useUpdateTask } from "../hooks/useTasks";
 import { pushInfoToast } from "../hooks/useToasts";
 import { useTranslate, type TranslationKey } from "../hooks/useTranslate";
 import { priorities } from "../util/priority";
+import { taskKey } from "../util/taskKey";
 import { toSearchGroups } from "../util/searchHits";
 import { CreatePlanForm } from "./CreatePlanForm";
 import { CreateProjectForm } from "./CreateProjectForm";
@@ -159,6 +161,10 @@ function PaletteDialog({ page, context, projectId, onCreate, onDelete }: Palette
     );
     const setDone = useSetTaskDone(context?.projectId ?? "", context?.planId ?? "");
     const update = useUpdateTask();
+    const contextKey = taskKey(
+        projects.data?.find((p) => p.id === context?.projectId)?.identifier ?? "",
+        task?.number ?? 0,
+    );
     const needle = query.trim().toLowerCase();
     const search = useSearch(needle.length >= 2 ? query : "");
 
@@ -241,6 +247,20 @@ function PaletteDialog({ page, context, projectId, onCreate, onDelete }: Palette
                         pushInfoToast(t("task.peek.linkCopied"), task.title);
                     },
                 },
+                ...(contextKey
+                    ? [
+                          {
+                              id: "ctx:id",
+                              group: group("palette.group.context"),
+                              label: `${t("palette.copyId")} (${contextKey})`,
+                              icon: <FiHash aria-hidden />,
+                              run: () => {
+                                  void navigator.clipboard.writeText(contextKey);
+                                  pushInfoToast(t("task.key.copied"), contextKey);
+                              },
+                          },
+                      ]
+                    : []),
                 {
                     id: "ctx:delete",
                     group: group("palette.group.context"),

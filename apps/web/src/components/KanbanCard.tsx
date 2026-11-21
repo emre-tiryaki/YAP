@@ -2,6 +2,8 @@ import { useParams } from "react-router";
 import type { CardAction } from "../types/cardAction";
 import type { Status } from "../types/status";
 import type { PlanTask, TaskPropertyKey } from "../types/task";
+import { useProjectIdentifier } from "../hooks/useProjects";
+import { taskKey } from "../util/taskKey";
 import { allTaskProperties } from "../util/taskView";
 import { CardMenu } from "./CardMenu";
 import { TaskProperties } from "./TaskProperties";
@@ -32,6 +34,7 @@ export function KanbanCard({
     const projectId = location.projectId ?? params.projectId ?? "";
     const planId = location.planId ?? params.planId ?? "";
     const isDone = task.completedAt !== null;
+    const key = taskKey(useProjectIdentifier(projectId), task.number);
 
     return (
         <div
@@ -41,6 +44,9 @@ export function KanbanCard({
                     : `${isDraggable ? "cursor-grab" : "cursor-pointer"} hover:border-line-strong hover:shadow-raised`
             }`}
         >
+            {key && (
+                <p className="text-caption text-fg-subtle">{key}</p>
+            )}
             <p
                 className={`pr-6 text-body-xs font-medium break-words ${
                     isDone ? "text-fg-subtle line-through" : "text-fg"

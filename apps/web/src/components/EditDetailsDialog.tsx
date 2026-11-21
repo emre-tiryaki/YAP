@@ -11,6 +11,8 @@ export type DetailsValue = {
     description: string;
     // Only set when the dialog edits an icon.
     icon?: string;
+    // Only set when the dialog edits a project identifier.
+    identifier?: string;
 };
 
 type EditDetailsDialogProps = {
@@ -19,6 +21,8 @@ type EditDetailsDialogProps = {
     initial: DetailsValue;
     // Shows the emoji picker and includes `icon` in the submitted value.
     withIcon?: boolean;
+    // Shows the project identifier field (ABC) and includes `identifier`.
+    withIdentifier?: boolean;
     isPending: boolean;
     errorMessage: string | null;
     onSubmit: (value: DetailsValue) => void;
@@ -47,6 +51,7 @@ type EditDetailsFormProps = Omit<
 function EditDetailsForm({
     initial,
     withIcon = false,
+    withIdentifier = false,
     isPending,
     errorMessage,
     onSubmit,
@@ -55,10 +60,16 @@ function EditDetailsForm({
     const [name, setName] = useState(initial.name);
     const [description, setDescription] = useState(initial.description);
     const [icon, setIcon] = useState(initial.icon ?? "");
+    const [identifier, setIdentifier] = useState(initial.identifier ?? "");
 
     function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
-        onSubmit(withIcon ? { name, description, icon } : { name, description });
+        onSubmit({
+            name,
+            description,
+            ...(withIcon ? { icon } : {}),
+            ...(withIdentifier ? { identifier } : {}),
+        });
     }
 
     return (
@@ -75,6 +86,22 @@ function EditDetailsForm({
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
             />
+            {withIdentifier && (
+                <div className="flex flex-col gap-1">
+                    <TextInput
+                        label={t("project.identifier")}
+                        value={identifier}
+                        onChange={(event) =>
+                            setIdentifier(event.target.value.toUpperCase())
+                        }
+                        maxLength={5}
+                        required
+                    />
+                    <p className="text-caption text-fg-subtle">
+                        {t("project.identifier.hint")}
+                    </p>
+                </div>
+            )}
             {withIcon && <IconPicker value={icon} onChange={setIcon} />}
             <FormError message={errorMessage} />
             <div>

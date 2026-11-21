@@ -31,6 +31,7 @@ type TaskRepository interface {
 	Update(ctx context.Context, q database.DBTX, workspaceID, taskID, title, description string, dueDate *time.Time, priority model.TaskPriority, now string) error
 	ListSubtasks(ctx context.Context, q database.DBTX, workspaceID, parentID string) ([]model.Task, error)
 	SetCompletedAt(ctx context.Context, q database.DBTX, workspaceID, taskID string, completedAt *time.Time, now string) error
+	ReserveNumber(ctx context.Context, q database.DBTX, workspaceID, projectID, now string) (int, error)
 }
 
 type CreateTaskInput struct {
@@ -120,6 +121,9 @@ func (s *TaskService) Create(ctx context.Context, session model.Session, project
 		task.Position = position.After(last)
 
 		now := nowUTC()
+		if task.Number, err = s.tasks.ReserveNumber(ctx, tx, session.WorkspaceID, projectID, now); err != nil {
+			return err
+		}
 		if err := s.tasks.Insert(ctx, tx, task, now); err != nil {
 			return err
 		}
@@ -327,6 +331,9 @@ func (s *TaskService) CreateSubtask(ctx context.Context, session model.Session, 
 		task.Position = position.After(last)
 
 		now := nowUTC()
+		if task.Number, err = s.tasks.ReserveNumber(ctx, tx, session.WorkspaceID, parent.ProjectID, now); err != nil {
+			return err
+		}
 		if err := s.tasks.Insert(ctx, tx, task, now); err != nil {
 			return err
 		}

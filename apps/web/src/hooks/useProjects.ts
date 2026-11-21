@@ -19,6 +19,12 @@ export function useProjects() {
     return useQuery({ queryKey: ["projects"], queryFn: listProjects });
 }
 
+// The identifier of a project ("ABC"), or "" until the projects are loaded.
+export function useProjectIdentifier(projectId: string): string {
+    const projects = useProjects();
+    return projects.data?.find((p) => p.id === projectId)?.identifier ?? "";
+}
+
 export function useCreateProjects() {
     const queryClient = useQueryClient();
 

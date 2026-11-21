@@ -35,9 +35,12 @@ type AccountRepository interface {
 	HasContent(ctx context.Context, q database.DBTX, workspaceID string) (bool, error)
 	PlanNames(ctx context.Context, q database.DBTX, workspaceID, projectID string) (map[string]bool, error)
 	InsertProject(ctx context.Context, q database.DBTX, workspaceID string, p model.ImportProject, now string) error
+	LiveIdentifiers(ctx context.Context, q database.DBTX, workspaceID string) (map[string]bool, error)
+	TaskNumber(ctx context.Context, q database.DBTX, taskID string) (int, error)
+	ReserveTaskNumber(ctx context.Context, q database.DBTX, workspaceID, projectID, now string) (int, error)
 	InsertPlan(ctx context.Context, q database.DBTX, workspaceID string, p model.ImportPlan, now string) error
 	InsertStatus(ctx context.Context, q database.DBTX, workspaceID string, s model.ImportStatus, now string) error
-	InsertTask(ctx context.Context, q database.DBTX, workspaceID, createdBy string, t model.ImportTask, now string) error
+	InsertTask(ctx context.Context, q database.DBTX, workspaceID, createdBy string, t model.ImportTask, number int, now string) error
 	InsertAssignee(ctx context.Context, q database.DBTX, workspaceID, taskID, membershipID, assignedAt, now string) error
 	InsertComment(ctx context.Context, q database.DBTX, workspaceID, authorID string, c model.ImportComment) error
 	InsertResource(ctx context.Context, q database.DBTX, workspaceID, createdBy, nameKey string, r model.ImportResource, now string) error

@@ -97,6 +97,7 @@ type ProjectDto = {
     name: string;
     description: string;
     icon: string;
+    identifier: string;
     task_count: number;
 };
 
@@ -111,6 +112,7 @@ type TaskDto = {
     position: string;
     due_date: string | null;
     priority: TaskPriority;
+    number: number;
     status_category: StatusCategory;
     completed_at: string | null;
 };
@@ -146,6 +148,7 @@ type PlanTaskDto = {
     position: string;
     due_date: string | null;
     priority: TaskPriority;
+    number: number;
     completed_at: string | null;
     // Sent for plan tasks; the upcoming list leaves them out.
     subtask_count?: number;
@@ -295,6 +298,7 @@ function toProject(dto: ProjectDto): Project {
         name: dto.name,
         description: dto.description,
         icon: dto.icon,
+        identifier: dto.identifier,
         taskCount: dto.task_count,
     };
 }
@@ -342,6 +346,7 @@ function toPlanTask(dto: PlanTaskDto): PlanTask {
         position: dto.position,
         dueDate: dto.due_date ? new Date(dto.due_date) : null,
         priority: dto.priority,
+        number: dto.number,
         completedAt: dto.completed_at ? new Date(dto.completed_at) : null,
         subtaskCount: dto.subtask_count ?? 0,
         doneSubtaskCount: dto.done_subtask_count ?? 0,

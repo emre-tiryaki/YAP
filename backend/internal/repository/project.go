@@ -17,7 +17,7 @@ func NewProjectRepository() *ProjectRepository {
 
 func (*ProjectRepository) List(ctx context.Context, q database.DBTX, workspaceID string) ([]model.Project, error) {
 	rows, err := q.QueryContext(ctx,
-		`SELECT p.id, p.name, p.description, p.icon,
+		`SELECT p.id, p.name, p.description, p.icon, COALESCE(p.identifier, ''),
 			(SELECT COUNT(*) FROM tasks t
 				WHERE t.project_id = p.id
 				AND t.workspace_id = p.workspace_id
@@ -36,7 +36,7 @@ func (*ProjectRepository) List(ctx context.Context, q database.DBTX, workspaceID
 	for rows.Next() {
 		p := model.Project{WorkspaceID: workspaceID}
 		var description, icon sql.NullString
-		if err := rows.Scan(&p.ID, &p.Name, &description, &icon, &p.TaskCount); err != nil {
+		if err := rows.Scan(&p.ID, &p.Name, &description, &icon, &p.Identifier, &p.TaskCount); err != nil {
 			return nil, fmt.Errorf("scan project: %w", err)
 		}
 		p.Description = description.String
@@ -51,14 +51,55 @@ func (*ProjectRepository) List(ctx context.Context, q database.DBTX, workspaceID
 
 func (*ProjectRepository) Insert(ctx context.Context, q database.DBTX, p model.Project, now string) error {
 	_, err := q.ExecContext(ctx,
-		`INSERT INTO projects (id, workspace_id, name, description, icon, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		p.ID, p.WorkspaceID, p.Name, nullIfEmpty(p.Description), nullIfEmpty(p.Icon), now, now,
+		`INSERT INTO projects (id, workspace_id, name, description, icon, identifier, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		p.ID, p.WorkspaceID, p.Name, nullIfEmpty(p.Description), nullIfEmpty(p.Icon), nullIfEmpty(p.Identifier), now, now,
 	)
 	if err != nil {
 		return fmt.Errorf("insert project: %w", err)
 	}
 	return nil
+}
+
+// Identifiers returns the identifiers of the workspace's live projects.
+func (*ProjectRepository) Identifiers(ctx context.Context, q database.DBTX, workspaceID string) (map[string]bool, error) {
+	rows, err := q.QueryContext(ctx,
+		`SELECT identifier FROM projects
+		 WHERE workspace_id = ? AND deleted_at IS NULL AND identifier IS NOT NULL`,
+		workspaceID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list identifiers: %w", err)
+	}
+	defer rows.Close()
+
+	taken := map[string]bool{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan identifier: %w", err)
+		}
+		taken[id] = true
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list identifiers: %w", err)
+	}
+	return taken, nil
+}
+
+// IdentifierTaken reports whether another live project of the workspace
+// already uses the identifier.
+func (*ProjectRepository) IdentifierTaken(ctx context.Context, q database.DBTX, workspaceID, identifier, excludeProjectID string) (bool, error) {
+	var n int
+	err := q.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM projects
+		 WHERE workspace_id = ? AND identifier = ? AND id <> ? AND deleted_at IS NULL`,
+		workspaceID, identifier, excludeProjectID,
+	).Scan(&n)
+	if err != nil {
+		return false, fmt.Errorf("identifier taken: %w", err)
+	}
+	return n > 0, nil
 }
 
 func (*ProjectRepository) InsertPlan(ctx context.Context, q database.DBTX, p model.Plan, now string) error {
@@ -131,7 +172,7 @@ func (*ProjectRepository) Get(ctx context.Context, q database.DBTX, workspaceID,
 	p := model.Project{ID: projectID, WorkspaceID: workspaceID}
 	var description, icon sql.NullString
 	err := q.QueryRowContext(ctx,
-		`SELECT p.name, p.description, p.icon,
+		`SELECT p.name, p.description, p.icon, COALESCE(p.identifier, ''),
 			(SELECT COUNT(*) FROM tasks t
 				WHERE t.project_id = p.id
 				AND t.workspace_id = p.workspace_id
@@ -139,7 +180,7 @@ func (*ProjectRepository) Get(ctx context.Context, q database.DBTX, workspaceID,
 		 FROM projects p
 		 WHERE p.id = ? AND p.workspace_id = ? AND p.deleted_at IS NULL`,
 		projectID, workspaceID,
-	).Scan(&p.Name, &description, &icon, &p.TaskCount)
+	).Scan(&p.Name, &description, &icon, &p.Identifier, &p.TaskCount)
 	if err != nil {
 		return model.Project{}, fmt.Errorf("get project: %w", err)
 	}
@@ -314,9 +355,9 @@ func (*ProjectRepository) UpdateStatus(ctx context.Context, q database.DBTX, wor
 // Update overwrites the name, description and icon of a non-deleted project.
 func (*ProjectRepository) Update(ctx context.Context, q database.DBTX, p model.Project, now string) error {
 	_, err := q.ExecContext(ctx,
-		`UPDATE projects SET name = ?, description = ?, icon = ?, updated_at = ?
+		`UPDATE projects SET name = ?, description = ?, icon = ?, identifier = ?, updated_at = ?
 		 WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`,
-		p.Name, nullIfEmpty(p.Description), nullIfEmpty(p.Icon), now, p.ID, p.WorkspaceID,
+		p.Name, nullIfEmpty(p.Description), nullIfEmpty(p.Icon), nullIfEmpty(p.Identifier), now, p.ID, p.WorkspaceID,
 	)
 	if err != nil {
 		return fmt.Errorf("update project: %w", err)

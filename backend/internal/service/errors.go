@@ -11,6 +11,9 @@ var (
 	ErrNotFound     = errors.New("not found")
 	ErrInvalidInput = errors.New("invalid input")
 	ErrConflict     = errors.New("conflict")
+	// ErrIdentifierTaken is a conflict: another project already uses the
+	// identifier.
+	ErrIdentifierTaken = fmt.Errorf("%w: identifier", ErrConflict)
 	// ErrInvalidPriority is an invalid input: the priority is not a known one.
 	ErrInvalidPriority = fmt.Errorf("%w: priority", ErrInvalidInput)
 	ErrForbidden       = errors.New("forbidden")

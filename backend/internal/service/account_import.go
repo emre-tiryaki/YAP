@@ -237,6 +237,8 @@ type importer struct {
 	ids map[string]string
 	// added holds the (local) ids of the rows this import inserted.
 	added map[string]bool
+	// idents are the live project identifiers, plus those of added projects.
+	idents map[string]bool
 	// placed are the disk paths written, removed again on failure.
 	placed [][]string
 }
@@ -301,12 +303,34 @@ func (im *importer) projects(ctx context.Context, tx *sql.Tx) error {
 			continue
 		}
 		p.ID = id
+		if p.Identifier, err = im.identifierFor(ctx, tx, p); err != nil {
+			return err
+		}
 		if err := im.s.repo.InsertProject(ctx, tx, im.session.WorkspaceID, p, im.now); err != nil {
 			return err
 		}
 		im.result.Added.Projects++
 	}
 	return nil
+}
+
+// identifierFor keeps the exported identifier when it is valid and free in this
+// workspace, and derives a new one from the name otherwise (an export made
+// before identifiers existed has none).
+func (im *importer) identifierFor(ctx context.Context, tx *sql.Tx, p model.ImportProject) (string, error) {
+	if im.idents == nil {
+		taken, err := im.s.repo.LiveIdentifiers(ctx, tx, im.session.WorkspaceID)
+		if err != nil {
+			return "", err
+		}
+		im.idents = taken
+	}
+	id := p.Identifier
+	if !identifierPattern.MatchString(id) || im.idents[id] {
+		id = suggestIdentifier(p.Name, im.idents)
+	}
+	im.idents[id] = true
+	return id, nil
 }
 
 func (im *importer) plans(ctx context.Context, tx *sql.Tx) error {
@@ -400,7 +424,18 @@ func (im *importer) tasks(ctx context.Context, tx *sql.Tx) error {
 			parent := im.ids[*t.ParentID]
 			t.ParentID = &parent
 		}
-		if err := im.s.repo.InsertTask(ctx, tx, im.session.WorkspaceID, im.session.MembershipID, t, im.now); err != nil {
+		// A task row that already exists (a deleted one coming back) keeps its
+		// number; an added task takes the project's next one.
+		number, err := im.s.repo.TaskNumber(ctx, tx, t.ID)
+		if err != nil {
+			return err
+		}
+		if number == 0 {
+			if number, err = im.s.repo.ReserveTaskNumber(ctx, tx, im.session.WorkspaceID, t.ProjectID, im.now); err != nil {
+				return err
+			}
+		}
+		if err := im.s.repo.InsertTask(ctx, tx, im.session.WorkspaceID, im.session.MembershipID, t, number, im.now); err != nil {
 			return err
 		}
 		im.result.Added.Tasks++

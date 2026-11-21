@@ -654,5 +654,11 @@
     "palette.changePriority": "Change priority...",
     "palette.placeholder.priority": "Pick a priority...",
     "palette.group.priority": "Priority",
-    "settings.shortcuts.changePriority": "Change the priority of the open task"
+    "settings.shortcuts.changePriority": "Change the priority of the open task",
+    "project.identifier": "Identifier",
+    "project.identifier.hint": "2 to 5 letters or digits, starting with a letter. Used in task keys such as ABC-12.",
+    "project.identifier.invalid": "The identifier must be 2 to 5 letters or digits and start with a letter.",
+    "project.identifier.taken": "Another project already uses this identifier.",
+    "task.key.copied": "Task ID copied",
+    "palette.copyId": "Copy ID"
 }

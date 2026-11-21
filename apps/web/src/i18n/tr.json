@@ -654,5 +654,11 @@
     "palette.changePriority": "Önceliği değiştir...",
     "palette.placeholder.priority": "Bir öncelik seçin...",
     "palette.group.priority": "Öncelik",
-    "settings.shortcuts.changePriority": "Açık görevin önceliğini değiştir"
+    "settings.shortcuts.changePriority": "Açık görevin önceliğini değiştir",
+    "project.identifier": "Kısaltma",
+    "project.identifier.hint": "Harfle başlayan 2 ila 5 harf veya rakam. ABC-12 gibi görev anahtarlarında kullanılır.",
+    "project.identifier.invalid": "Kısaltma harfle başlamalı ve 2 ila 5 harf veya rakamdan oluşmalı.",
+    "project.identifier.taken": "Bu kısaltmayı başka bir proje kullanıyor.",
+    "task.key.copied": "Görev kimliği kopyalandı",
+    "palette.copyId": "Kimliği kopyala"
 }

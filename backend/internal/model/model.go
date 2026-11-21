@@ -42,7 +42,9 @@ type Project struct {
 	Name        string
 	Description string
 	Icon        string
-	TaskCount   int
+	// Identifier is the short project code of task keys, e.g. "ABC" in ABC-12.
+	Identifier string
+	TaskCount  int
 }
 
 type Plan struct {
@@ -103,6 +105,8 @@ type Task struct {
 	StatusCategory StatusCategory
 	DueDate        *time.Time
 	Priority       TaskPriority
+	// Number is the task's number within its project (the 12 of ABC-12).
+	Number int
 	// CompletedAt is set while the task is finished. It does not depend on
 	// the task's status: moving a task between columns leaves it alone.
 	CompletedAt *time.Time
@@ -253,6 +257,8 @@ type ImportProject struct {
 	Icon        *string `json:"icon"`
 	CreatedAt   string  `json:"created_at"`
 	ArchivedAt  *string `json:"archived_at"`
+	// Empty in exports made before identifiers existed.
+	Identifier string `json:"identifier"`
 }
 
 type ImportPlan struct {
@@ -290,6 +296,9 @@ type ImportTask struct {
 	CompletedAt *string `json:"completed_at"`
 	// Empty in exports made before priorities existed.
 	Priority string `json:"priority"`
+	// Task number in the exporting database; the import numbers added tasks
+	// again.
+	Number *int `json:"number"`
 }
 
 type ImportAssignee struct {

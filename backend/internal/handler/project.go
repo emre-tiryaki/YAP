@@ -40,6 +40,7 @@ type projectResponse struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Icon        string `json:"icon"`
+	Identifier  string `json:"identifier"`
 	TaskCount   int    `json:"task_count"`
 }
 
@@ -50,7 +51,7 @@ type createProjectRequest struct {
 }
 
 func toProjectResponse(p model.Project) projectResponse {
-	return projectResponse{ID: p.ID, Name: p.Name, Description: p.Description, Icon: p.Icon, TaskCount: p.TaskCount}
+	return projectResponse{ID: p.ID, Name: p.Name, Description: p.Description, Icon: p.Icon, Identifier: p.Identifier, TaskCount: p.TaskCount}
 }
 
 func (h *ProjectHandler) list(w http.ResponseWriter, r *http.Request) {
@@ -301,6 +302,7 @@ type updateProjectRequest struct {
 	Name        *string `json:"name"`
 	Description *string `json:"description"`
 	Icon        *string `json:"icon"`
+	Identifier  *string `json:"identifier"`
 }
 
 func (h *ProjectHandler) update(w http.ResponseWriter, r *http.Request) {
@@ -313,6 +315,7 @@ func (h *ProjectHandler) update(w http.ResponseWriter, r *http.Request) {
 		Name:        req.Name,
 		Description: req.Description,
 		Icon:        req.Icon,
+		Identifier:  req.Identifier,
 	})
 	if err != nil {
 		writeError(w, r, err)

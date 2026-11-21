@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"slices"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -21,6 +23,7 @@ type SearchRepository interface {
 	SearchPlans(ctx context.Context, q database.DBTX, workspaceID, needle string, limit int) ([]model.SearchPlan, error)
 	SearchTasks(ctx context.Context, q database.DBTX, workspaceID, needle string, limit int) ([]model.SearchTask, error)
 	SearchResources(ctx context.Context, q database.DBTX, workspaceID, needle string, limit int) ([]model.SearchResource, error)
+	TaskByKey(ctx context.Context, q database.DBTX, workspaceID, identifier string, number int) (model.SearchTask, bool, error)
 }
 
 type SearchService struct {
@@ -62,6 +65,19 @@ func (s *SearchService) Search(ctx context.Context, session model.Session, query
 		}
 		if res.Tasks, err = s.repo.SearchTasks(ctx, tx, session.WorkspaceID, needle, searchLimitPerKind); err != nil {
 			return err
+		}
+		// A task key such as ABC-12 finds that task first.
+		if m := keyPattern.FindStringSubmatch(query); m != nil {
+			number, convErr := strconv.Atoi(m[2])
+			if convErr == nil {
+				task, found, err := s.repo.TaskByKey(ctx, tx, session.WorkspaceID, strings.ToUpper(m[1]), number)
+				if err != nil {
+					return err
+				}
+				if found {
+					res.Tasks = append([]model.SearchTask{task}, slices.DeleteFunc(res.Tasks, func(t model.SearchTask) bool { return t.ID == task.ID })...)
+				}
+			}
 		}
 		res.Resources, err = s.repo.SearchResources(ctx, tx, session.WorkspaceID, needle, searchLimitPerKind)
 		return err

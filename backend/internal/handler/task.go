@@ -42,6 +42,7 @@ type taskResponse struct {
 	Position       string  `json:"position"`
 	DueDate        *string `json:"due_date"`
 	Priority       string  `json:"priority"`
+	Number         int     `json:"number"`
 	StatusCategory string  `json:"status_category"`
 	CompletedAt    *string `json:"completed_at"`
 }
@@ -64,6 +65,7 @@ type planTaskResponse struct {
 	Position         string  `json:"position"`
 	DueDate          *string `json:"due_date"`
 	Priority         string  `json:"priority"`
+	Number           int     `json:"number"`
 	CompletedAt      *string `json:"completed_at"`
 	SubtaskCount     int     `json:"subtask_count"`
 	DoneSubtaskCount int     `json:"done_subtask_count"`
@@ -114,6 +116,7 @@ func toTaskResponse(t model.Task) taskResponse {
 		StatusCategory: string(t.StatusCategory),
 		DueDate:        formatTime(t.DueDate),
 		Priority:       string(t.Priority),
+		Number:         t.Number,
 		CompletedAt:    formatTime(t.CompletedAt),
 	}
 }
@@ -128,6 +131,7 @@ func toPlanTaskResponse(t model.Task) planTaskResponse {
 		Position:         t.Position,
 		DueDate:          formatTime(t.DueDate),
 		Priority:         string(t.Priority),
+		Number:           t.Number,
 		CompletedAt:      formatTime(t.CompletedAt),
 		SubtaskCount:     t.SubtaskCount,
 		DoneSubtaskCount: t.DoneSubtaskCount,

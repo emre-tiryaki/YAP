@@ -74,6 +74,7 @@ export function useCreateTask() {
                 position: "",
                 dueDate: input.dueDate,
                 priority: input.priority ?? "none",
+                number: 0,
                 completedAt: null,
                 subtaskCount: 0,
                 doneSubtaskCount: 0,

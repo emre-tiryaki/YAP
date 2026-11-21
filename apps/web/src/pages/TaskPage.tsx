@@ -7,6 +7,7 @@ import { useProject } from "../hooks/useProjects";
 import { usePlanTasks } from "../hooks/useTasks";
 import { useTranslate } from "../hooks/useTranslate";
 import type { BreadcrumbItem } from "../types/breadcrumb";
+import { taskKey } from "../util/taskKey";
 import NotFoundPage from "./NotFoundPage";
 
 // A task on its own page (/projects/:projectId/plans/:planId/tasks/:taskId):
@@ -29,7 +30,11 @@ export default function TaskPage() {
             label: plan.data?.name ?? "",
             to: `/projects/${projectId}/plans/${planId}`,
         },
-        { label: task?.title ?? "" },
+        {
+            label: task
+                ? `${taskKey(project.data?.identifier ?? "", task.number)} ${task.title}`.trim()
+                : "",
+        },
     ].filter((item) => item.label);
 
     return (

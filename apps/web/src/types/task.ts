@@ -20,6 +20,9 @@ export type PlanTask = {
   position: string;
   dueDate: Date | null;
   priority: TaskPriority;
+  // The task's number in its project (the 12 of ABC-12); 0 while it is
+  // still being created.
+  number: number;
   // Set while the task is finished; independent of the status it sits in.
   completedAt: Date | null;
   subtaskCount: number;

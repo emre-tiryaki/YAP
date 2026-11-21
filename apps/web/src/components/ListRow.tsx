@@ -2,11 +2,13 @@ import type { HTMLAttributes, KeyboardEvent } from "react";
 import { FiCheckCircle, FiCircle } from "react-icons/fi";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { useProjectIdentifier } from "../hooks/useProjects";
 import { useSetTaskDone } from "../hooks/useTasks";
 import { useTranslate } from "../hooks/useTranslate";
 import type { CardAction } from "../types/cardAction";
 import type { Status } from "../types/status";
 import type { PlanTask, TaskPropertyKey } from "../types/task";
+import { taskKey } from "../util/taskKey";
 import { CardMenu } from "./CardMenu";
 import { TaskProperties } from "./TaskProperties";
 
@@ -75,6 +77,7 @@ function RowContent({
     const isDone = task.completedAt !== null;
     const DoneIcon = isDone ? FiCheckCircle : FiCircle;
     const doneLabel = t(isDone ? "task.row.markUndone" : "task.row.markDone");
+    const key = taskKey(useProjectIdentifier(projectId), task.number);
 
     return (
         <div
@@ -108,6 +111,11 @@ function RowContent({
             >
                 <DoneIcon aria-hidden />
             </button>
+            {key && (
+                <span className="w-16 shrink-0 text-caption text-fg-subtle">
+                    {key}
+                </span>
+            )}
             <span
                 className={`min-w-0 flex-1 truncate text-body-xs font-medium ${
                     isDone ? "text-fg-subtle line-through" : "text-fg"

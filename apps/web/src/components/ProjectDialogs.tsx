@@ -36,7 +36,10 @@ export function ProjectDialogs({
         : update.error instanceof ApiError &&
             update.error.message === "invalid_input"
           ? t("project.invalid")
-          : t("common.error");
+          : update.error instanceof ApiError &&
+              update.error.message === "conflict"
+            ? t("project.identifier.taken")
+            : t("common.error");
 
     return (
         <>
@@ -60,6 +63,7 @@ export function ProjectDialogs({
                 title={t("project.edit.title")}
                 initial={project}
                 withIcon
+                withIdentifier
                 isPending={update.isPending}
                 errorMessage={updateError}
                 onSubmit={(input) =>

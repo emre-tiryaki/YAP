@@ -40,6 +40,8 @@ type ProjectRepository interface {
 	SoftDeleteStatus(ctx context.Context, q database.DBTX, workspaceID, statusID, now string) error
 	PlanNameTaken(ctx context.Context, q database.DBTX, workspaceID, projectID, teamID, name, excludePlanID string) (bool, error)
 	CountWholeProjectPlans(ctx context.Context, q database.DBTX, workspaceID, projectID string) (int, error)
+	Identifiers(ctx context.Context, q database.DBTX, workspaceID string) (map[string]bool, error)
+	IdentifierTaken(ctx context.Context, q database.DBTX, workspaceID, identifier, excludeProjectID string) (bool, error)
 }
 
 var colorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
@@ -114,6 +116,12 @@ func (s *ProjectService) Create(ctx context.Context, workspaceID string, in Crea
 	}
 
 	err = database.WithTx(ctx, s.db, func(tx *sql.Tx) error {
+		taken, err := s.repo.Identifiers(ctx, tx, workspaceID)
+		if err != nil {
+			return err
+		}
+		project.Identifier = suggestIdentifier(name, taken)
+
 		now := nowUTC()
 		if err := s.repo.Insert(ctx, tx, project, now); err != nil {
 			return err
@@ -447,6 +455,8 @@ type UpdateProjectInput struct {
 	Description *string
 	// Icon set to "" removes the icon.
 	Icon *string
+	// Identifier is trimmed and uppercased; it must be unique in the workspace.
+	Identifier *string
 }
 
 // UpdatePlanInput carries the fields to change; nil fields are kept.
@@ -459,7 +469,7 @@ type UpdatePlanInput struct {
 
 // Update changes the name, description and/or icon of a project.
 func (s *ProjectService) Update(ctx context.Context, workspaceID, projectID string, in UpdateProjectInput) (model.Project, error) {
-	if in.Name == nil && in.Description == nil && in.Icon == nil {
+	if in.Name == nil && in.Description == nil && in.Icon == nil && in.Identifier == nil {
 		return model.Project{}, fmt.Errorf("%w: nothing to update", ErrInvalidInput)
 	}
 	if in.Name != nil && strings.TrimSpace(*in.Name) == "" {
@@ -469,6 +479,14 @@ func (s *ProjectService) Update(ctx context.Context, workspaceID, projectID stri
 	if in.Icon != nil {
 		var err error
 		if icon, err = normalizeIcon(*in.Icon); err != nil {
+			return model.Project{}, err
+		}
+	}
+
+	var identifier string
+	if in.Identifier != nil {
+		var err error
+		if identifier, err = normalizeIdentifier(*in.Identifier); err != nil {
 			return model.Project{}, err
 		}
 	}
@@ -491,6 +509,16 @@ func (s *ProjectService) Update(ctx context.Context, workspaceID, projectID stri
 		}
 		if in.Icon != nil {
 			project.Icon = icon
+		}
+		if in.Identifier != nil && identifier != project.Identifier {
+			taken, err := s.repo.IdentifierTaken(ctx, tx, workspaceID, identifier, projectID)
+			if err != nil {
+				return err
+			}
+			if taken {
+				return ErrIdentifierTaken
+			}
+			project.Identifier = identifier
 		}
 		return s.repo.Update(ctx, tx, project, nowUTC())
 	})

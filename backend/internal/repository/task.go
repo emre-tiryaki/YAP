@@ -70,10 +70,10 @@ func (*TaskRepository) Insert(ctx context.Context, q database.DBTX, t model.Task
 
 	_, err := q.ExecContext(ctx,
 		`INSERT INTO tasks
-			(id, workspace_id, project_id, plan_id, status_id, parent_id, created_by, title, description, position, due_date, priority, completed_at, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			(id, workspace_id, project_id, plan_id, status_id, parent_id, created_by, title, description, position, due_date, priority, number, completed_at, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		t.ID, t.WorkspaceID, t.ProjectID, t.PlanID, t.StatusID, nullIfEmpty(t.ParentID), t.CreatedBy, t.Title,
-		nullIfEmpty(t.Description), t.Position, dueDate, priorityOrNone(t.Priority), formatTime(t.CompletedAt), now, now,
+		nullIfEmpty(t.Description), t.Position, dueDate, priorityOrNone(t.Priority), nullIfZero(t.Number), formatTime(t.CompletedAt), now, now,
 	)
 	if err != nil {
 		return fmt.Errorf("insert task: %w", err)
@@ -98,7 +98,7 @@ func (*TaskRepository) InsertAssignee(ctx context.Context, q database.DBTX, work
 func (*TaskRepository) ListUpcoming(ctx context.Context, q database.DBTX, workspaceID, membershipID string, limit int) ([]model.Task, error) {
 	rows, err := q.QueryContext(ctx,
 		`SELECT t.id, t.title, t.description, t.project_id, t.plan_id, t.status_id, t.position,
-			p.name, t.due_date, s.category, t.completed_at, t.priority
+			p.name, t.due_date, s.category, t.completed_at, t.priority, COALESCE(t.number, 0)
 		 FROM task_assignees ta
 		 JOIN tasks t ON t.id = ta.task_id AND t.workspace_id = ta.workspace_id
 		 JOIN projects p ON p.id = t.project_id AND p.workspace_id = t.workspace_id
@@ -122,7 +122,7 @@ func (*TaskRepository) ListUpcoming(ctx context.Context, q database.DBTX, worksp
 		var description, dueDate, completedAt sql.NullString
 		var category, priority string
 		if err := rows.Scan(&t.ID, &t.Title, &description, &t.ProjectID, &t.PlanID, &t.StatusID, &t.Position,
-			&t.ProjectName, &dueDate, &category, &completedAt, &priority); err != nil {
+			&t.ProjectName, &dueDate, &category, &completedAt, &priority, &t.Number); err != nil {
 			return nil, fmt.Errorf("scan task: %w", err)
 		}
 		t.Description = description.String
@@ -142,7 +142,7 @@ func (*TaskRepository) ListUpcoming(ctx context.Context, q database.DBTX, worksp
 func (*TaskRepository) ListByPlan(ctx context.Context, q database.DBTX, workspaceID, planID string) ([]model.Task, error) {
 	rows, err := q.QueryContext(ctx,
 		`SELECT t.id, t.project_id, t.status_id, t.created_by, t.title, t.description,
-			t.position, t.due_date, s.category, t.completed_at, t.priority, `+taskCounts+`
+			t.position, t.due_date, s.category, t.completed_at, t.priority, COALESCE(t.number, 0), `+taskCounts+`
 		 FROM tasks t
 		 JOIN statuses s ON s.id = t.status_id AND s.plan_id = t.plan_id
 		 WHERE t.workspace_id = ? AND t.plan_id = ?
@@ -162,7 +162,7 @@ func (*TaskRepository) ListByPlan(ctx context.Context, q database.DBTX, workspac
 		var description, dueDate, completedAt sql.NullString
 		var category, priority string
 		if err := rows.Scan(&t.ID, &t.ProjectID, &t.StatusID, &t.CreatedBy, &t.Title, &description,
-			&t.Position, &dueDate, &category, &completedAt, &priority, &t.SubtaskCount, &t.DoneSubtaskCount, &t.CommentCount); err != nil {
+			&t.Position, &dueDate, &category, &completedAt, &priority, &t.Number, &t.SubtaskCount, &t.DoneSubtaskCount, &t.CommentCount); err != nil {
 			return nil, fmt.Errorf("scan task: %w", err)
 		}
 		t.Description = description.String
@@ -298,14 +298,14 @@ func (*TaskRepository) Get(ctx context.Context, q database.DBTX, workspaceID, ta
 	var category, priority string
 	err := q.QueryRowContext(ctx,
 		`SELECT t.project_id, p.name, t.plan_id, t.status_id, t.parent_id, t.created_by, t.title,
-			t.description, t.position, t.due_date, s.category, t.completed_at, t.priority, `+taskCounts+`
+			t.description, t.position, t.due_date, s.category, t.completed_at, t.priority, COALESCE(t.number, 0), `+taskCounts+`
 		 FROM tasks t
 		 JOIN projects p ON p.id = t.project_id AND p.workspace_id = t.workspace_id
 		 JOIN statuses s ON s.id = t.status_id AND s.plan_id = t.plan_id
 		 WHERE t.id = ? AND t.workspace_id = ? AND t.deleted_at IS NULL`,
 		taskID, workspaceID,
 	).Scan(&t.ProjectID, &t.ProjectName, &t.PlanID, &t.StatusID, &parentID, &t.CreatedBy, &t.Title,
-		&description, &t.Position, &dueDate, &category, &completedAt, &priority, &t.SubtaskCount, &t.DoneSubtaskCount, &t.CommentCount)
+		&description, &t.Position, &dueDate, &category, &completedAt, &priority, &t.Number, &t.SubtaskCount, &t.DoneSubtaskCount, &t.CommentCount)
 	if err != nil {
 		return model.Task{}, fmt.Errorf("get task: %w", err)
 	}
@@ -385,6 +385,30 @@ func (*TaskRepository) SetCompletedAt(ctx context.Context, q database.DBTX, work
 		return fmt.Errorf("set task completed_at: %w", err)
 	}
 	return nil
+}
+
+// ReserveNumber takes the next task number of the project and advances the
+// counter. Call it in the same transaction that inserts the task.
+func (*TaskRepository) ReserveNumber(ctx context.Context, q database.DBTX, workspaceID, projectID, now string) (int, error) {
+	var next int
+	err := q.QueryRowContext(ctx,
+		`UPDATE projects SET next_task_number = next_task_number + 1, updated_at = ?
+		 WHERE id = ? AND workspace_id = ?
+		 RETURNING next_task_number - 1`,
+		now, projectID, workspaceID,
+	).Scan(&next)
+	if err != nil {
+		return 0, fmt.Errorf("reserve task number: %w", err)
+	}
+	return next, nil
+}
+
+// nullIfZero stores an unset number as NULL.
+func nullIfZero(n int) any {
+	if n == 0 {
+		return nil
+	}
+	return n
 }
 
 // priorityOrNone stores an unset priority as 'none'.
