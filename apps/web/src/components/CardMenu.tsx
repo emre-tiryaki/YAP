@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type SyntheticEvent } from "react";
 import { createPortal } from "react-dom";
 import { FiEdit2, FiMoreVertical, FiTrash2, FiType } from "react-icons/fi";
 import { TbPin, TbPinnedOff } from "react-icons/tb";
+import { useDismiss } from "../hooks/useDismiss";
 import { togglePin, usePins } from "../hooks/usePins";
 import { useTranslate } from "../hooks/useTranslate";
 import type { CardAction } from "../types/cardAction";
@@ -38,36 +39,16 @@ export function CardMenu({ onSelect, pin }: CardMenuProps) {
     const ref = useRef<HTMLDivElement>(null);
     const menuRef = useRef<HTMLUListElement>(null);
 
+    useDismiss(ref, isOpen, () => setAnchor(null), [menuRef]);
+
     useEffect(() => {
         if (!isOpen) return;
 
         const close = () => setAnchor(null);
-        function handlePointerDown(event: PointerEvent) {
-            const target = event.target as Node;
-            if (
-                !ref.current?.contains(target) &&
-                !menuRef.current?.contains(target)
-            )
-                close();
-        }
-        function handleKeyDown(event: KeyboardEvent) {
-            if (event.key === "Escape") close();
-        }
-
-        // Capture phase, so menus close even when the click lands on an
-        // element that stops propagation (e.g. another card's menu).
-        document.addEventListener("pointerdown", handlePointerDown, true);
-        document.addEventListener("keydown", handleKeyDown, true);
         // A fixed menu would drift away from its button.
         window.addEventListener("scroll", close, true);
         window.addEventListener("resize", close);
         return () => {
-            document.removeEventListener(
-                "pointerdown",
-                handlePointerDown,
-                true,
-            );
-            document.removeEventListener("keydown", handleKeyDown, true);
             window.removeEventListener("scroll", close, true);
             window.removeEventListener("resize", close);
         };

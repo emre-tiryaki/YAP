@@ -568,5 +568,7 @@
     "resources.repo.commits.offline": "GitHub cannot be reached, so the commit history cannot be shown.",
     "resources.repo.commits.none": "No commits.",
     "resources.repo.commits.more": "Load older commits",
-    "resources.repo.commits.merge": "merge"
+    "resources.repo.commits.merge": "merge",
+    "common.search": "Search",
+    "common.noOptions": "No options"
 }

@@ -568,5 +568,7 @@
     "resources.repo.commits.offline": "GitHub'a ulaşılamıyor, commit geçmişi gösterilemiyor.",
     "resources.repo.commits.none": "Commit yok.",
     "resources.repo.commits.more": "Daha eski commit'leri yükle",
-    "resources.repo.commits.merge": "birleştirme"
+    "resources.repo.commits.merge": "birleştirme",
+    "common.search": "Ara",
+    "common.noOptions": "Seçenek yok"
 }

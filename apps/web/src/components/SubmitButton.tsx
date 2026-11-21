@@ -1,18 +1,15 @@
-import type { ReactNode } from "react"
+import type { ReactNode } from "react";
+import { Button } from "./Button";
 
 type SubmitButtonProps = {
-    children: ReactNode
-    disabled?: boolean
-}
+    children: ReactNode;
+    disabled?: boolean;
+};
 
 export function SubmitButton({ children, disabled }: SubmitButtonProps) {
     return (
-        <button
-            type="submit"
-            disabled={disabled}
-            className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-fg hover:bg-accent/85 disabled:opacity-50"
-        >
+        <Button variant="primary" size="lg" type="submit" disabled={disabled}>
             {children}
-        </button>
-    )
+        </Button>
+    );
 }
