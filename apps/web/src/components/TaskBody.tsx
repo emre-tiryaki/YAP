@@ -1,10 +1,12 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { FiCalendar, FiCheck, FiFlag, FiTag } from "react-icons/fi";
 import { Link } from "react-router";
 import { ApiError } from "../api/client";
 import { useChangeTaskStatus } from "../hooks/useChangeTaskStatus";
+import { openPalette, setPaletteContext } from "../hooks/useCommandPalette";
 import { usePlan } from "../hooks/usePlans";
 import { useProject } from "../hooks/useProjects";
+import { useShortcut } from "../hooks/useShortcut";
 import { useSetTaskDone, useUpdateTask } from "../hooks/useTasks";
 import { useTranslate } from "../hooks/useTranslate";
 import type { Status } from "../types/status";
@@ -49,7 +51,24 @@ export function TaskBody({ projectId, planId, task, statuses, full }: TaskBodyPr
     const changeStatus = useChangeTaskStatus(projectId, planId, statuses);
     const [title, setTitle] = useState(task.title);
     const [description, setDescription] = useState(task.description);
+    // Bumped by the D shortcut to open the due date calendar.
+    const [dueDateRequest, setDueDateRequest] = useState(0);
     const isDone = task.completedAt !== null;
+
+    // The palette offers this task's actions while it is open.
+    useEffect(() => {
+        setPaletteContext({
+            kind: "task",
+            taskId: task.id,
+            projectId,
+            planId,
+            title: task.title,
+        });
+        return () => setPaletteContext(null);
+    }, [task.id, task.title, projectId, planId]);
+
+    useShortcut({ key: "s", inModal: true }, () => openPalette("status"));
+    useShortcut({ key: "d", inModal: true }, () => setDueDateRequest((n) => n + 1));
 
     function save(input: UpdateTaskInput) {
         update.mutate({ taskId: task.id, input });
@@ -138,6 +157,7 @@ export function TaskBody({ projectId, planId, task, statuses, full }: TaskBodyPr
                     projectId={projectId}
                     planId={planId}
                     statuses={statuses}
+                    dueDateRequest={dueDateRequest}
                 />
             )}
 
@@ -215,6 +235,7 @@ export function TaskBody({ projectId, planId, task, statuses, full }: TaskBodyPr
                     <DatePicker
                         label={t("form.dueDate")}
                         value={toDateInputValue(task.dueDate)}
+                        openRequest={dueDateRequest}
                         onChange={(value) =>
                             save({ dueDate: fromDateInputValue(value) })
                         }

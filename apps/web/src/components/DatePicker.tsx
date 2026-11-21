@@ -30,6 +30,8 @@ type DatePickerProps = {
     // A compact pill for task rows and cards: the date next to a calendar
     // icon (icon only while empty), red when `overdue`.
     pill?: { overdue: boolean };
+    // Opens the calendar each time this number changes (a keyboard shortcut).
+    openRequest?: number;
 };
 
 const POPOVER_WIDTH = 288;
@@ -43,10 +45,16 @@ export function DatePicker({
     onChange,
     showLabel = false,
     pill,
+    openRequest = 0,
 }: DatePickerProps) {
     const t = useTranslate();
     const format = useDateFormat();
     const [isOpen, setIsOpen] = useState(false);
+    const [seenRequest, setSeenRequest] = useState(openRequest);
+    if (openRequest !== seenRequest) {
+        setSeenRequest(openRequest);
+        setIsOpen(true);
+    }
     const triggerRef = useRef<HTMLButtonElement>(null);
     const selected = fromDateInputValue(value);
 

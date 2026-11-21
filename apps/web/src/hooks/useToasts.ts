@@ -17,6 +17,19 @@ export function pushToasts(items: AppNotification[]) {
     emit();
 }
 
+// A plain confirmation in the toast area, e.g. "Link copied".
+export function pushInfoToast(title: string, body: string) {
+    pushToasts([
+        {
+            id: `info:${Date.now()}:${body}`,
+            kind: "info",
+            title,
+            body,
+            href: null,
+        },
+    ]);
+}
+
 export function dismissToast(id: string) {
     toasts = toasts.filter((toast) => toast.id !== id);
     emit();

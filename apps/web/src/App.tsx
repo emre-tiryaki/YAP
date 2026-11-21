@@ -9,7 +9,12 @@ import ProjectsPage from "./pages/ProjectsPage";
 import UpcomingTasksPage from "./pages/UpcomingTasksPage";
 import { useEffect } from "react";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { CommandPalette } from "./components/CommandPalette";
+import { GlobalShortcuts } from "./components/GlobalShortcuts";
+import { SettingsModal } from "./components/SettingsModal";
+import { ShortcutsDialog } from "./components/ShortcutsDialog";
 import { Sidebar } from "./components/SideBar";
+import { closeSettings, useSettingsDialog } from "./hooks/useSettingsDialog";
 import { NotificationCenter } from "./components/NotificationCenter";
 import { usePreferences } from "./hooks/usePreferences";
 import { useTheme } from "./hooks/useTheme";
@@ -19,6 +24,7 @@ import { useTheme } from "./hooks/useTheme";
 // (`app-frame`) turns translucent over a background picture.
 function AppLayout() {
     const { pathname } = useLocation();
+    const settingsSection = useSettingsDialog();
     return (
         <div className="app-canvas flex h-screen gap-2 bg-canvas p-2">
             <Sidebar />
@@ -28,6 +34,14 @@ function AppLayout() {
                 </ErrorBoundary>
             </div>
             <NotificationCenter />
+            <GlobalShortcuts />
+            <CommandPalette />
+            <ShortcutsDialog />
+            <SettingsModal
+                isOpen={settingsSection !== null}
+                initialSection={settingsSection ?? undefined}
+                onClose={closeSettings}
+            />
         </div>
     );
 }

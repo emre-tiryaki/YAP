@@ -1,4 +1,3 @@
-import { useCallback, useState } from "react";
 import {
     FiBell,
     FiCheck,
@@ -11,14 +10,14 @@ import {
     FiUser,
 } from "react-icons/fi";
 import { updatePreferences, usePreferences } from "../hooks/usePreferences";
-import { useShortcut } from "../hooks/useShortcut";
+import { openSettings } from "../hooks/useSettingsDialog";
+import { openShortcutsDialog } from "../hooks/useShortcutsDialog";
 import { useTranslate } from "../hooks/useTranslate";
 import { useWorkspace } from "../hooks/useWorkspace";
-import type { SettingsSection, Theme } from "../types/settings";
+import type { Theme } from "../types/settings";
 import { Menu } from "./Menu";
 import { MenuItem } from "./MenuItem";
 import { MenuSeparator } from "./MenuSeparator";
-import { SettingsModal } from "./SettingsModal";
 import { Tooltip } from "./Tooltip";
 
 const themeItems = [
@@ -31,10 +30,6 @@ export function ProfileMenu({ collapsed }: { collapsed: boolean }) {
     const t = useTranslate();
     const workspace = useWorkspace();
     const { theme } = usePreferences();
-    const [section, setSection] = useState<SettingsSection | null>(null);
-    const closeSettings = useCallback(() => setSection(null), []);
-
-    useShortcut({ key: ",", mod: true }, () => setSection("general"));
 
     const username = workspace.data?.username ?? "";
     const label = username || t("sidebar.profile.label");
@@ -90,23 +85,23 @@ export function ProfileMenu({ collapsed }: { collapsed: boolean }) {
                 <MenuItem
                     icon={<FiUser aria-hidden />}
                     label={t("sidebar.profile.profile")}
-                    onSelect={() => setSection("account")}
+                    onSelect={() => openSettings("account")}
                 />
                 <MenuItem
                     icon={<FiSettings aria-hidden />}
                     label={t("sidebar.profile.settings")}
                     shortcut={["mod", ","]}
-                    onSelect={() => setSection("general")}
+                    onSelect={() => openSettings("general")}
                 />
                 <MenuItem
                     icon={<FiBell aria-hidden />}
                     label={t("sidebar.profile.notifications")}
-                    onSelect={() => setSection("notifications")}
+                    onSelect={() => openSettings("notifications")}
                 />
                 <MenuItem
                     icon={<FiCommand aria-hidden />}
                     label={t("sidebar.profile.shortcuts")}
-                    onSelect={() => setSection("shortcuts")}
+                    onSelect={openShortcutsDialog}
                 />
                 <MenuSeparator />
                 <p className="px-2 pt-1 pb-0.5 text-caption text-fg-subtle">
@@ -127,11 +122,6 @@ export function ProfileMenu({ collapsed }: { collapsed: boolean }) {
                     />
                 ))}
             </Menu>
-            <SettingsModal
-                isOpen={section !== null}
-                initialSection={section ?? undefined}
-                onClose={closeSettings}
-            />
         </div>
     );
 }

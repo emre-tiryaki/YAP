@@ -13,7 +13,7 @@ import {
 import { Link } from "react-router";
 import { updatePreferences } from "../hooks/usePreferences";
 import { useSetTaskDone } from "../hooks/useTasks";
-import { pushToasts } from "../hooks/useToasts";
+import { pushInfoToast } from "../hooks/useToasts";
 import { useTranslate } from "../hooks/useTranslate";
 import type { TaskPeekMode } from "../types/settings";
 import type { PlanTask } from "../types/task";
@@ -54,15 +54,7 @@ export function TaskPeekHeader({
     function copyLink() {
         const url = `${window.location.origin}/projects/${projectId}/plans/${planId}?task=${task.id}`;
         void navigator.clipboard.writeText(url);
-        pushToasts([
-            {
-                id: `copy:${task.id}:${Date.now()}`,
-                kind: "info",
-                title: t("task.peek.linkCopied"),
-                body: task.title,
-                href: null,
-            },
-        ]);
+        pushInfoToast(t("task.peek.linkCopied"), task.title);
     }
 
     return (

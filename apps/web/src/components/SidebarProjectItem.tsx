@@ -12,7 +12,7 @@ import {
 import { TbLayoutKanban } from "react-icons/tb";
 import { toggleSidebarExpanded } from "../hooks/useSidebarExpanded";
 import { useProjectPlans } from "../hooks/useProjects";
-import { pushToasts } from "../hooks/useToasts";
+import { pushInfoToast } from "../hooks/useToasts";
 import { useTranslate } from "../hooks/useTranslate";
 import type { CardAction } from "../types/cardAction";
 import type { Pin } from "../types/pin";
@@ -66,15 +66,7 @@ export function SidebarProjectItem({
 
     function copyLink() {
         void navigator.clipboard.writeText(`${window.location.origin}${href}`);
-        pushToasts([
-            {
-                id: `copy:${project.id}:${Date.now()}`,
-                kind: "info",
-                title: t("sidebar.project.linkCopied"),
-                body: project.name,
-                href: null,
-            },
-        ]);
+        pushInfoToast(t("sidebar.project.linkCopied"), project.name);
     }
 
     return (

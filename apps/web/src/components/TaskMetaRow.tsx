@@ -13,6 +13,7 @@ type TaskMetaRowProps = {
     projectId: string;
     planId: string;
     statuses: Status[];
+    dueDateRequest: number;
 };
 
 function Divider() {
@@ -20,7 +21,7 @@ function Divider() {
 }
 
 // The compact property controls under the title in the peek.
-export function TaskMetaRow({ task, projectId, planId, statuses }: TaskMetaRowProps) {
+export function TaskMetaRow({ task, projectId, planId, statuses, dueDateRequest }: TaskMetaRowProps) {
     const t = useTranslate();
     const update = useUpdateTask();
     const changeStatus = useChangeTaskStatus(projectId, planId, statuses);
@@ -57,6 +58,7 @@ export function TaskMetaRow({ task, projectId, planId, statuses }: TaskMetaRowPr
                 label={t("form.dueDate")}
                 value={toDateInputValue(task.dueDate)}
                 pill={{ overdue: isOverdue }}
+                openRequest={dueDateRequest}
                 onChange={(value) =>
                     update.mutate({
                         taskId: task.id,
