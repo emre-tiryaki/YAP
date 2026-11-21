@@ -5,6 +5,7 @@ import { useCloneRepository, useLocalFolders } from "../hooks/useGitHub";
 import { errorKey } from "../hooks/useResourceOperations";
 import { useTranslate } from "../hooks/useTranslate";
 import { Modal } from "./Modal";
+import { Button } from "./Button";
 
 type CloneRepositoryDialogProps = {
     isOpen: boolean;
@@ -57,13 +58,12 @@ function CloneForm({ resourceId, defaultName, onClose }: { resourceId: string; d
                 </p>
                 <p className="text-xs text-gray-500">{t("resources.repo.clone.ownership")}</p>
                 <div className="flex justify-end">
-                    <button
+                    <Button variant="primary" size="lg"
                         type="button"
                         onClick={onClose}
-                        className="cursor-pointer rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-fg hover:bg-accent/85"
                     >
                         {t("common.close")}
-                    </button>
+                    </Button>
                 </div>
             </div>
         );
@@ -157,13 +157,12 @@ function CloneForm({ resourceId, defaultName, onClose }: { resourceId: string; d
                         {t("resources.repo.clone.cloning")}
                     </span>
                 )}
-                <button
+                <Button variant="primary" size="lg"
                     type="submit"
                     disabled={!current || !trimmed || clone.isPending}
-                    className="cursor-pointer rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-fg hover:bg-accent/85 disabled:cursor-default disabled:opacity-50"
                 >
                     {t("resources.repo.clone.submit")}
-                </button>
+                </Button>
             </div>
         </form>
     );

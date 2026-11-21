@@ -3,6 +3,10 @@ import type { Plan } from "../types/plan";
 import { InlineError } from "./InlineError";
 import { PlanCard } from "./PlanCard";
 import { SectionHeader } from "./SectionHeader";
+import { Button } from "./Button";
+import { FiLayout } from "react-icons/fi";
+import { EmptyState } from "./EmptyState";
+import { Skeleton } from "./Skeleton";
 
 type PlanListProps = {
     plans: Plan[];
@@ -32,10 +36,7 @@ export function PlanList({
             {isLoading && (
                 <div aria-busy="true" className={gridClass}>
                     {[0, 1, 2].map((i) => (
-                        <div
-                            key={i}
-                            className="h-40 animate-pulse rounded-xl border border-gray-200 bg-gray-100"
-                        />
+                        <Skeleton key={i} className="h-40 rounded-xl" />
                     ))}
                 </div>
             )}
@@ -46,21 +47,16 @@ export function PlanList({
                 />
             )}
             {!isLoading && !isError && plans.length === 0 && (
-                <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-gray-300 p-8 text-center">
-                    <p className="text-sm font-medium text-gray-700">
-                        {t("project.plans.empty")}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                        {t("project.plans.emptyHint")}
-                    </p>
-                    <button
-                        type="button"
-                        onClick={onCreate}
-                        className="cursor-pointer rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg hover:bg-accent/85"
-                    >
-                        + {t("project.plans.create.title")}
-                    </button>
-                </div>
+                <EmptyState
+                    icon={FiLayout}
+                    title={t("project.plans.empty")}
+                    description={t("project.plans.emptyHint")}
+                    action={
+                        <Button variant="primary" size="lg" onClick={onCreate}>
+                            + {t("project.plans.create.title")}
+                        </Button>
+                    }
+                />
             )}
             {!isError && plans.length > 0 && (
                 <div className={gridClass}>

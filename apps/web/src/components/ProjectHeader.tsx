@@ -6,6 +6,7 @@ import { CardMenu } from "./CardMenu";
 import { ExpandableText } from "./ExpandableText";
 import { ProjectDialogs } from "./ProjectDialogs";
 import { ProjectIconButton } from "./ProjectIconButton";
+import { Skeleton } from "./Skeleton";
 
 type ProjectHeaderProps = {
     project: Project;
@@ -80,11 +81,11 @@ export function ProjectHeaderSkeleton() {
     return (
         <div
             aria-busy="true"
-            className="mb-8 animate-pulse rounded-lg border border-gray-200 bg-white p-6 shadow-sm"
+            className="mb-8 rounded-lg border border-line bg-surface-1 p-6 shadow-raised"
         >
-            <div className="h-7 w-1/3 rounded bg-gray-200" />
-            <div className="mt-3 h-4 w-2/3 rounded bg-gray-100" />
-            <div className="mt-5 h-3 w-40 rounded bg-gray-100" />
+            <Skeleton className="h-7 w-1/3" />
+            <Skeleton className="mt-3 h-4 w-2/3" />
+            <Skeleton className="mt-5 h-3 w-40" />
         </div>
     );
 }

@@ -13,8 +13,10 @@ import { fromDateInputValue, toDateInputValue } from "../util/date";
 import { CommentSection } from "./CommentSection";
 import { DatePicker } from "./DatePicker";
 import { FormError } from "./FormError";
+import { PropertySelect } from "./PropertySelect";
 import { SubtaskList } from "./SubtaskList";
 import { TaskResourceSection } from "./TaskResourceSection";
+import { Skeleton } from "./Skeleton";
 
 // The editor pulls in TipTap, so it loads only once the dialog opens.
 const MarkdownEditor = lazy(() =>
@@ -225,7 +227,7 @@ function TaskDetailBody({
                     </label>
                     <Suspense
                         fallback={
-                            <div className="min-h-40 animate-pulse rounded-md border border-gray-200 bg-gray-50" />
+                            <Skeleton className="min-h-40" />
                         }
                     >
                         <MarkdownEditor
@@ -261,21 +263,21 @@ function TaskDetailBody({
                             className="size-3 shrink-0 rounded-full"
                             style={{ backgroundColor: status?.color }}
                         />
-                        <select
-                            aria-label={t("plan.task.create.status")}
+                        <PropertySelect
+                            variant="ghost"
+                            ariaLabel={t("plan.task.create.status")}
+                            placeholder={t("plan.task.create.status")}
                             value={task.statusId}
-                            disabled={move.isPending}
-                            onChange={(event) =>
-                                changeStatus(event.target.value)
+                            onChange={(value) =>
+                                typeof value === "string" &&
+                                !move.isPending &&
+                                changeStatus(value)
                             }
-                            className="w-full cursor-pointer rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm"
-                        >
-                            {statuses.map((s) => (
-                                <option key={s.id} value={s.id}>
-                                    {s.title}
-                                </option>
-                            ))}
-                        </select>
+                            options={statuses.map((s) => ({
+                                value: s.id,
+                                label: s.title,
+                            }))}
+                        />
                     </div>
                 </Property>
 

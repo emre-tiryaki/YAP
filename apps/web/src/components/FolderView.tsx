@@ -1,5 +1,5 @@
 import { useState, type DragEvent, type KeyboardEvent, type MouseEvent } from "react";
-import { FiArrowDown, FiArrowUp } from "react-icons/fi";
+import { FiArrowDown, FiArrowUp, FiFile } from "react-icons/fi";
 import { resourceContentUrl } from "../api/client";
 import { useDateFormat } from "../hooks/useDateFormat";
 import { usePreferences } from "../hooks/usePreferences";
@@ -10,6 +10,7 @@ import { isDropAccepted, readDrop, startResourceDrag, type DroppedItems } from "
 import { compareResources, fileCategory, formatSize, type ResourceSortKey } from "../util/resources";
 import { ResourceIcon } from "./ResourceIcon";
 import { ResourceMenu, type ResourceMenuItem } from "./ResourceMenu";
+import { EmptyState } from "./EmptyState";
 
 type FolderViewProps = {
     folderId: string | null;
@@ -200,10 +201,11 @@ export function FolderView({
             }`}
         >
             {sorted.length === 0 ? (
-                <div className="flex h-64 flex-col items-center justify-center gap-1 text-sm text-gray-400">
-                    <p>{t("resources.folderEmpty")}</p>
-                    <p>{t("resources.dropHint")}</p>
-                </div>
+                <EmptyState
+                    icon={FiFile}
+                    title={t("resources.folderEmpty")}
+                    description={t("resources.dropHint")}
+                />
             ) : mode === "list" ? (
                 <table className="w-full table-fixed text-left text-sm">
                     <thead className="border-b border-gray-200 text-xs text-gray-500">

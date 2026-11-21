@@ -4,6 +4,7 @@ import { useResourceText, useSaveResourceText } from "../hooks/useResources";
 import { useTranslate } from "../hooks/useTranslate";
 import { defaultUserSettings, useUserSettings } from "../hooks/useUserSettings";
 import type { Resource } from "../types/resource";
+import { Button } from "./Button";
 
 // TipTap is only needed for the markdown preview.
 const MarkdownView = lazy(() =>
@@ -169,15 +170,14 @@ function EditorBody({ resource, initialText, isMarkdown, readOnly, onReload }: E
                 )}
                 <span className="flex-1" />
                 {!readOnly && (
-                    <button
+                    <Button variant="primary" size="md"
                         type="button"
                         onClick={() => void saveNow()}
                         disabled={!isDirty || status === "saving" || status === "conflict"}
                         title="Ctrl+S"
-                        className="cursor-pointer rounded-md bg-accent px-3 py-1 text-sm font-medium text-accent-fg hover:bg-accent/85 disabled:cursor-default disabled:opacity-40"
                     >
                         {t("common.save")}
-                    </button>
+                    </Button>
                 )}
             </div>
             {status === "conflict" && (

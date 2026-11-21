@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { ApiError } from "../api/client";
 import { useTranslate } from "../hooks/useTranslate";
 import { cardAccent as accent, initials } from "../util/accent";
 import { FormError } from "./FormError";
 import { IconPicker } from "./IconPicker";
+import { useDismiss } from "../hooks/useDismiss";
 
 type IconButtonProps = {
     name: string;
@@ -29,31 +30,11 @@ export function IconButton({
     const [isOpen, setIsOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        if (!isOpen) return;
-
-        const close = () => {
-            setIsOpen(false);
-            reset();
-        };
-        function handlePointerDown(event: PointerEvent) {
-            if (!ref.current?.contains(event.target as Node)) close();
-        }
-        function handleKeyDown(event: KeyboardEvent) {
-            if (event.key === "Escape") close();
-        }
-
-        document.addEventListener("pointerdown", handlePointerDown, true);
-        document.addEventListener("keydown", handleKeyDown, true);
-        return () => {
-            document.removeEventListener(
-                "pointerdown",
-                handlePointerDown,
-                true,
-            );
-            document.removeEventListener("keydown", handleKeyDown, true);
-        };
-    }, [isOpen, reset]);
+    function close() {
+        setIsOpen(false);
+        reset();
+    }
+    useDismiss(ref, isOpen, close);
 
     function select(next: string) {
         onSelect(next, () => {

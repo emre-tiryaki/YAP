@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import { FiChevronRight } from "react-icons/fi";
 import { useTranslate } from "../hooks/useTranslate";
+import { Button } from "./Button";
 
 type SectionHeaderProps = {
     title: string;
@@ -30,13 +31,12 @@ export function SectionHeader({ title, onCreate, href }: SectionHeaderProps) {
                     title
                 )}
             </h2>
-            <button
+            <Button variant="primary" size="lg"
                 type="button"
                 onClick={onCreate}
-                className="cursor-pointer rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg hover:bg-accent/85"
             >
                 + {t("common.new")}
-            </button>
+            </Button>
         </div>
     );
 }

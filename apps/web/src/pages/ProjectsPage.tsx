@@ -11,6 +11,8 @@ import { useProjects } from "../hooks/useProjects";
 import { useTranslate } from "../hooks/useTranslate";
 import type { BreadcrumbItem } from "../types/breadcrumb";
 import type { Project } from "../types/project";
+import { Button } from "../components/Button";
+import { PropertySelect } from "../components/PropertySelect";
 
 type ProjectView = "list" | "cards";
 type ProjectFilter = "all" | "withTasks" | "empty";
@@ -53,9 +55,6 @@ function compare(sort: ProjectSort) {
         }
     };
 }
-
-const selectClass =
-    "rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-700";
 
 export default function ProjectsPage() {
     const t = useTranslate();
@@ -106,13 +105,12 @@ export default function ProjectsPage() {
                             </span>
                         )}
                     </h1>
-                    <button
+                    <Button variant="primary" size="lg"
                         type="button"
                         onClick={() => setIsCreateOpen(true)}
-                        className="cursor-pointer rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg hover:bg-accent/85"
                     >
                         + {t("workspace.projects.create.title")}
-                    </button>
+                    </Button>
                 </div>
 
                 <div className="mb-6 flex flex-wrap items-center gap-3">
@@ -132,34 +130,34 @@ export default function ProjectsPage() {
                             className="w-full rounded-md border border-gray-300 bg-white py-1.5 pr-3 pl-8 text-sm"
                         />
                     </div>
-                    <select
-                        aria-label={t("projects.filter.label")}
+                    <PropertySelect
+                        variant="ghost"
+                        ariaLabel={t("projects.filter.label")}
+                        placeholder={t("projects.filter.label")}
                         value={filter}
-                        onChange={(event) =>
-                            setParam("filter", event.target.value, "all")
+                        onChange={(value) =>
+                            typeof value === "string" &&
+                            setParam("filter", value, "all")
                         }
-                        className={selectClass}
-                    >
-                        {filters.map((value) => (
-                            <option key={value} value={value}>
-                                {t(`projects.filter.${value}`)}
-                            </option>
-                        ))}
-                    </select>
-                    <select
-                        aria-label={t("projects.sort.label")}
+                        options={filters.map((value) => ({
+                            value,
+                            label: t(`projects.filter.${value}`),
+                        }))}
+                    />
+                    <PropertySelect
+                        variant="ghost"
+                        ariaLabel={t("projects.sort.label")}
+                        placeholder={t("projects.sort.label")}
                         value={sort}
-                        onChange={(event) =>
-                            setParam("sort", event.target.value, "name")
+                        onChange={(value) =>
+                            typeof value === "string" &&
+                            setParam("sort", value, "name")
                         }
-                        className={selectClass}
-                    >
-                        {sorts.map((value) => (
-                            <option key={value} value={value}>
-                                {t(`projects.sort.${value}`)}
-                            </option>
-                        ))}
-                    </select>
+                        options={sorts.map((value) => ({
+                            value,
+                            label: t(`projects.sort.${value}`),
+                        }))}
+                    />
                     <ViewToggle<ProjectView>
                         value={view}
                         onChange={(next) => setParam("view", next, "list")}

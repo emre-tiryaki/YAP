@@ -16,6 +16,7 @@ import {
     fromDateInputValue,
     toDateInputValue,
 } from "../util/date";
+import { useDismiss } from "../hooks/useDismiss";
 
 type DatePickerProps = {
     label: string;
@@ -144,29 +145,7 @@ function Calendar({
         };
     }, [anchor]);
 
-    useEffect(() => {
-        function handlePointerDown(event: PointerEvent) {
-            const target = event.target as Node;
-            if (
-                !ref.current?.contains(target) &&
-                !anchor.current?.contains(target)
-            )
-                onClose();
-        }
-        // Capture phase, so Escape closes only the calendar and not the
-        // dialog it sits in.
-        function handleKeyDown(event: globalThis.KeyboardEvent) {
-            if (event.key !== "Escape") return;
-            event.stopPropagation();
-            onClose();
-        }
-        document.addEventListener("pointerdown", handlePointerDown, true);
-        document.addEventListener("keydown", handleKeyDown, true);
-        return () => {
-            document.removeEventListener("pointerdown", handlePointerDown, true);
-            document.removeEventListener("keydown", handleKeyDown, true);
-        };
-    }, [anchor, onClose]);
+    useDismiss(ref, true, onClose, [anchor]);
 
     // Moves keyboard focus along with the focused day.
     useEffect(() => {

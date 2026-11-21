@@ -6,6 +6,7 @@ import { CardMenu } from "./CardMenu";
 import { ExpandableText } from "./ExpandableText";
 import { PlanDialogs } from "./PlanDialogs";
 import { PlanIconButton } from "./PlanIconButton";
+import { Skeleton } from "./Skeleton";
 
 type PlanHeaderProps = {
     plan: Plan;
@@ -93,12 +94,12 @@ export function PlanHeaderSkeleton() {
     return (
         <div
             aria-busy="true"
-            className="mb-6 animate-pulse rounded-lg border border-gray-200 bg-white p-6 shadow-sm"
+            className="mb-6 rounded-lg border border-line bg-surface-1 p-6 shadow-raised"
         >
-            <div className="h-7 w-1/3 rounded bg-gray-200" />
-            <div className="mt-3 h-4 w-2/3 rounded bg-gray-100" />
-            <div className="mt-5 h-3 w-40 rounded bg-gray-100" />
-            <div className="mt-4 h-2 w-full rounded bg-gray-100" />
+            <Skeleton className="h-7 w-1/3" />
+            <Skeleton className="mt-3 h-4 w-2/3" />
+            <Skeleton className="mt-5 h-3 w-40" />
+            <Skeleton className="mt-4 h-2 w-full" />
         </div>
     );
 }

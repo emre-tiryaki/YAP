@@ -4,6 +4,7 @@ import { usePlanTasks } from "../hooks/useTasks";
 import { useTranslate } from "../hooks/useTranslate";
 import { Modal } from "./Modal";
 import { SelectInput } from "./SelectInput";
+import { Button } from "./Button";
 
 type TaskPickerDialogProps = {
     title: string;
@@ -93,14 +94,13 @@ export function TaskPickerDialog({
                 >
                     {t("common.cancel")}
                 </button>
-                <button
+                <Button variant="primary" size="lg"
                     type="button"
                     disabled={taskId === "" || isPending}
                     onClick={() => onPick(taskId)}
-                    className="cursor-pointer rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-fg hover:bg-accent/85 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     {t("resources.link.submit")}
-                </button>
+                </Button>
             </div>
         </Modal>
     );

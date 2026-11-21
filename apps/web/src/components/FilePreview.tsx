@@ -6,6 +6,7 @@ import type { Resource } from "../types/resource";
 import { fileCategory } from "../util/resources";
 import { ResourceIcon } from "./ResourceIcon";
 import { TextFileEditor } from "./TextFileEditor";
+import { Button } from "./Button";
 
 type FilePreviewProps = {
     resource: Resource;
@@ -52,14 +53,13 @@ export function FilePreview({ resource, onDownload }: FilePreviewProps) {
                 <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
                     <ResourceIcon resource={resource} className="text-7xl" />
                     <p className="text-sm text-gray-500">{t("resources.preview.unavailable")}</p>
-                    <button
+                    <Button variant="primary" size="lg"
                         type="button"
                         onClick={onDownload}
-                        className="flex cursor-pointer items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-fg hover:bg-accent/85"
                     >
                         <FiDownload aria-hidden />
                         {t("resources.download")}
-                    </button>
+                    </Button>
                 </div>
             );
     }

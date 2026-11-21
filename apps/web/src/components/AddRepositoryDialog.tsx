@@ -6,6 +6,7 @@ import { errorKey } from "../hooks/useResourceOperations";
 import { useTranslate } from "../hooks/useTranslate";
 import type { Resource } from "../types/resource";
 import { Modal } from "./Modal";
+import { Button } from "./Button";
 
 type AddRepositoryDialogProps = {
     isOpen: boolean;
@@ -104,13 +105,12 @@ function AddRepositoryForm({ parentId, onAdded }: { parentId: string | null; onA
                 </p>
             )}
             <div className="flex justify-end">
-                <button
+                <Button variant="primary" size="lg"
                     type="submit"
                     disabled={!fullName || add.isPending}
-                    className="cursor-pointer rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-fg hover:bg-accent/85 disabled:cursor-default disabled:opacity-50"
                 >
                     {t("resources.repo.add")}
-                </button>
+                </Button>
             </div>
         </form>
     );

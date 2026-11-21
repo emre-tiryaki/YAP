@@ -42,6 +42,7 @@ import type { Pin } from "../types/pin";
 import type { SettingsSection } from "../types/settings";
 import { hasPinDrag, readPinDrag, setPinDragData } from "../util/pinDrag";
 import { SettingsModal } from "./SettingsModal";
+import { useDismiss } from "../hooks/useDismiss";
 
 type IconType = ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
 
@@ -475,21 +476,7 @@ function ProfileMenu({ isCollapsed }: { isCollapsed: boolean }) {
     useState<SettingsSection | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    function handlePointerDown(event: PointerEvent) {
-      if (!ref.current?.contains(event.target as Node)) setIsOpen(false);
-    }
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setIsOpen(false);
-    }
-    document.addEventListener("pointerdown", handlePointerDown, true);
-    document.addEventListener("keydown", handleKeyDown, true);
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown, true);
-      document.removeEventListener("keydown", handleKeyDown, true);
-    };
-  }, [isOpen]);
+  useDismiss(ref, isOpen, () => setIsOpen(false));
 
   const username = workspace.data?.username ?? "";
   const profileTip = useSideLabel(

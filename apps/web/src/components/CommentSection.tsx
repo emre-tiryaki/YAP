@@ -13,6 +13,8 @@ import { isWithinLastMinute } from "../util/date";
 import { ExpandableText } from "./ExpandableText";
 import { FormError } from "./FormError";
 import { InlineError } from "./InlineError";
+import { Button } from "./Button";
+import { Skeleton } from "./Skeleton";
 
 type CommentSectionProps = {
     taskId: string;
@@ -62,10 +64,7 @@ export function CommentSection({ taskId }: CommentSectionProps) {
             </div>
 
             {comments.isLoading && (
-                <div
-                    aria-busy="true"
-                    className="h-16 animate-pulse rounded-md bg-gray-100"
-                />
+                <Skeleton className="h-16" />
             )}
             {comments.isError && (
                 <InlineError
@@ -108,13 +107,12 @@ export function CommentSection({ taskId }: CommentSectionProps) {
                     <span className="text-xs text-gray-400">
                         {t("task.detail.commentHint")}
                     </span>
-                    <button
+                    <Button variant="primary" size="lg"
                         type="submit"
                         disabled={create.isPending || draft.trim() === ""}
-                        className="cursor-pointer rounded-md bg-accent px-3 py-1.5 text-sm text-accent-fg hover:bg-accent/85 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         {t("task.detail.commentSubmit")}
-                    </button>
+                    </Button>
                 </div>
             </form>
             <FormError
@@ -237,13 +235,12 @@ function CommentItem({ taskId, comment }: CommentItemProps) {
                             className="field-sizing-content min-h-16 w-full resize-none rounded-md border border-gray-300 p-2 text-sm focus:border-gray-500 focus:outline-none"
                         />
                         <div className="flex gap-2">
-                            <button
+                            <Button variant="primary" size="md"
                                 type="submit"
                                 disabled={update.isPending || draft.trim() === ""}
-                                className="cursor-pointer rounded-md bg-accent px-3 py-1 text-sm text-accent-fg hover:bg-accent/85 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 {t("common.save")}
-                            </button>
+                            </Button>
                             <button
                                 type="button"
                                 onClick={cancelEdit}

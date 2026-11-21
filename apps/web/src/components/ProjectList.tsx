@@ -3,6 +3,9 @@ import type { Project } from "../types/project";
 import { ProjectCard } from "./ProjectCard";
 import { SectionHeader } from "./SectionHeader";
 import { ViewAllLink } from "./ViewAllLink";
+import { FiFolder } from "react-icons/fi";
+import { Button } from "./Button";
+import { EmptyState } from "./EmptyState";
 
 type ProjectListProps = {
     projects: Project[];
@@ -37,9 +40,16 @@ export function ProjectList({
                 <p className="text-sm text-red-600">{t("common.error")}</p>
             )}
             {!isLoading && !isError && projects.length === 0 && (
-                <p className="text-sm text-gray-500">
-                    {t("workspace.projects.empty")}
-                </p>
+                <EmptyState
+                    compact={limit !== undefined}
+                    icon={FiFolder}
+                    title={t("workspace.projects.empty")}
+                    action={
+                        <Button variant="primary" size="lg" onClick={onCreate}>
+                            + {t("workspace.projects.create.title")}
+                        </Button>
+                    }
+                />
             )}
             {shown.length > 0 && (
                 <div className="flex flex-col gap-3">

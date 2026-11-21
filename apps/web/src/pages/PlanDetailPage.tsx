@@ -28,6 +28,7 @@ import type { CardAction } from "../types/cardAction";
 import type { Status } from "../types/status";
 import type { PlanTask } from "../types/task";
 import NotFoundPage from "./NotFoundPage";
+import { Skeleton } from "../components/Skeleton";
 
 export default function PlanDetailPage() {
     const t = useTranslate();
@@ -160,9 +161,9 @@ export default function PlanDetailPage() {
                                 className="flex gap-4"
                             >
                                 {[0, 1, 2].map((i) => (
-                                    <div
+                                    <Skeleton
                                         key={i}
-                                        className="h-64 w-72 animate-pulse rounded-lg border border-gray-200 bg-gray-100"
+                                        className="h-64 w-72 rounded-lg"
                                     />
                                 ))}
                             </div>

@@ -9,6 +9,9 @@ import { SectionHeader } from "./SectionHeader";
 import { TaskDialogs } from "./TaskDialogs";
 import { UpcomingTaskDrawer } from "./UpcomingTaskDrawer";
 import { ViewAllLink } from "./ViewAllLink";
+import { FiCheckSquare } from "react-icons/fi";
+import { Button } from "./Button";
+import { EmptyState } from "./EmptyState";
 
 type TaskListProps = {
     tasks: Task[];
@@ -92,9 +95,23 @@ export function TaskList({
                 <p className="text-sm text-red-600">{t("common.error")}</p>
             )}
             {!isLoading && !isError && tasks.length === 0 && (
-                <p className="text-sm text-gray-500">
-                    {emptyMessage ?? t("workspace.tasks.empty")}
-                </p>
+                <EmptyState
+                    compact={compact || limit !== undefined}
+                    icon={FiCheckSquare}
+                    title={emptyMessage ?? t("workspace.tasks.empty")}
+                    action={
+                        limit === undefined &&
+                        !emptyMessage && (
+                            <Button
+                                variant="primary"
+                                size="lg"
+                                onClick={onCreate}
+                            >
+                                + {t("workspace.tasks.create.title")}
+                            </Button>
+                        )
+                    }
+                />
             )}
             {shown.length > 0 && (
                 <div className="flex flex-col gap-6">

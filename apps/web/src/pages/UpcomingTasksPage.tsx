@@ -9,6 +9,8 @@ import { useShortcut } from "../hooks/useShortcut";
 import { useUpcomingTasks } from "../hooks/useTasks";
 import { useTranslate } from "../hooks/useTranslate";
 import type { BreadcrumbItem } from "../types/breadcrumb";
+import { Button } from "../components/Button";
+import { PropertySelect } from "../components/PropertySelect";
 
 export default function UpcomingTasksPage() {
     const t = useTranslate();
@@ -45,34 +47,31 @@ export default function UpcomingTasksPage() {
                         )}
                     </h1>
                     <div className="flex items-center gap-3">
-                        <select
-                            aria-label={t("tasks.filter.project")}
+                        <PropertySelect
+                            variant="ghost"
+                            ariaLabel={t("tasks.filter.project")}
+                            placeholder={t("tasks.filter.allProjects")}
                             value={projectId}
-                            onChange={(event) =>
-                                setParams(
-                                    event.target.value
-                                        ? { project: event.target.value }
-                                        : {},
-                                    { replace: true },
-                                )
+                            onChange={(value) =>
+                                typeof value === "string" &&
+                                setParams(value ? { project: value } : {}, {
+                                    replace: true,
+                                })
                             }
-                            className="max-w-56 rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-700"
-                        >
-                            <option value="">{t("tasks.filter.allProjects")}</option>
-                            {projectItems.map((project) => (
-                                <option key={project.id} value={project.id}>
-                                    {project.icon ? `${project.icon} ` : ""}
-                                    {project.name}
-                                </option>
-                            ))}
-                        </select>
-                        <button
+                            options={[
+                                { value: "", label: t("tasks.filter.allProjects") },
+                                ...projectItems.map((project) => ({
+                                    value: project.id,
+                                    label: `${project.icon ? `${project.icon} ` : ""}${project.name}`,
+                                })),
+                            ]}
+                        />
+                        <Button variant="primary" size="lg"
                             type="button"
                             onClick={() => setIsCreateOpen(true)}
-                            className="cursor-pointer rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg hover:bg-accent/85"
                         >
                             + {t("workspace.tasks.create.title")}
-                        </button>
+                        </Button>
                     </div>
                 </div>
                 <TaskList

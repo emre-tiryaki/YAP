@@ -11,6 +11,8 @@ import { useTranslate } from "../hooks/useTranslate";
 import type { Subtask } from "../types/task";
 import { FormError } from "./FormError";
 import { InlineError } from "./InlineError";
+import { Button } from "./Button";
+import { Skeleton } from "./Skeleton";
 
 type SubtaskListProps = {
     taskId: string;
@@ -85,10 +87,7 @@ export function SubtaskList({ taskId }: SubtaskListProps) {
             {subtasks.isLoading && (
                 <div className="flex flex-col gap-2" aria-busy="true">
                     {[0, 1].map((i) => (
-                        <div
-                            key={i}
-                            className="h-8 animate-pulse rounded-md bg-gray-100"
-                        />
+                        <Skeleton key={i} className="h-8" />
                     ))}
                 </div>
             )}
@@ -155,13 +154,12 @@ export function SubtaskList({ taskId }: SubtaskListProps) {
                         }}
                         className="min-w-0 flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-gray-500 focus:outline-none"
                     />
-                    <button
+                    <Button variant="primary" size="lg"
                         type="submit"
                         disabled={create.isPending || draft.trim() === ""}
-                        className="cursor-pointer rounded-md bg-accent px-3 py-1.5 text-sm text-accent-fg hover:bg-accent/85 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         {t("common.save")}
-                    </button>
+                    </Button>
                 </form>
             ) : (
                 <button

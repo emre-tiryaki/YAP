@@ -77,6 +77,7 @@ import {
   UnsupportedImageError,
 } from "../util/backgroundImage";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { Button } from "./Button";
 
 // Every setting is applied and saved except the collapsed sidebar default,
 // which is still design only: its toggle keeps local state.
@@ -1441,15 +1442,14 @@ function GitHubConnect() {
         hint={hint}
         hintTone={error || outcome === "denied" ? "error" : "default"}
       >
-        <button
+        <Button variant="primary" size="lg"
           type="button"
           disabled={start.isPending}
           onClick={begin}
-          className="flex cursor-pointer items-center gap-2 rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg hover:bg-accent/85 disabled:opacity-50"
         >
           <FiGithub aria-hidden />
           {t("settings.github.connect")}
-        </button>
+        </Button>
       </SettingRow>
     );
 

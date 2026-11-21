@@ -6,6 +6,7 @@ import type { Resource } from "../types/resource";
 import { childrenOf, type ResourceIndex } from "../util/resources";
 import { Modal } from "./Modal";
 import { ResourceIcon } from "./ResourceIcon";
+import { Button } from "./Button";
 
 type ResourcePickerDialogProps = {
     title: string;
@@ -111,14 +112,13 @@ export function ResourcePickerDialog({
                 >
                     {t("common.cancel")}
                 </button>
-                <button
+                <Button variant="primary" size="lg"
                     type="button"
                     disabled={picked === undefined || isPending}
                     onClick={() => picked !== undefined && onPick(picked)}
-                    className="cursor-pointer rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-fg hover:bg-accent/85 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     {confirmLabel}
-                </button>
+                </Button>
             </div>
         </Modal>
     );

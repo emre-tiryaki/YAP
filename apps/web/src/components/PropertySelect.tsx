@@ -26,6 +26,8 @@ type PropertySelectProps<T extends string> = {
     variant: "pill" | "ghost" | "cell";
     tooltip?: string;
     triggerLabel?: ReactNode;
+    // Accessible name of the trigger when its text alone is not enough.
+    ariaLabel?: string;
 };
 
 const triggerClasses = {
@@ -44,6 +46,7 @@ export function PropertySelect<T extends string>({
     variant,
     tooltip,
     triggerLabel,
+    ariaLabel,
 }: PropertySelectProps<T>) {
     const t = useTranslate();
     const listId = useId();
@@ -109,6 +112,7 @@ export function PropertySelect<T extends string>({
         <button
             ref={anchorRef}
             type="button"
+            aria-label={ariaLabel}
             aria-haspopup="listbox"
             aria-expanded={open}
             onClick={(event) => {
