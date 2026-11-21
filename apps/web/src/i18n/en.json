@@ -570,5 +570,8 @@
     "resources.repo.commits.more": "Load older commits",
     "resources.repo.commits.merge": "merge",
     "common.search": "Search",
-    "common.noOptions": "No options"
+    "common.noOptions": "No options",
+    "settings.shortcuts.group.general": "General",
+    "settings.shortcuts.group.resources": "Resources",
+    "settings.shortcuts.group.tasks": "Tasks"
 }

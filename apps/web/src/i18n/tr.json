@@ -570,5 +570,8 @@
     "resources.repo.commits.more": "Daha eski commit'leri yükle",
     "resources.repo.commits.merge": "birleştirme",
     "common.search": "Ara",
-    "common.noOptions": "Seçenek yok"
+    "common.noOptions": "Seçenek yok",
+    "settings.shortcuts.group.general": "Genel",
+    "settings.shortcuts.group.resources": "Kaynaklar",
+    "settings.shortcuts.group.tasks": "Görevler"
 }

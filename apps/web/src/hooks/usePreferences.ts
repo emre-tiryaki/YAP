@@ -48,6 +48,8 @@ function defaults(): Preferences {
     accent: "neutral",
     density: "comfortable",
     background: { kind: "none" },
+    // The sidebar used to keep this in its own key; read it once as the start value.
+    sidebarCollapsed: localStorage.getItem("yap.sidebar.collapsed") === "true",
   };
 }
 
@@ -117,6 +119,10 @@ function read(): Preferences {
     accent: pick(accents, stored.accent, base.accent),
     density: pick(densities, stored.density, base.density),
     background: pickBackground(stored.background),
+    sidebarCollapsed:
+      typeof stored.sidebarCollapsed === "boolean"
+        ? stored.sidebarCollapsed
+        : base.sidebarCollapsed,
   };
   return cache;
 }

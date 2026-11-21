@@ -35,6 +35,11 @@ import {
 } from "react-icons/tb";
 import { useTranslate, type TranslationKey } from "../hooks/useTranslate";
 import { addPin, unpinWhere, usePins } from "../hooks/usePins";
+import {
+  getPreferences,
+  updatePreferences,
+  usePreferences,
+} from "../hooks/usePreferences";
 import { useProjects } from "../hooks/useProjects";
 import { useShortcut } from "../hooks/useShortcut";
 import { useWorkspace } from "../hooks/useWorkspace";
@@ -46,7 +51,6 @@ import { useDismiss } from "../hooks/useDismiss";
 
 type IconType = ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
 
-const COLLAPSED_KEY = "yap.sidebar.collapsed";
 
 // True while something pinnable is being dragged anywhere in the window, so
 // the Pinned section can show itself as a drop target before the pointer
@@ -110,15 +114,13 @@ export function Sidebar() {
   const { pathname } = useLocation();
   const { pins } = usePins();
   const projects = useProjects();
-  const [isCollapsed, setIsCollapsed] = useState(
-    () => localStorage.getItem(COLLAPSED_KEY) === "true",
+  const { sidebarCollapsed: isCollapsed } = usePreferences();
+  const setIsCollapsed = (collapsed: boolean) =>
+    updatePreferences({ sidebarCollapsed: collapsed });
+
+  useShortcut({ key: "b", mod: true }, () =>
+    updatePreferences({ sidebarCollapsed: !getPreferences().sidebarCollapsed }),
   );
-
-  useEffect(() => {
-    localStorage.setItem(COLLAPSED_KEY, String(isCollapsed));
-  }, [isCollapsed]);
-
-  useShortcut({ key: "b", mod: true }, () => setIsCollapsed((c) => !c));
   const toggleTip = useSideLabel(t("sidebar.expand"), isCollapsed);
   const isPinDragActive = usePinDragActive();
   const [isPinDropOver, setIsPinDropOver] = useState(false);

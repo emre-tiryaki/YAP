@@ -7,7 +7,8 @@ export type BoardView = "board" | "list";
 type ViewOption<T extends string> = {
     view: T;
     label: string;
-    Icon: ComponentType<{ "aria-hidden"?: boolean }>;
+    // Without an icon the option is text only.
+    Icon?: ComponentType<{ "aria-hidden"?: boolean }>;
 };
 
 type ViewToggleProps<T extends string> = {
@@ -15,12 +16,15 @@ type ViewToggleProps<T extends string> = {
     onChange: (view: T) => void;
     // Defaults to the plan page's board/list options.
     options?: readonly ViewOption<T>[];
+    // Accessible name of the group; defaults to the plan view label.
+    label?: string;
 };
 
 export function ViewToggle<T extends string = BoardView>({
     value,
     onChange,
     options,
+    label,
 }: ViewToggleProps<T>) {
     const t = useTranslate();
     const boardOptions = [
@@ -31,8 +35,8 @@ export function ViewToggle<T extends string = BoardView>({
     return (
         <div
             role="radiogroup"
-            aria-label={t("plan.view.label")}
-            className="inline-flex rounded-md border border-gray-300 bg-white p-0.5"
+            aria-label={label ?? t("plan.view.label")}
+            className="inline-flex rounded-md border border-line-strong bg-layer-2 p-0.5"
         >
             {(options ?? boardOptions).map(({ view, label, Icon }) => (
                 <button
@@ -44,10 +48,10 @@ export function ViewToggle<T extends string = BoardView>({
                     className={`flex cursor-pointer items-center gap-1.5 rounded px-3 py-1 text-sm ${
                         value === view
                             ? "bg-accent text-accent-fg"
-                            : "text-gray-600 hover:bg-gray-100"
+                            : "text-fg-muted hover:bg-layer-1-hover"
                     }`}
                 >
-                    <Icon aria-hidden />
+                    {Icon && <Icon aria-hidden />}
                     {label}
                 </button>
             ))}

@@ -61,4 +61,6 @@ export type Preferences = {
   accent: Accent;
   density: Density;
   background: Background;
+  // Sidebar shown as an icon rail.
+  sidebarCollapsed: boolean;
 };

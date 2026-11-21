@@ -12,6 +12,8 @@ type DialogProps = {
     size?: "sm" | "md" | "lg" | "xl";
     children: ReactNode;
     footer?: ReactNode;
+    // Drops the body padding, for content that lays itself out edge to edge.
+    bare?: boolean;
 };
 
 const widths = {
@@ -28,6 +30,7 @@ export function Dialog({
     size = "md",
     children,
     footer,
+    bare,
 }: DialogProps) {
     const t = useTranslate();
     const titleId = useId();
@@ -72,7 +75,9 @@ export function Dialog({
                         <FiX aria-hidden />
                     </Button>
                 </div>
-                <div className="min-h-0 flex-1 overflow-auto p-4">
+                <div
+                    className={`min-h-0 flex-1 overflow-auto ${bare ? "" : "p-4"}`}
+                >
                     {children}
                 </div>
                 {footer && (
