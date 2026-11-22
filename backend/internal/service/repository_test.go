@@ -554,9 +554,7 @@ func commit(t *testing.T, dir string, run func(...string) string, files map[stri
 
 func TestRepositoryCloneToFolder(t *testing.T) {
 	git := repofetch.NewGit()
-	if !git.Available() {
-		t.Skip("git is not installed")
-	}
+	requireGit(t, git)
 	e := newRepoEnvWith(t, git)
 	r := e.addHello(t, "")
 	src, head := gitRepo(t, map[string]string{"README.md": "# Git", "pkg/a.go": "package pkg"})
@@ -798,4 +796,17 @@ func TestRepositoryCommits(t *testing.T) {
 	delete(e.creds.m, e.session.UserID)
 	_, err = e.repos.Commits(e.ctx, e.session, r.ID, 1)
 	wantErr(t, err, ErrGitHubNotConnected)
+}
+
+// requireGit skips when git is missing, except in CI where a missing git
+// would silently hide the clone tests, so it fails there.
+func requireGit(t *testing.T, git *repofetch.Git) {
+	t.Helper()
+	if git.Available() {
+		return
+	}
+	if os.Getenv("CI") != "" {
+		t.Fatal("git is required in CI")
+	}
+	t.Skip("git is not installed")
 }
