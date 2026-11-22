@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -16,6 +15,7 @@ import (
 	"github.com/emre-tiryaki/YAP/backend/internal/repository"
 	"github.com/emre-tiryaki/YAP/backend/internal/service"
 	"github.com/emre-tiryaki/YAP/backend/internal/storage"
+	"github.com/emre-tiryaki/YAP/backend/internal/testdb"
 )
 
 type testEnv struct {
@@ -23,13 +23,15 @@ type testEnv struct {
 	session model.Session
 	llm     *fakeAILLM
 	keys    *memAIKeys
+	// waitAI blocks until running AI generations are finished.
+	waitAI func()
 }
 
 func newTestEnv(t *testing.T) testEnv {
 	t.Helper()
 	ctx := context.Background()
 
-	db, err := database.New(ctx, filepath.Join(t.TempDir(), "app.db"))
+	db, err := database.New(ctx, testdb.Path(t))
 	if err != nil {
 		t.Fatalf("database.New() error = %v", err)
 	}
@@ -85,7 +87,7 @@ func newTestEnv(t *testing.T) testEnv {
 	t.Cleanup(chats.Wait)
 	NewAIHandler(session, chats, conns).Register(mux)
 
-	return testEnv{mux: mux, session: session, llm: fake, keys: keys}
+	return testEnv{mux: mux, session: session, llm: fake, keys: keys, waitAI: chats.Wait}
 }
 
 func (e testEnv) do(t *testing.T, method, path, body string) *httptest.ResponseRecorder {

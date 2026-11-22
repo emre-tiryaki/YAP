@@ -53,7 +53,7 @@ Strict one-way layering: `handler → service → repository → database`, with
 
 ### Tests
 
-Table-driven, against a real SQLite DB in `t.TempDir()` created via `database.New` (so migrations and pragmas match production) — do not mock the database. Each package has a `testhelper_test.go` (e.g. `service.newTestDB` returns a DB plus a bootstrapped session).
+Table-driven, against a real SQLite DB in `t.TempDir()` (so migrations and pragmas match production) — do not mock the database. `internal/testdb` builds the migrated schema once per test binary with `database.New` and gives each test a file copy (`testdb.Path(t)`); packages using it call `testdb.Run(m)` from `TestMain`. Each package has a `testhelper_test.go` (e.g. `service.newTestDB` returns a DB plus a bootstrapped session). Tests that need `git` use `requireGit`, which skips locally but fails when `CI` is set.
 
 ## Frontend architecture
 

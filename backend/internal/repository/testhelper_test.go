@@ -3,12 +3,12 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/emre-tiryaki/YAP/backend/internal/database"
 	"github.com/emre-tiryaki/YAP/backend/internal/model"
+	"github.com/emre-tiryaki/YAP/backend/internal/testdb"
 )
 
 const baseNow = "2026-01-01T00:00:00Z"
@@ -21,7 +21,7 @@ type workspaceSeed struct {
 
 func newTestDB(t *testing.T) *sql.DB {
 	t.Helper()
-	db, err := database.New(context.Background(), filepath.Join(t.TempDir(), "app.db"))
+	db, err := database.New(context.Background(), testdb.Path(t))
 	if err != nil {
 		t.Fatalf("database.New() error = %v", err)
 	}
