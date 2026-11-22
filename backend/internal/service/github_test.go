@@ -162,3 +162,29 @@ func TestGitHubReposForgetsRejectedToken(t *testing.T) {
 		t.Fatalf("token dropped while offline: %v", err)
 	}
 }
+
+// A keychain that fails after GitHub approved the code must not cost the user
+// the approval: the device code is spent, so the next poll has to finish with
+// the token already received.
+func TestGitHubConnectSurvivesKeychainFailure(t *testing.T) {
+	e := newGitHubEnv(t)
+	if _, err := e.svc.StartConnect(e.ctx, e.session); err != nil {
+		t.Fatal(err)
+	}
+	e.advance(5 * time.Second)
+	e.creds.err = model.ErrSecretStoreUnavailable
+	_, err := e.svc.PollConnect(e.ctx, e.session)
+	wantErr(t, err, ErrKeychainUnavailable)
+
+	e.creds.err = nil
+	res, err := e.svc.PollConnect(e.ctx, e.session)
+	if err != nil || res.State != ConnectConnected {
+		t.Fatalf("retry = %v, %v; want connected", res.State, err)
+	}
+	if e.api.polls != 1 {
+		t.Fatalf("GitHub polled %d times, want 1 (the code is spent)", e.api.polls)
+	}
+	if cred, err := e.creds.Get(e.session.UserID); err != nil || cred.Token != "token-1" {
+		t.Fatalf("stored credential = %+v, %v", cred, err)
+	}
+}

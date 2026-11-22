@@ -73,6 +73,7 @@ func TestStatusErrors(t *testing.T) {
 		{"not found", http.StatusNotFound, nil, model.ErrGitHubNotFound},
 		{"rate limited", http.StatusForbidden, map[string]string{"X-RateLimit-Remaining": "0"}, model.ErrGitHubUnavailable},
 		{"too many requests", http.StatusTooManyRequests, nil, model.ErrGitHubUnavailable},
+		{"secondary rate limit", http.StatusForbidden, map[string]string{"Retry-After": "60"}, model.ErrGitHubUnavailable},
 		{"forbidden", http.StatusForbidden, nil, model.ErrGitHubNotFound},
 		{"server error", http.StatusBadGateway, nil, model.ErrGitHubUnavailable},
 	}

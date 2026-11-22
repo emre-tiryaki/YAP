@@ -81,7 +81,9 @@ func checkStatus(res *http.Response) error {
 	case res.StatusCode == http.StatusNotFound:
 		return model.ErrGitHubNotFound
 	case res.StatusCode == http.StatusTooManyRequests,
-		res.StatusCode == http.StatusForbidden && res.Header.Get("X-RateLimit-Remaining") == "0":
+		// Primary limits set X-RateLimit-Remaining, secondary (abuse)
+		// limits only Retry-After.
+		res.StatusCode == http.StatusForbidden && (res.Header.Get("X-RateLimit-Remaining") == "0" || res.Header.Get("Retry-After") != ""):
 		return fmt.Errorf("%w: rate limited", model.ErrGitHubUnavailable)
 	case res.StatusCode == http.StatusForbidden:
 		// Forbidden without a rate limit: SSO enforcement or a blocked

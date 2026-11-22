@@ -78,6 +78,11 @@ type deviceFlow struct {
 	expiresAt time.Time
 	nextPoll  time.Time
 	interval  time.Duration
+	// token and scopes are set once GitHub approved the code but saving the
+	// account failed (keychain locked, GitHub unreachable). The device code
+	// is spent by then, so the next poll finishes with these instead of
+	// asking GitHub again.
+	token, scopes string
 }
 
 type GitHubService struct {
@@ -148,33 +153,25 @@ func (s *GitHubService) PollConnect(ctx context.Context, session model.Session) 
 		s.endFlow(session.UserID, f)
 		return ConnectResult{State: ConnectExpired}, nil
 	}
-	if now.Before(flow.nextPoll) {
-		return ConnectResult{State: ConnectPending}, nil
-	}
-
-	token, scopes, interval, err := s.api.PollDeviceToken(ctx, flow.code.DeviceCode)
-	switch {
-	case errors.Is(err, model.ErrDeviceAuthPending), errors.Is(err, model.ErrDeviceSlowDown):
-		s.mu.Lock()
-		if errors.Is(err, model.ErrDeviceSlowDown) {
-			f.interval = max(interval, f.interval+5*time.Second)
+	token, scopes := flow.token, flow.scopes
+	if token == "" {
+		if now.Before(flow.nextPoll) {
+			return ConnectResult{State: ConnectPending}, nil
 		}
-		f.nextPoll = now.Add(f.interval)
+		var interval time.Duration
+		var err error
+		token, scopes, interval, err = s.api.PollDeviceToken(ctx, flow.code.DeviceCode)
+		if res, done, err := s.pollOutcome(session, f, now, interval, err); done {
+			return res, err
+		}
+		s.mu.Lock()
+		f.token, f.scopes = token, scopes
 		s.mu.Unlock()
-		return ConnectResult{State: ConnectPending}, nil
-	case errors.Is(err, model.ErrDeviceExpired):
-		s.endFlow(session.UserID, f)
-		return ConnectResult{State: ConnectExpired}, nil
-	case errors.Is(err, model.ErrDeviceDenied):
-		s.endFlow(session.UserID, f)
-		return ConnectResult{State: ConnectDenied}, nil
-	case err != nil:
-		return ConnectResult{}, err
 	}
 
 	user, err := s.api.User(ctx, token)
 	if err != nil {
-		return ConnectResult{}, err
+		return ConnectResult{}, s.apiError(session, "", err)
 	}
 	c := model.GitHubCredential{Token: token, Scopes: scopes, User: user, ConnectedAt: now.UTC().Truncate(time.Second)}
 	if err := s.creds.Set(session.UserID, c); err != nil {
@@ -182,6 +179,30 @@ func (s *GitHubService) PollConnect(ctx context.Context, session model.Session) 
 	}
 	s.endFlow(session.UserID, f)
 	return ConnectResult{State: ConnectConnected, Account: toAccount(c)}, nil
+}
+
+// pollOutcome handles the answers of a device token poll that are not a
+// token. done is false when a token arrived.
+func (s *GitHubService) pollOutcome(session model.Session, f *deviceFlow, now time.Time, interval time.Duration, err error) (res ConnectResult, done bool, _ error) {
+	switch {
+	case err == nil:
+		return ConnectResult{}, false, nil
+	case errors.Is(err, model.ErrDeviceAuthPending), errors.Is(err, model.ErrDeviceSlowDown):
+		s.mu.Lock()
+		if errors.Is(err, model.ErrDeviceSlowDown) {
+			f.interval = max(interval, f.interval+5*time.Second)
+		}
+		f.nextPoll = now.Add(f.interval)
+		s.mu.Unlock()
+		return ConnectResult{State: ConnectPending}, true, nil
+	case errors.Is(err, model.ErrDeviceExpired):
+		s.endFlow(session.UserID, f)
+		return ConnectResult{State: ConnectExpired}, true, nil
+	case errors.Is(err, model.ErrDeviceDenied):
+		s.endFlow(session.UserID, f)
+		return ConnectResult{State: ConnectDenied}, true, nil
+	}
+	return ConnectResult{}, true, err
 }
 
 // endFlow forgets a flow unless a newer one has replaced it.
