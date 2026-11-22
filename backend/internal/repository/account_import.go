@@ -18,6 +18,7 @@ var rowStateQueries = map[string]string{
 	"statuses":        `SELECT workspace_id = ?, deleted_at IS NULL FROM statuses WHERE id = ?`,
 	"tasks":           `SELECT workspace_id = ?, deleted_at IS NULL FROM tasks WHERE id = ?`,
 	"task_comments":   `SELECT workspace_id = ?, deleted_at IS NULL FROM task_comments WHERE id = ?`,
+	"labels":          `SELECT workspace_id = ?, deleted_at IS NULL FROM labels WHERE id = ?`,
 	"resource_events": `SELECT workspace_id = ?, deleted_at IS NULL FROM resource_events WHERE id = ?`,
 	// An item in the trash counts as taken: the import adds a live copy
 	// instead of reaching into the trash.
@@ -176,6 +177,53 @@ func (*AccountRepository) InsertTask(ctx context.Context, q database.DBTX, works
 	)
 	if err != nil {
 		return fmt.Errorf("import task: %w", err)
+	}
+	return nil
+}
+
+// LabelIDByName returns the id of the live label of a project with the name.
+func (*AccountRepository) LabelIDByName(ctx context.Context, q database.DBTX, workspaceID, projectID, name string) (string, bool, error) {
+	var id string
+	err := q.QueryRowContext(ctx,
+		`SELECT id FROM labels WHERE workspace_id = ? AND project_id = ? AND name = ? AND deleted_at IS NULL`,
+		workspaceID, projectID, name,
+	).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("label by name: %w", err)
+	}
+	return id, true, nil
+}
+
+// InsertLabel adds a label, bringing a deleted one back.
+func (*AccountRepository) InsertLabel(ctx context.Context, q database.DBTX, workspaceID string, l model.ImportLabel, now string) error {
+	_, err := q.ExecContext(ctx,
+		`INSERT INTO labels (id, workspace_id, project_id, name, color, position, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		 ON CONFLICT (id) DO UPDATE SET project_id = excluded.project_id, name = excluded.name, color = excluded.color,
+		     position = excluded.position, created_at = excluded.created_at, updated_at = excluded.updated_at,
+		     deleted_at = NULL
+		   WHERE labels.workspace_id = excluded.workspace_id`,
+		l.ID, workspaceID, l.ProjectID, l.Name, l.Color, l.Position, l.CreatedAt, now,
+	)
+	if err != nil {
+		return fmt.Errorf("import label: %w", err)
+	}
+	return nil
+}
+
+// InsertTaskLabel labels a task, reopening a label that was removed.
+func (*AccountRepository) InsertTaskLabel(ctx context.Context, q database.DBTX, workspaceID, projectID string, l model.ImportTaskLabel, now string) error {
+	_, err := q.ExecContext(ctx,
+		`INSERT INTO task_labels (workspace_id, project_id, task_id, label_id, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?)
+		 ON CONFLICT (task_id, label_id) DO UPDATE SET removed_at = NULL, updated_at = excluded.updated_at`,
+		workspaceID, projectID, l.TaskID, l.LabelID, l.CreatedAt, now,
+	)
+	if err != nil {
+		return fmt.Errorf("import task label: %w", err)
 	}
 	return nil
 }

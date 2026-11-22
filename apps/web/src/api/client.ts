@@ -2,6 +2,12 @@ import type { ImportCounts, ImportResult } from "../types/account";
 import type { Comment } from "../types/comment";
 import type { RecentComment } from "../types/notification";
 import type { SearchResults } from "../types/search";
+import type {
+    CreateLabelInput,
+    Label,
+    LabelColor,
+    UpdateLabelInput,
+} from "../types/label";
 import type { CreatePlanInput, Plan, UpdatePlanInput } from "../types/plan";
 import type {
     CreateProjectInput,
@@ -113,6 +119,7 @@ type TaskDto = {
     due_date: string | null;
     priority: TaskPriority;
     number: number;
+    label_ids?: string[];
     status_category: StatusCategory;
     completed_at: string | null;
 };
@@ -149,6 +156,7 @@ type PlanTaskDto = {
     due_date: string | null;
     priority: TaskPriority;
     number: number;
+    label_ids?: string[];
     completed_at: string | null;
     // Sent for plan tasks; the upcoming list leaves them out.
     subtask_count?: number;
@@ -347,6 +355,7 @@ function toPlanTask(dto: PlanTaskDto): PlanTask {
         dueDate: dto.due_date ? new Date(dto.due_date) : null,
         priority: dto.priority,
         number: dto.number,
+        labelIds: dto.label_ids ?? [],
         completedAt: dto.completed_at ? new Date(dto.completed_at) : null,
         subtaskCount: dto.subtask_count ?? 0,
         doneSubtaskCount: dto.done_subtask_count ?? 0,
@@ -617,12 +626,13 @@ export async function updateTask(
     taskId: string,
     input: UpdateTaskInput,
 ): Promise<PlanTask> {
-    const body: Record<string, string | null> = {};
+    const body: Record<string, string | string[] | null> = {};
     if (input.title !== undefined) body.title = input.title;
     if (input.description !== undefined) body.description = input.description;
     if (input.dueDate !== undefined)
         body.due_date = input.dueDate ? input.dueDate.toISOString() : null;
     if (input.priority !== undefined) body.priority = input.priority;
+    if (input.labelIds !== undefined) body.label_ids = input.labelIds;
     const dto = await request<PlanTaskDto>(`/api/tasks/${taskId}`, {
         method: "PATCH",
         body: JSON.stringify(body),
@@ -1340,4 +1350,53 @@ export async function listRepoCommits(resourceId: string, page: number): Promise
         date: new Date(dto.date),
         htmlUrl: dto.html_url,
     }));
+}
+
+type LabelDto = {
+    id: string;
+    project_id: string;
+    name: string;
+    color: LabelColor;
+    position: string;
+};
+
+function toLabel(dto: LabelDto): Label {
+    return {
+        id: dto.id,
+        projectId: dto.project_id,
+        name: dto.name,
+        color: dto.color,
+        position: dto.position,
+    };
+}
+
+export async function listLabels(projectId: string): Promise<Label[]> {
+    const dtos = await request<LabelDto[]>(`/api/projects/${projectId}/labels`);
+    return dtos.map(toLabel);
+}
+
+export async function createLabel(
+    projectId: string,
+    input: CreateLabelInput,
+): Promise<Label> {
+    const dto = await request<LabelDto>(`/api/projects/${projectId}/labels`, {
+        method: "POST",
+        body: JSON.stringify(input),
+    });
+    return toLabel(dto);
+}
+
+export async function updateLabel(
+    labelId: string,
+    input: UpdateLabelInput,
+): Promise<Label> {
+    const dto = await request<LabelDto>(`/api/labels/${labelId}`, {
+        method: "PATCH",
+        body: JSON.stringify(input),
+    });
+    return toLabel(dto);
+}
+
+export async function deleteLabel(labelId: string): Promise<void> {
+    await request<void>(`/api/labels/${labelId}`, { method: "DELETE" });
 }

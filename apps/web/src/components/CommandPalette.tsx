@@ -17,6 +17,7 @@ import {
     FiSettings,
     FiSidebar,
     FiSun,
+    FiTag,
     FiTrash2,
     FiX,
     FiCalendar,
@@ -32,6 +33,7 @@ import {
     type PalettePage,
 } from "../hooks/useCommandPalette";
 import { useFocusTrap } from "../hooks/useFocusTrap";
+import { useLabels } from "../hooks/useLabels";
 import { usePlanStatuses } from "../hooks/usePlans";
 import { getPreferences, updatePreferences } from "../hooks/usePreferences";
 import { useProjects } from "../hooks/useProjects";
@@ -41,6 +43,7 @@ import { openShortcutsDialog } from "../hooks/useShortcutsDialog";
 import { usePlanTasks, useSetTaskDone, useUpdateTask } from "../hooks/useTasks";
 import { pushInfoToast } from "../hooks/useToasts";
 import { useTranslate, type TranslationKey } from "../hooks/useTranslate";
+import { labelDotClass } from "../util/labelColors";
 import { priorities } from "../util/priority";
 import { taskKey } from "../util/taskKey";
 import { toSearchGroups } from "../util/searchHits";
@@ -161,6 +164,7 @@ function PaletteDialog({ page, context, projectId, onCreate, onDelete }: Palette
     );
     const setDone = useSetTaskDone(context?.projectId ?? "", context?.planId ?? "");
     const update = useUpdateTask();
+    const projectLabels = useLabels(context?.projectId ?? "");
     const contextKey = taskKey(
         projects.data?.find((p) => p.id === context?.projectId)?.identifier ?? "",
         task?.number ?? 0,
@@ -175,7 +179,35 @@ function PaletteDialog({ page, context, projectId, onCreate, onDelete }: Palette
     }
 
     const items: PaletteItem[] = [];
-    if (page === "priority") {
+    if (page === "labels") {
+        const current = task?.labelIds ?? [];
+        for (const label of projectLabels.data ?? []) {
+            const isOn = current.includes(label.id);
+            items.push({
+                id: `label:${label.id}`,
+                group: t("palette.group.labels"),
+                label: label.name,
+                icon: (
+                    <span
+                        aria-hidden
+                        className={`size-2.5 rounded-full ${labelDotClass(label.color)}`}
+                    />
+                ),
+                checked: isOn,
+                keepOpen: true,
+                run: () =>
+                    task &&
+                    update.mutate({
+                        taskId: task.id,
+                        input: {
+                            labelIds: isOn
+                                ? current.filter((id) => id !== label.id)
+                                : [...current, label.id],
+                        },
+                    }),
+            });
+        }
+    } else if (page === "priority") {
         for (const { value, label, Icon, color } of priorities) {
             items.push({
                 id: `priority:${value}`,
@@ -227,6 +259,15 @@ function PaletteDialog({ page, context, projectId, onCreate, onDelete }: Palette
                     shortcut: ["P"],
                     keepOpen: true,
                     run: () => setPalettePage("priority"),
+                },
+                {
+                    id: "ctx:labels",
+                    group: group("palette.group.context"),
+                    label: t("palette.changeLabels"),
+                    icon: <FiTag aria-hidden />,
+                    shortcut: ["L"],
+                    keepOpen: true,
+                    run: () => setPalettePage("labels"),
                 },
                 {
                     id: "ctx:done",
@@ -438,7 +479,9 @@ function PaletteDialog({ page, context, projectId, onCreate, onDelete }: Palette
                                 ? "palette.placeholder.status"
                                 : page === "priority"
                                   ? "palette.placeholder.priority"
-                                  : "palette.placeholder",
+                                  : page === "labels"
+                                    ? "palette.placeholder.labels"
+                                    : "palette.placeholder",
                         )}
                         aria-label={t("palette.search")}
                         autoComplete="off"

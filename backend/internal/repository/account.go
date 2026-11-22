@@ -35,6 +35,8 @@ var exportQueries = []struct {
 	{"tasks", `SELECT * FROM tasks WHERE workspace_id = ? AND deleted_at IS NULL ORDER BY id`, byWorkspace},
 	{"task_assignees", `SELECT * FROM task_assignees WHERE workspace_id = ? AND removed_at IS NULL ORDER BY task_id, membership_id`, byWorkspace},
 	{"task_comments", `SELECT * FROM task_comments WHERE workspace_id = ? AND deleted_at IS NULL ORDER BY id`, byWorkspace},
+	{"labels", `SELECT * FROM labels WHERE workspace_id = ? AND deleted_at IS NULL ORDER BY id`, byWorkspace},
+	{"task_labels", `SELECT * FROM task_labels WHERE workspace_id = ? AND removed_at IS NULL ORDER BY task_id, label_id`, byWorkspace},
 	// Trashed items are left out, like their bytes, and so are their links.
 	{"resources", `SELECT * FROM resources WHERE workspace_id = ? AND trashed_at IS NULL AND deleted_at IS NULL ORDER BY id`, byWorkspace},
 	{"task_resources", `SELECT * FROM task_resources tr
@@ -112,6 +114,8 @@ var resetStatements = []struct {
 	table string
 	query string
 }{
+	{"task_labels", `UPDATE task_labels SET removed_at = ?, updated_at = ? WHERE workspace_id = ? AND removed_at IS NULL`},
+	{"labels", `UPDATE labels SET deleted_at = ?, updated_at = ? WHERE workspace_id = ? AND deleted_at IS NULL`},
 	{"task_comments", `UPDATE task_comments SET deleted_at = ?, updated_at = ? WHERE workspace_id = ? AND deleted_at IS NULL`},
 	{"task_assignees", `UPDATE task_assignees SET removed_at = ?, updated_at = ? WHERE workspace_id = ? AND removed_at IS NULL`},
 	{"task_resources", `UPDATE task_resources SET removed_at = ?, updated_at = ? WHERE workspace_id = ? AND removed_at IS NULL`},

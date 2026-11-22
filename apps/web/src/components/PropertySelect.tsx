@@ -5,7 +5,7 @@ import {
     type KeyboardEvent,
     type ReactNode,
 } from "react";
-import { FiCheck } from "react-icons/fi";
+import { FiCheck, FiPlus } from "react-icons/fi";
 import { useTranslate } from "../hooks/useTranslate";
 import { Popover } from "./Popover";
 import { Tooltip } from "./Tooltip";
@@ -28,6 +28,12 @@ type PropertySelectProps<T extends string> = {
     triggerLabel?: ReactNode;
     // Accessible name of the trigger when its text alone is not enough.
     ariaLabel?: string;
+    // Adds a "create" row at the bottom while the search text matches no
+    // option exactly (e.g. "Create label 'x'").
+    create?: {
+        label: (query: string) => string;
+        onCreate: (query: string) => void;
+    };
 };
 
 const triggerClasses = {
@@ -47,6 +53,7 @@ export function PropertySelect<T extends string>({
     tooltip,
     triggerLabel,
     ariaLabel,
+    create,
 }: PropertySelectProps<T>) {
     const t = useTranslate();
     const listId = useId();
@@ -64,6 +71,23 @@ export function PropertySelect<T extends string>({
         ...options.filter((o) => selected.includes(o.value)),
         ...options.filter((o) => !selected.includes(o.value)),
     ].filter((o) => o.label.toLowerCase().includes(query.trim().toLowerCase()));
+
+    const trimmedQuery = query.trim();
+    const canCreate =
+        create !== undefined &&
+        trimmedQuery !== "" &&
+        !options.some(
+            (o) => o.label.toLowerCase() === trimmedQuery.toLowerCase(),
+        );
+    // The create row comes after the options, so it has the last index.
+    const rowCount = visible.length + (canCreate ? 1 : 0);
+
+    function runCreate() {
+        if (!create) return;
+        create.onCreate(trimmedQuery);
+        setQuery("");
+        setActive(0);
+    }
 
     const selectedOptions = options.filter((o) => selected.includes(o.value));
     const summary =
@@ -97,7 +121,7 @@ export function PropertySelect<T extends string>({
     function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
         if (event.key === "ArrowDown") {
             event.preventDefault();
-            setActive((i) => Math.min(i + 1, visible.length - 1));
+            setActive((i) => Math.min(i + 1, rowCount - 1));
         } else if (event.key === "ArrowUp") {
             event.preventDefault();
             setActive((i) => Math.max(i - 1, 0));
@@ -105,6 +129,7 @@ export function PropertySelect<T extends string>({
             event.preventDefault();
             const option = visible[active];
             if (option) pick(option);
+            else if (canCreate && active === visible.length) runCreate();
         }
     }
 
@@ -170,7 +195,7 @@ export function PropertySelect<T extends string>({
                         }}
                         className="max-h-64 overflow-auto outline-none"
                     >
-                        {visible.length === 0 && (
+                        {rowCount === 0 && (
                             <div className="px-2 py-1.5 text-body-xs text-fg-subtle">
                                 {t("common.noOptions")}
                             </div>
@@ -220,6 +245,23 @@ export function PropertySelect<T extends string>({
                                 </div>
                             );
                         })}
+                        {canCreate && create && (
+                            <div
+                                id={`${listId}-${visible.length}`}
+                                role="option"
+                                aria-selected={false}
+                                onClick={runCreate}
+                                onMouseEnter={() => setActive(visible.length)}
+                                className={`flex h-7 cursor-pointer items-center gap-2 rounded-md px-2 text-body-xs text-accent ${
+                                    active === visible.length ? "bg-layer-1-hover" : ""
+                                }`}
+                            >
+                                <FiPlus aria-hidden className="shrink-0" />
+                                <span className="flex-1 truncate">
+                                    {create.label(trimmedQuery)}
+                                </span>
+                            </div>
+                        )}
                     </div>
                 </div>
             </Popover>

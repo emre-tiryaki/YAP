@@ -273,6 +273,14 @@ func (*TaskRepository) SoftDeleteTree(ctx context.Context, q database.DBTX, work
 		return fmt.Errorf("close task resource links: %w", err)
 	}
 	_, err = q.ExecContext(ctx,
+		tree+` UPDATE task_labels SET removed_at = ?, updated_at = ?
+		 WHERE workspace_id = ? AND removed_at IS NULL AND task_id IN (SELECT id FROM tree)`,
+		taskID, workspaceID, workspaceID, now, now, workspaceID,
+	)
+	if err != nil {
+		return fmt.Errorf("close task labels: %w", err)
+	}
+	_, err = q.ExecContext(ctx,
 		tree+` UPDATE task_comments SET deleted_at = ?, updated_at = ?
 		 WHERE workspace_id = ? AND deleted_at IS NULL AND task_id IN (SELECT id FROM tree)`,
 		taskID, workspaceID, workspaceID, now, now, workspaceID,
@@ -445,6 +453,98 @@ func scanTaskTimes(t *model.Task, dueDate, completedAt sql.NullString) error {
 			return fmt.Errorf("parse %s: %w", f.name, err)
 		}
 		*f.dst = &parsed
+	}
+	return nil
+}
+
+// labelChunk bounds the ids of one IN (...) list.
+const labelChunk = 400
+
+// LabelIDsByTask returns the live label ids of the given tasks, in label order.
+func (*TaskRepository) LabelIDsByTask(ctx context.Context, q database.DBTX, workspaceID string, taskIDs []string) (map[string][]string, error) {
+	out := map[string][]string{}
+	for start := 0; start < len(taskIDs); start += labelChunk {
+		chunk := taskIDs[start:min(start+labelChunk, len(taskIDs))]
+		args := []any{workspaceID}
+		for _, id := range chunk {
+			args = append(args, id)
+		}
+		rows, err := q.QueryContext(ctx,
+			`SELECT tl.task_id, tl.label_id
+			 FROM task_labels tl
+			 JOIN labels l ON l.id = tl.label_id AND l.workspace_id = tl.workspace_id
+			 WHERE tl.workspace_id = ? AND tl.removed_at IS NULL AND l.deleted_at IS NULL
+			   AND tl.task_id IN (`+placeholders(len(chunk))+`)
+			 ORDER BY l.position, l.id`,
+			args...,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("task label ids: %w", err)
+		}
+		for rows.Next() {
+			var taskID, labelID string
+			if err := rows.Scan(&taskID, &labelID); err != nil {
+				rows.Close()
+				return nil, fmt.Errorf("scan task label: %w", err)
+			}
+			out[taskID] = append(out[taskID], labelID)
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return nil, fmt.Errorf("task label ids: %w", err)
+		}
+	}
+	return out, nil
+}
+
+// CountProjectLabels returns how many of the ids are live labels of the project.
+func (*TaskRepository) CountProjectLabels(ctx context.Context, q database.DBTX, workspaceID, projectID string, labelIDs []string) (int, error) {
+	if len(labelIDs) == 0 {
+		return 0, nil
+	}
+	args := []any{workspaceID, projectID}
+	for _, id := range labelIDs {
+		args = append(args, id)
+	}
+	var n int
+	err := q.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM labels
+		 WHERE workspace_id = ? AND project_id = ? AND deleted_at IS NULL AND id IN (`+placeholders(len(labelIDs))+`)`,
+		args...,
+	).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("count project labels: %w", err)
+	}
+	return n, nil
+}
+
+// SetLabels makes labelIDs the task's label set: labels no longer in it are
+// marked removed, new ones are added, and one that comes back has its
+// removed_at cleared.
+func (*TaskRepository) SetLabels(ctx context.Context, q database.DBTX, workspaceID, projectID, taskID string, labelIDs []string, now string) error {
+	removeArgs := []any{now, now, workspaceID, taskID}
+	remove := `UPDATE task_labels SET removed_at = ?, updated_at = ?
+		 WHERE workspace_id = ? AND task_id = ? AND removed_at IS NULL`
+	if len(labelIDs) > 0 {
+		remove += ` AND label_id NOT IN (` + placeholders(len(labelIDs)) + `)`
+		for _, id := range labelIDs {
+			removeArgs = append(removeArgs, id)
+		}
+	}
+	if _, err := q.ExecContext(ctx, remove, removeArgs...); err != nil {
+		return fmt.Errorf("remove task labels: %w", err)
+	}
+	for _, id := range labelIDs {
+		if _, err := q.ExecContext(ctx,
+			`INSERT INTO task_labels (workspace_id, project_id, task_id, label_id, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?, ?)
+			 ON CONFLICT (task_id, label_id) DO UPDATE SET removed_at = NULL, updated_at = excluded.updated_at
+			   WHERE task_labels.removed_at IS NOT NULL`,
+			workspaceID, projectID, taskID, id, now, now,
+		); err != nil {
+			return fmt.Errorf("add task label: %w", err)
+		}
 	}
 	return nil
 }

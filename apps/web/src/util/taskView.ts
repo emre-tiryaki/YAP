@@ -6,6 +6,7 @@ import type { TaskPropertyKey } from "../types/task";
 export const allTaskProperties: ReadonlySet<TaskPropertyKey> = new Set([
     "status",
     "priority",
+    "labels",
     "dueDate",
     "subtasks",
     "comments",

@@ -45,6 +45,7 @@ type ImportCounts struct {
 	Tasks     int
 	Comments  int
 	Resources int
+	Labels    int
 }
 
 // importDocument is the part of data.json an import reads. Unknown tables
@@ -66,6 +67,8 @@ type importDocument struct {
 		Tasks          []model.ImportTask         `json:"tasks"`
 		TaskAssignees  []model.ImportAssignee     `json:"task_assignees"`
 		TaskComments   []model.ImportComment      `json:"task_comments"`
+		Labels         []model.ImportLabel        `json:"labels"`
+		TaskLabels     []model.ImportTaskLabel    `json:"task_labels"`
 		Resources      []model.ImportResource     `json:"resources"`
 		TaskResources  []model.ImportTaskResource `json:"task_resources"`
 		ResourceEvents []model.ImportEvent        `json:"resource_events"`
@@ -237,6 +240,8 @@ type importer struct {
 	ids map[string]string
 	// added holds the (local) ids of the rows this import inserted.
 	added map[string]bool
+	// taskProject maps the added tasks to their project, for their labels.
+	taskProject map[string]string
 	// idents are the live project identifiers, plus those of added projects.
 	idents map[string]bool
 	// placed are the disk paths written, removed again on failure.
@@ -279,7 +284,7 @@ func (im *importer) run(ctx context.Context, tx *sql.Tx) error {
 	im.result.Restored = !hasContent
 
 	steps := []func(context.Context, *sql.Tx) error{
-		im.projects, im.plans, im.statuses, im.tasks, im.assignees, im.comments,
+		im.projects, im.plans, im.statuses, im.labels, im.tasks, im.taskLabels, im.assignees, im.comments,
 		im.resources, im.repositories, im.taskResources, im.events,
 	}
 	if im.result.Restored {
@@ -438,7 +443,67 @@ func (im *importer) tasks(ctx context.Context, tx *sql.Tx) error {
 		if err := im.s.repo.InsertTask(ctx, tx, im.session.WorkspaceID, im.session.MembershipID, t, number, im.now); err != nil {
 			return err
 		}
+		if im.taskProject == nil {
+			im.taskProject = map[string]string{}
+		}
+		im.taskProject[t.ID] = t.ProjectID
 		im.result.Added.Tasks++
+	}
+	return nil
+}
+
+// labels adds the exported labels. A label whose name a kept project already
+// uses is not added again: its tasks get the existing label.
+func (im *importer) labels(ctx context.Context, tx *sql.Tx) error {
+	for _, l := range im.doc.Tables.Labels {
+		id, add, err := im.keepOrAdd(ctx, tx, "labels", l.ID)
+		if err != nil {
+			return err
+		}
+		if !add {
+			continue
+		}
+		name, err := normalizeLabelName(l.Name)
+		if err != nil {
+			return err
+		}
+		if !validLabelColor(l.Color) {
+			return fmt.Errorf("%w: label color %q", ErrInvalidInput, l.Color)
+		}
+		l.ID, l.Name = id, name
+		l.ProjectID = im.ids[l.ProjectID]
+		if !im.added[l.ProjectID] {
+			existing, found, err := im.s.repo.LabelIDByName(ctx, tx, im.session.WorkspaceID, l.ProjectID, l.Name)
+			if err != nil {
+				return err
+			}
+			if found {
+				im.ids[l.ID] = existing
+				delete(im.added, id)
+				im.ids[id] = existing
+				continue
+			}
+		}
+		if err := im.s.repo.InsertLabel(ctx, tx, im.session.WorkspaceID, l, im.now); err != nil {
+			return err
+		}
+		im.result.Added.Labels++
+	}
+	return nil
+}
+
+// taskLabels labels the tasks this import added.
+func (im *importer) taskLabels(ctx context.Context, tx *sql.Tx) error {
+	for _, l := range im.doc.Tables.TaskLabels {
+		taskID, okTask := im.ids[l.TaskID]
+		labelID, okLabel := im.ids[l.LabelID]
+		if !okTask || !okLabel || !im.added[taskID] {
+			continue
+		}
+		l.TaskID, l.LabelID = taskID, labelID
+		if err := im.s.repo.InsertTaskLabel(ctx, tx, im.session.WorkspaceID, im.taskProject[taskID], l, im.now); err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -32,6 +33,9 @@ type TaskRepository interface {
 	ListSubtasks(ctx context.Context, q database.DBTX, workspaceID, parentID string) ([]model.Task, error)
 	SetCompletedAt(ctx context.Context, q database.DBTX, workspaceID, taskID string, completedAt *time.Time, now string) error
 	ReserveNumber(ctx context.Context, q database.DBTX, workspaceID, projectID, now string) (int, error)
+	LabelIDsByTask(ctx context.Context, q database.DBTX, workspaceID string, taskIDs []string) (map[string][]string, error)
+	CountProjectLabels(ctx context.Context, q database.DBTX, workspaceID, projectID string, labelIDs []string) (int, error)
+	SetLabels(ctx context.Context, q database.DBTX, workspaceID, projectID, taskID string, labelIDs []string, now string) error
 }
 
 type CreateTaskInput struct {
@@ -63,7 +67,27 @@ func NewTaskService(db *sql.DB, projects ProjectRepository, tasks TaskRepository
 }
 
 func (s *TaskService) Upcoming(ctx context.Context, session model.Session) ([]model.Task, error) {
-	return s.tasks.ListUpcoming(ctx, s.db, session.WorkspaceID, session.MembershipID, upcomingTaskLimit)
+	tasks, err := s.tasks.ListUpcoming(ctx, s.db, session.WorkspaceID, session.MembershipID, upcomingTaskLimit)
+	if err != nil {
+		return nil, err
+	}
+	return tasks, s.attachLabels(ctx, s.db, session.WorkspaceID, tasks)
+}
+
+// attachLabels fills in the label ids of the tasks.
+func (s *TaskService) attachLabels(ctx context.Context, q database.DBTX, workspaceID string, tasks []model.Task) error {
+	ids := make([]string, len(tasks))
+	for i, t := range tasks {
+		ids[i] = t.ID
+	}
+	byTask, err := s.tasks.LabelIDsByTask(ctx, q, workspaceID, ids)
+	if err != nil {
+		return err
+	}
+	for i := range tasks {
+		tasks[i].LabelIDs = byTask[tasks[i].ID]
+	}
+	return nil
 }
 
 func (s *TaskService) Create(ctx context.Context, session model.Session, projectID string, in CreateTaskInput) (model.Task, error) {
@@ -176,7 +200,11 @@ func (s *TaskService) ListByPlan(ctx context.Context, session model.Session, pro
 	if _, err := s.resolvePlanID(ctx, s.db, session.WorkspaceID, projectID, planID); err != nil {
 		return nil, err
 	}
-	return s.tasks.ListByPlan(ctx, s.db, session.WorkspaceID, planID)
+	tasks, err := s.tasks.ListByPlan(ctx, s.db, session.WorkspaceID, planID)
+	if err != nil {
+		return nil, err
+	}
+	return tasks, s.attachLabels(ctx, s.db, session.WorkspaceID, tasks)
 }
 
 // Move places a task at in.Index inside in.StatusID of its own plan. Only the
@@ -240,12 +268,14 @@ type UpdateTaskInput struct {
 	DueDate     *time.Time
 	DueDateSet  bool
 	Priority    *model.TaskPriority
+	// LabelIDs replaces the task's labels; they must be labels of its project.
+	LabelIDs *[]string
 }
 
 // Update changes the title, description, due date and/or priority of a task. Its
 // placement (plan, status, position) is left alone; use Move for that.
 func (s *TaskService) Update(ctx context.Context, session model.Session, taskID string, in UpdateTaskInput) (model.Task, error) {
-	if in.Title == nil && in.Description == nil && !in.DueDateSet && in.Priority == nil {
+	if in.Title == nil && in.Description == nil && !in.DueDateSet && in.Priority == nil && in.LabelIDs == nil {
 		return model.Task{}, fmt.Errorf("%w: nothing to update", ErrInvalidInput)
 	}
 	if in.Priority != nil && !in.Priority.Valid() {
@@ -281,7 +311,31 @@ func (s *TaskService) Update(ctx context.Context, session model.Session, taskID 
 		if in.Priority != nil {
 			task.Priority = *in.Priority
 		}
-		return s.tasks.Update(ctx, tx, session.WorkspaceID, taskID, task.Title, task.Description, task.DueDate, task.Priority, nowUTC())
+		now := nowUTC()
+		if err := s.tasks.Update(ctx, tx, session.WorkspaceID, taskID, task.Title, task.Description, task.DueDate, task.Priority, now); err != nil {
+			return err
+		}
+		if in.LabelIDs != nil {
+			ids := slices.Clone(*in.LabelIDs)
+			slices.Sort(ids)
+			ids = slices.Compact(ids)
+			count, err := s.tasks.CountProjectLabels(ctx, tx, session.WorkspaceID, task.ProjectID, ids)
+			if err != nil {
+				return err
+			}
+			if count != len(ids) {
+				return fmt.Errorf("%w: label_ids must be labels of the task's project", ErrInvalidInput)
+			}
+			if err := s.tasks.SetLabels(ctx, tx, session.WorkspaceID, task.ProjectID, taskID, ids, now); err != nil {
+				return err
+			}
+		}
+		byTask, err := s.tasks.LabelIDsByTask(ctx, tx, session.WorkspaceID, []string{taskID})
+		if err != nil {
+			return err
+		}
+		task.LabelIDs = byTask[taskID]
+		return nil
 	})
 	if err != nil {
 		return model.Task{}, err

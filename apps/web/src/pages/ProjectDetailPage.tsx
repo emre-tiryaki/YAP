@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useNavigate, useParams, useSearchParams } from "react-router";
 import { useTranslate } from "../hooks/useTranslate";
 import { useProject, useProjectPlans } from "../hooks/useProjects";
 import { ApiError } from "../api/client";
@@ -17,6 +17,8 @@ import { InlineError } from "../components/InlineError";
 import { Modal } from "../components/Modal";
 import { CreatePlanForm } from "../components/CreatePlanForm";
 import { ResourceActivity } from "../components/ResourceActivity";
+import { LabelsManager } from "../components/LabelsManager";
+import { Tabs } from "../components/Tabs";
 
 export default function ProjectDetailPage() {
     const t = useTranslate();
@@ -25,6 +27,8 @@ export default function ProjectDetailPage() {
     const project = useProject(projectId);
     const plans = useProjectPlans(projectId);
     const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
+    const [searchParams, setSearchParams] = useSearchParams();
+    const tab = searchParams.get("tab") === "labels" ? "labels" : "plans";
 
     if (project.error instanceof ApiError && project.error.status === 404)
         return <NotFoundPage />;
@@ -64,7 +68,27 @@ export default function ProjectDetailPage() {
                                 void navigate("/home", { replace: true })
                             }
                         />
-                        <div className="flex flex-col gap-8 xl:flex-row xl:items-start">
+                        <div className="mb-6 border-b border-line">
+                            <Tabs
+                                value={tab}
+                                onChange={(next) =>
+                                    setSearchParams(
+                                        next === "plans" ? {} : { tab: next },
+                                        { replace: true },
+                                    )
+                                }
+                                tabs={[
+                                    { id: "plans", label: t("project.tab.plans") },
+                                    { id: "labels", label: t("project.tab.labels") },
+                                ]}
+                            />
+                        </div>
+                        {tab === "labels" && <LabelsManager projectId={projectId} />}
+                        <div
+                            className={`flex flex-col gap-8 xl:flex-row xl:items-start ${
+                                tab === "plans" ? "" : "hidden"
+                            }`}
+                        >
                             <div className="min-w-0 flex-1">
                                 <PlanList
                                     plans={plans.data ?? []}

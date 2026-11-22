@@ -14,6 +14,9 @@ var (
 	// ErrIdentifierTaken is a conflict: another project already uses the
 	// identifier.
 	ErrIdentifierTaken = fmt.Errorf("%w: identifier", ErrConflict)
+	// ErrLabelNameTaken is a conflict: the project already has a label with
+	// that name.
+	ErrLabelNameTaken = fmt.Errorf("%w: label name", ErrConflict)
 	// ErrInvalidPriority is an invalid input: the priority is not a known one.
 	ErrInvalidPriority = fmt.Errorf("%w: priority", ErrInvalidInput)
 	ErrForbidden       = errors.New("forbidden")

@@ -91,6 +91,19 @@ func (p TaskPriority) Valid() bool {
 	return false
 }
 
+// Label is a coloured tag of a project's tasks.
+type Label struct {
+	ID          string
+	WorkspaceID string
+	ProjectID   string
+	Name        string
+	Color       string
+	Position    string
+}
+
+// LabelColors are the colours a label can have.
+var LabelColors = []string{"gray", "red", "orange", "amber", "emerald", "teal", "blue", "indigo", "violet", "pink"}
+
 type Task struct {
 	ID             string
 	WorkspaceID    string
@@ -107,6 +120,8 @@ type Task struct {
 	Priority       TaskPriority
 	// Number is the task's number within its project (the 12 of ABC-12).
 	Number int
+	// LabelIDs are the task's labels, in label order.
+	LabelIDs []string
 	// CompletedAt is set while the task is finished. It does not depend on
 	// the task's status: moving a task between columns leaves it alone.
 	CompletedAt *time.Time
@@ -259,6 +274,21 @@ type ImportProject struct {
 	ArchivedAt  *string `json:"archived_at"`
 	// Empty in exports made before identifiers existed.
 	Identifier string `json:"identifier"`
+}
+
+type ImportLabel struct {
+	ID        string `json:"id"`
+	ProjectID string `json:"project_id"`
+	Name      string `json:"name"`
+	Color     string `json:"color"`
+	Position  string `json:"position"`
+	CreatedAt string `json:"created_at"`
+}
+
+type ImportTaskLabel struct {
+	TaskID    string `json:"task_id"`
+	LabelID   string `json:"label_id"`
+	CreatedAt string `json:"created_at"`
 }
 
 type ImportPlan struct {

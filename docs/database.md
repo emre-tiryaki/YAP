@@ -134,6 +134,28 @@ erDiagram
         DATETIME removed_at
     }
 
+    labels {
+        TEXT id PK
+        TEXT workspace_id FK
+        TEXT project_id FK
+        TEXT name
+        TEXT color
+        TEXT position
+        DATETIME created_at
+        DATETIME updated_at
+        DATETIME deleted_at
+    }
+
+    task_labels {
+        TEXT workspace_id FK
+        TEXT project_id FK
+        TEXT task_id PK, FK
+        TEXT label_id PK, FK
+        DATETIME created_at
+        DATETIME updated_at
+        DATETIME removed_at
+    }
+
     task_comments {
         TEXT id PK
         TEXT workspace_id FK
@@ -186,6 +208,9 @@ erDiagram
 
     tasks o|--o{ tasks : "parent-child"
     tasks ||--o{ task_comments : "has comments"
+    projects ||--o{ labels : "defines"
+    tasks ||--o{ task_labels : "carries"
+    labels ||--o{ task_labels : "tags"
     memberships ||--o{ task_comments : "writes"
 
     workspaces ||--o{ resources : "contains"
@@ -208,7 +233,7 @@ The same logical schema exists in two physical databases.
 | -------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
 | Engine   | SQLite (`modernc.org/sqlite`, `database/sql`, no ORM (Object-Relational Mapping))                          | PostgreSQL                                               |
 | Scope    | The user's own device                                                                                      | Team workspaces, accounts, invitations, synchronization |
-| Tables   | users, workspaces, memberships, teams, team_members, projects, project_teams, plans, statuses, tasks, task_assignees, task_comments, resources, task_resources, resource_events, resource_repositories, repository_checkouts, repository_clones, user_settings | All local tables except repository_checkouts and repository_clones, plus accounts and invitations |
+| Tables   | users, workspaces, memberships, teams, team_members, projects, project_teams, plans, statuses, tasks, task_assignees, task_comments, labels, task_labels, resources, task_resources, resource_events, resource_repositories, repository_checkouts, repository_clones, user_settings | All local tables except repository_checkouts and repository_clones, plus accounts and invitations |
 
 DDL (Data Definition Language) is maintained in two separate directories: `migrations/sqlite` and `migrations/postgres`. The logical schema is the same; only type mappings and language-specific differences vary.
 
@@ -280,6 +305,10 @@ Rules:
 | A project has an identifier and its tasks have numbers, together a task key such as `ABC-12`. | `projects.identifier` is 2 to 5 characters, a letter then letters or digits, uppercase (`^[A-Z][A-Z0-9]{1,4}$`), unique among the workspace's live projects (partial unique index). A new project gets the first up to three ASCII letters of its name (`PRJ` when there are fewer than two), with a number appended when taken (`KIT`, `KIT2`). It can be changed; an invalid value is invalid input (400) and a taken one is `ErrIdentifierTaken` (409). Deleting a project frees its identifier. |
 | A task number is unique in its project and never reused. | `tasks.number` is set when the task (or subtask) is created, from `projects.next_task_number`, which is read and advanced in the same transaction. `(project_id, number)` is unique, deleted tasks keep theirs. Migration 011 numbered existing tasks in creation order and derived identifiers for existing projects the same way. |
 | Search finds a task by its key. | A search query that looks like a key (`abc-12`, case-insensitive) puts that live task first in the task results. |
+| A label belongs to a project, and a task only carries labels of its own project. | `labels (project_id, workspace_id)` → `projects (id, workspace_id)`. `task_labels (task_id, project_id)` → `tasks (id, project_id)` and `task_labels (label_id, project_id)` → `labels (id, project_id)`, so the composite foreign keys make a label of another project impossible. |
+| A label name is unique within its project; its colour is one of a fixed palette. | Partial unique index on `labels (project_id, name) WHERE deleted_at IS NULL`; a taken name is `ErrLabelNameTaken` (conflict, 409). The service accepts only `gray`, `red`, `orange`, `amber`, `emerald`, `teal`, `blue`, `indigo`, `violet`, `pink` (invalid input, 400) and a name of 1 to 50 characters. |
+| A task's label set is replaced as a whole. | `PATCH /api/tasks/{id}` with `label_ids`: labels not in the list get `removed_at`, new ones are inserted, a label that comes back has `removed_at` cleared (the same row). Ids that are not live labels of the task's project are invalid input (400). Task lists report `label_ids` in label order. |
+| Deleting a label. | The label gets `deleted_at` and its open `task_labels` rows get `removed_at`, in one transaction. Deleting a task, plan, status or project closes the `task_labels` rows of the tasks it deletes, and deleting a project also deletes its labels. |
 | A comment belongs to a task and an author of the same workspace. | `task_comments (task_id, workspace_id)` → `tasks (id, workspace_id)`, `task_comments (author_id, workspace_id)` → `memberships (id, workspace_id)`. |
 | A comment body is not empty. | `CHECK (length(body) > 0)`. |
 | A resource, its parent, its task links and its events belong to the same workspace. | Composite foreign keys on `(resource_id / parent_id, workspace_id)`. |
@@ -344,8 +373,8 @@ All of these rules are protected by unit tests.
 | Default statuses of a new plan. | Every new plan (also the first plan of a new project) gets one todo, one in-progress and one done status, titled with the creating user's `statuses.default_name.*` settings. Existing plans are not renamed when the settings change. |
 | Comment notifications. | `GET /api/comments/recent?since=` lists live comments on live tasks (of live plans and projects) written by other members at or after `since`, oldest first, at most 50. Which notifications were already shown is remembered per device, not in the database. |
 | Exporting the data. | A ZIP with `data.json` (format `yap-export`, version 1: the live rows of the user, the workspace and every workspace table, plus `user_settings`) and the bytes of the live resources under `files/`, laid out like the tree. Repository folders are exported as empty folders with their `resource_repositories` row; their files, `repository_checkouts` and `repository_clones` are not exported. Importing such a row makes the added folder a repository folder again with a pending copy; nothing in the archive may sit inside a repository folder. Rows are read in one transaction. Trashed resources and their links are left out. Files whose bytes are missing from the disk are listed in `missing_files` instead. |
-| Importing an export. | All or nothing, and nothing is deleted. Rows are checked like rows made in the app (names, colors, icons, times, comment bodies, resource names) and every reference must point to a row of the archive; teams and team plans are rejected because a personal workspace has none. Rows keep their ids: a row whose id is still live is kept as it is, a deleted row of the workspace with that id is brought back (its `deleted_at` cleared, its columns taken from the archive), and a free id is used as it is, so importing the same export twice adds nothing, also after a reset. Only an id taken by another workspace or by an item in the trash gets a new one (the trashed item stays in the trash and a live copy is added). A folder whose name is taken by a folder is merged into it; a file whose name is taken gets a free `name (n).ext`; a plan whose name is taken in a kept project becomes `name (n)`; a project whose identifier is invalid or taken (or missing, in an older export) gets a new one derived from its name; a task that comes back from the deleted rows keeps its number, an added task takes the project's next one. Assignments and task links are only added for tasks or resources the import adds, and go to the importing member. The activity log of added resources comes along, with ids that carry the original times. Files missing from the archive are skipped and reported. Only when the workspace had no live projects and resources are the display name, the workspace name and the user settings taken from the archive. |
-| Resetting the local data. | In one transaction every content row of the workspace (projects, plans, statuses, tasks, comments, teams, resources, live or trashed, and resource events) gets `deleted_at`, and every relationship row (`task_assignees`, `task_resources`, `project_teams`, `team_members`) gets `removed_at`. The user, the workspace and the owner membership keep their ids; the display name, the workspace name and the user settings go back to their first-run defaults. Afterwards the workspace's directory, trash included, is removed from the disk; a failure there is reported and a second reset finishes it. |
+| Importing an export. | All or nothing, and nothing is deleted. Rows are checked like rows made in the app (names, colors, icons, times, comment bodies, resource names) and every reference must point to a row of the archive; teams and team plans are rejected because a personal workspace has none. Rows keep their ids: a row whose id is still live is kept as it is, a deleted row of the workspace with that id is brought back (its `deleted_at` cleared, its columns taken from the archive), and a free id is used as it is, so importing the same export twice adds nothing, also after a reset. Only an id taken by another workspace or by an item in the trash gets a new one (the trashed item stays in the trash and a live copy is added). A folder whose name is taken by a folder is merged into it; a file whose name is taken gets a free `name (n).ext`; a plan whose name is taken in a kept project becomes `name (n)`; a project whose identifier is invalid or taken (or missing, in an older export) gets a new one derived from its name; a task that comes back from the deleted rows keeps its number, an added task takes the project's next one; a label whose name a kept project already uses is not added again, its tasks get the existing label. Assignments and task links are only added for tasks or resources the import adds, and go to the importing member. The activity log of added resources comes along, with ids that carry the original times. Files missing from the archive are skipped and reported. Only when the workspace had no live projects and resources are the display name, the workspace name and the user settings taken from the archive. |
+| Resetting the local data. | In one transaction every content row of the workspace (projects, plans, statuses, tasks, comments, labels, teams, resources, live or trashed, and resource events) gets `deleted_at`, and every relationship row (`task_assignees`, `task_resources`, `task_labels`, `project_teams`, `team_members`) gets `removed_at`. The user, the workspace and the owner membership keep their ids; the display name, the workspace name and the user settings go back to their first-run defaults. Afterwards the workspace's directory, trash included, is removed from the disk; a failure there is reported and a second reset finishes it. |
 
 ## 5. Table Reference
 
@@ -364,6 +393,8 @@ All of these rules are protected by unit tests.
 | tasks          | Both     | Tasks | `plan_id` and `project_id` are both stored; `parent_id` identifies a subtask; `completed_at` is set while the task is finished; `priority` defaults to `none`; `number` is the per-project task number. |
 | task_assignees | Both     | Person assignments to tasks | |
 | task_comments  | Both     | Comments on tasks | `author_id` is a membership; soft-deleted with `deleted_at`. |
+| labels         | Both     | Coloured tags a project's tasks can carry | Soft-deleted with `deleted_at`. |
+| task_labels    | Both     | Which labels a task carries | Re-adding a removed label clears `removed_at`. |
 | resources      | Both     | Folders and files of a workspace | The bytes live on disk under `RESOURCES_PATH/<workspace_id>/<path>` (trashed items under `.yap-trash/<trash root id>/`); the rows are the source of truth for the tree. `revision` counts content changes. `deleted_at` marks a purged tombstone. |
 | task_resources | Both     | Links between tasks and resources | Re-linking clears `removed_at`. |
 | resource_events | Both    | Resource activity log | Append-only apart from extending an open `edited` event; `deleted_at` is only set by a data reset. `details` is a JSON object (name, from/to paths, size, task title). |
@@ -389,6 +420,9 @@ All of these rules are protected by unit tests.
 | `tasks (plan_id, status_id, position)` | Order tasks on a plan's board. |
 | `tasks (workspace_id, updated_at)` | Retrieve changed records during synchronization. |
 | `task_comments (task_id, created_at) WHERE deleted_at IS NULL` | List a task's comments in order and count them. |
+| `labels (project_id, name) WHERE deleted_at IS NULL` (unique) | Keep label names unique in a project. |
+| `labels (workspace_id, updated_at)`, `task_labels (workspace_id, updated_at)` | Retrieve changed records during synchronization. |
+| `task_labels (label_id) WHERE removed_at IS NULL` | Tasks that carry a label. |
 | `task_comments (workspace_id, updated_at)` | Retrieve changed comments during synchronization. |
 | `projects (workspace_id) WHERE deleted_at IS NULL` | non-deleted projects of a workspace |
 | `projects (workspace_id, identifier) WHERE deleted_at IS NULL` (unique) | Keep identifiers unique and resolve a task key. |
@@ -421,7 +455,6 @@ Synchronization is not implemented at this stage; the schema has been designed w
 | Project-level access control | If introduced, the synchronization filter will move from the workspace level to the project level, creating a security boundary. A `projects.visibility` column can be added later. |
 | Multiple email addresses | Since `accounts.user_id` is unique, a user can have only one account. If needed, the `accounts` table can be split. |
 | Multiple owning teams | Handled through subtasks in separate team plans. |
-| Labels | Product feature to be added at the relevant stage. |
 | Per-resource access control | Would be a security boundary below the workspace: the server must not even send such rows or bytes to members without access. To add later as a `resource_permissions` table and a sync filter; resource bytes are only ever served through the API, so the disk layout can change without clients noticing. |
 | Resource content history (versions, diffs, restoring an older content) | The activity log records that a file changed and by whom, not what changed. |
 | A separate (NoSQL) store for the activity log | The log is low-volume thanks to edit merging; an append-only SQLite table is enough. Old events can be archived on the server if it ever grows too large. |

@@ -5,6 +5,7 @@ export type StatusCategory = "todo" | "in_progress" | "done";
 export type TaskPropertyKey =
   | "status"
   | "priority"
+  | "labels"
   | "dueDate"
   | "subtasks"
   | "comments";
@@ -23,6 +24,8 @@ export type PlanTask = {
   // The task's number in its project (the 12 of ABC-12); 0 while it is
   // still being created.
   number: number;
+  // Ids of the labels the task carries, in label order.
+  labelIds: string[];
   // Set while the task is finished; independent of the status it sits in.
   completedAt: Date | null;
   subtaskCount: number;
@@ -58,6 +61,8 @@ export type UpdateTaskInput = {
   description?: string
   dueDate?: Date | null
   priority?: TaskPriority
+  // Replaces the task's labels.
+  labelIds?: string[]
 }
 
 // A direct child of a task, shown as a checklist item inside its parent.

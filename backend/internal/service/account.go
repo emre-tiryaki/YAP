@@ -40,6 +40,9 @@ type AccountRepository interface {
 	ReserveTaskNumber(ctx context.Context, q database.DBTX, workspaceID, projectID, now string) (int, error)
 	InsertPlan(ctx context.Context, q database.DBTX, workspaceID string, p model.ImportPlan, now string) error
 	InsertStatus(ctx context.Context, q database.DBTX, workspaceID string, s model.ImportStatus, now string) error
+	LabelIDByName(ctx context.Context, q database.DBTX, workspaceID, projectID, name string) (string, bool, error)
+	InsertLabel(ctx context.Context, q database.DBTX, workspaceID string, l model.ImportLabel, now string) error
+	InsertTaskLabel(ctx context.Context, q database.DBTX, workspaceID, projectID string, l model.ImportTaskLabel, now string) error
 	InsertTask(ctx context.Context, q database.DBTX, workspaceID, createdBy string, t model.ImportTask, number int, now string) error
 	InsertAssignee(ctx context.Context, q database.DBTX, workspaceID, taskID, membershipID, assignedAt, now string) error
 	InsertComment(ctx context.Context, q database.DBTX, workspaceID, authorID string, c model.ImportComment) error

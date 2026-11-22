@@ -51,6 +51,7 @@ func main() {
 	projectSvc := service.NewProjectService(db, projectRepo, settingsRepo)
 	taskSvc := service.NewTaskService(db, projectRepo, taskRepo)
 	commentSvc := service.NewCommentService(db, taskRepo, commentRepo)
+	labelSvc := service.NewLabelService(db, projectRepo, repository.NewLabelRepository())
 	workspaceSvc := service.NewWorkspaceService(db, repository.NewWorkspaceRepository())
 
 	store, err := storage.NewFS(cfg.ResourcesPath)
@@ -75,6 +76,7 @@ func main() {
 	handler.NewProjectHandler(session, projectSvc).Register(mux)
 	handler.NewTaskHandler(session, taskSvc).Register(mux)
 	handler.NewCommentHandler(session, commentSvc).Register(mux)
+	handler.NewLabelHandler(session, labelSvc).Register(mux)
 	handler.NewResourceHandler(session, resourceSvc).Register(mux)
 	handler.NewRepositoryHandler(session, repositorySvc).Register(mux)
 	handler.NewGitHubHandler(session, githubSvc).Register(mux)

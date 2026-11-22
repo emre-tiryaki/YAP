@@ -5,6 +5,7 @@ import type { Status } from "../types/status";
 import type { PlanTask } from "../types/task";
 import { daysFromToday, fromDateInputValue, toDateInputValue } from "../util/date";
 import { DatePicker } from "./DatePicker";
+import { LabelsSelect } from "./LabelsSelect";
 import { Pill } from "./Pill";
 import { PrioritySelect } from "./PrioritySelect";
 import { PropertySelect } from "./PropertySelect";
@@ -60,6 +61,15 @@ export function TaskMetaRow({ task, projectId, planId, statuses, dueDateRequest 
                 value={task.priority}
                 onChange={(priority) =>
                     update.mutate({ taskId: task.id, input: { priority } })
+                }
+            />
+            <Divider />
+            <LabelsSelect
+                variant="ghost"
+                projectId={projectId}
+                value={task.labelIds}
+                onChange={(labelIds) =>
+                    update.mutate({ taskId: task.id, input: { labelIds } })
                 }
             />
             <Divider />

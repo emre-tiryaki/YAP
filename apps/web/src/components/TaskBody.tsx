@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { FiAlertTriangle, FiCalendar, FiCheck, FiFlag, FiTag } from "react-icons/fi";
+import { FiAlertTriangle, FiCalendar, FiCheck, FiFlag, FiLayers, FiTag } from "react-icons/fi";
 import { Link } from "react-router";
 import { ApiError } from "../api/client";
 import { useChangeTaskStatus } from "../hooks/useChangeTaskStatus";
@@ -16,6 +16,7 @@ import { taskKey } from "../util/taskKey";
 import { CommentSection } from "./CommentSection";
 import { DatePicker } from "./DatePicker";
 import { FormError } from "./FormError";
+import { LabelsSelect } from "./LabelsSelect";
 import { Pill } from "./Pill";
 import { PrioritySelect } from "./PrioritySelect";
 import { PropertySelect } from "./PropertySelect";
@@ -72,6 +73,7 @@ export function TaskBody({ projectId, planId, task, statuses, full }: TaskBodyPr
 
     useShortcut({ key: "s", inModal: true }, () => openPalette("status"));
     useShortcut({ key: "p", inModal: true }, () => openPalette("priority"));
+    useShortcut({ key: "l", inModal: true }, () => openPalette("labels"));
     useShortcut({ key: "d", inModal: true }, () => setDueDateRequest((n) => n + 1));
 
     function save(input: UpdateTaskInput) {
@@ -244,6 +246,17 @@ export function TaskBody({ projectId, planId, task, statuses, full }: TaskBodyPr
                 </TaskPropertyRow>
                 <TaskPropertyRow
                     icon={<FiTag />}
+                    label={t("task.property.labels")}
+                >
+                    <LabelsSelect
+                        variant="ghost"
+                        projectId={projectId}
+                        value={task.labelIds}
+                        onChange={(labelIds) => save({ labelIds })}
+                    />
+                </TaskPropertyRow>
+                <TaskPropertyRow
+                    icon={<FiLayers />}
                     label={t("task.property.category")}
                 >
                     <Pill>{t(`status.category.${task.statusCategory}`)}</Pill>

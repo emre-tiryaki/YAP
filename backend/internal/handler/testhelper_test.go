@@ -43,6 +43,7 @@ func newTestEnv(t *testing.T) testEnv {
 	taskRepo := repository.NewTaskRepository()
 	taskSvc := service.NewTaskService(db, projectRepo, taskRepo)
 	commentSvc := service.NewCommentService(db, taskRepo, repository.NewCommentRepository())
+	labelSvc := service.NewLabelService(db, projectRepo, repository.NewLabelRepository())
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/hello-world", HelloWorld)
@@ -50,6 +51,7 @@ func newTestEnv(t *testing.T) testEnv {
 	NewProjectHandler(session, projectSvc).Register(mux)
 	NewTaskHandler(session, taskSvc).Register(mux)
 	NewCommentHandler(session, commentSvc).Register(mux)
+	NewLabelHandler(session, labelSvc).Register(mux)
 
 	store, err := storage.NewFS(t.TempDir())
 	if err != nil {

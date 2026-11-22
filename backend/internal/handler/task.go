@@ -32,19 +32,20 @@ func (h *TaskHandler) Register(mux *http.ServeMux) {
 }
 
 type taskResponse struct {
-	ID             string  `json:"id"`
-	Title          string  `json:"title"`
-	Description    string  `json:"description"`
-	ProjectID      string  `json:"project_id"`
-	ProjectName    string  `json:"project_name"`
-	PlanID         string  `json:"plan_id"`
-	StatusID       string  `json:"status_id"`
-	Position       string  `json:"position"`
-	DueDate        *string `json:"due_date"`
-	Priority       string  `json:"priority"`
-	Number         int     `json:"number"`
-	StatusCategory string  `json:"status_category"`
-	CompletedAt    *string `json:"completed_at"`
+	ID             string   `json:"id"`
+	Title          string   `json:"title"`
+	Description    string   `json:"description"`
+	ProjectID      string   `json:"project_id"`
+	ProjectName    string   `json:"project_name"`
+	PlanID         string   `json:"plan_id"`
+	StatusID       string   `json:"status_id"`
+	Position       string   `json:"position"`
+	DueDate        *string  `json:"due_date"`
+	Priority       string   `json:"priority"`
+	Number         int      `json:"number"`
+	LabelIDs       []string `json:"label_ids"`
+	StatusCategory string   `json:"status_category"`
+	CompletedAt    *string  `json:"completed_at"`
 }
 
 type createTaskRequest struct {
@@ -57,19 +58,20 @@ type createTaskRequest struct {
 }
 
 type planTaskResponse struct {
-	ID               string  `json:"id"`
-	Title            string  `json:"title"`
-	Description      string  `json:"description"`
-	StatusID         string  `json:"status_id"`
-	StatusCategory   string  `json:"status_category"`
-	Position         string  `json:"position"`
-	DueDate          *string `json:"due_date"`
-	Priority         string  `json:"priority"`
-	Number           int     `json:"number"`
-	CompletedAt      *string `json:"completed_at"`
-	SubtaskCount     int     `json:"subtask_count"`
-	DoneSubtaskCount int     `json:"done_subtask_count"`
-	CommentCount     int     `json:"comment_count"`
+	ID               string   `json:"id"`
+	Title            string   `json:"title"`
+	Description      string   `json:"description"`
+	StatusID         string   `json:"status_id"`
+	StatusCategory   string   `json:"status_category"`
+	Position         string   `json:"position"`
+	DueDate          *string  `json:"due_date"`
+	Priority         string   `json:"priority"`
+	Number           int      `json:"number"`
+	LabelIDs         []string `json:"label_ids"`
+	CompletedAt      *string  `json:"completed_at"`
+	SubtaskCount     int      `json:"subtask_count"`
+	DoneSubtaskCount int      `json:"done_subtask_count"`
+	CommentCount     int      `json:"comment_count"`
 }
 
 type subtaskResponse struct {
@@ -95,6 +97,14 @@ type moveTaskRequest struct {
 	Index    int    `json:"index"`
 }
 
+// labelIDs makes a missing list an empty one, so the JSON is [] and not null.
+func labelIDs(ids []string) []string {
+	if ids == nil {
+		return []string{}
+	}
+	return ids
+}
+
 func formatTime(d *time.Time) *string {
 	if d == nil {
 		return nil
@@ -117,6 +127,7 @@ func toTaskResponse(t model.Task) taskResponse {
 		DueDate:        formatTime(t.DueDate),
 		Priority:       string(t.Priority),
 		Number:         t.Number,
+		LabelIDs:       labelIDs(t.LabelIDs),
 		CompletedAt:    formatTime(t.CompletedAt),
 	}
 }
@@ -132,6 +143,7 @@ func toPlanTaskResponse(t model.Task) planTaskResponse {
 		DueDate:          formatTime(t.DueDate),
 		Priority:         string(t.Priority),
 		Number:           t.Number,
+		LabelIDs:         labelIDs(t.LabelIDs),
 		CompletedAt:      formatTime(t.CompletedAt),
 		SubtaskCount:     t.SubtaskCount,
 		DoneSubtaskCount: t.DoneSubtaskCount,
@@ -254,6 +266,7 @@ type updateTaskRequest struct {
 	Description *string         `json:"description"`
 	DueDate     json.RawMessage `json:"due_date"`
 	Priority    *string         `json:"priority"`
+	LabelIDs    *[]string       `json:"label_ids"`
 }
 
 func (h *TaskHandler) update(w http.ResponseWriter, r *http.Request) {
@@ -267,6 +280,7 @@ func (h *TaskHandler) update(w http.ResponseWriter, r *http.Request) {
 		priority := model.TaskPriority(*req.Priority)
 		in.Priority = &priority
 	}
+	in.LabelIDs = req.LabelIDs
 	if req.DueDate != nil {
 		var raw *string
 		if err := json.Unmarshal(req.DueDate, &raw); err != nil {
