@@ -8,6 +8,10 @@ import { EditStatusForm } from "../components/EditStatusForm";
 import { InlineError } from "../components/InlineError";
 import { Modal } from "../components/Modal";
 import { TaskBoardDnd } from "../components/TaskBoardDnd";
+import { CalendarLayout } from "../components/CalendarLayout";
+import { SpreadsheetLayout } from "../components/SpreadsheetLayout";
+import { useCurrentUserSettings } from "../hooks/useUserSettings";
+import { filterTasks, orderTasks } from "../util/taskFilter";
 import { PlanHeader, PlanHeaderSkeleton } from "../components/PlanHeader";
 import { TaskDialogs } from "../components/TaskDialogs";
 import { TaskPeek } from "../components/TaskPeek";
@@ -43,13 +47,19 @@ export default function PlanDetailPage() {
     const navigate = useNavigate();
     const { projectId = "", planId = "" } = useParams();
     const [searchParams, setSearchParams] = useSearchParams();
+    const viewParam = searchParams.get("view");
     const view: BoardView =
-        searchParams.get("view") === "list" ? "list" : "board";
+        viewParam === "list" ||
+        viewParam === "calendar" ||
+        viewParam === "table"
+            ? viewParam
+            : "board";
 
     // The filters live in the URL so a reload or a shared link keeps them.
     const filters = filtersFromParams(searchParams);
     const display = usePlanDisplay(planId);
     const labels = useLabels(projectId);
+    const { hideDone } = useCurrentUserSettings();
 
     const project = useProject(projectId);
     const plan = usePlan(projectId, planId);
@@ -113,6 +123,13 @@ export default function PlanDetailPage() {
         deleteStatus.reset();
     }
 
+    const shownTasks = orderTasks(
+        filterTasks(tasks.data ?? [], filters).filter(
+            (task) => !hideDone || task.completedAt === null,
+        ),
+        display.orderBy,
+        display.orderDir,
+    );
     const boardLoading = statuses.isLoading || tasks.isLoading;
     const boardError = statuses.isError || tasks.isError;
 
@@ -225,7 +242,32 @@ export default function PlanDetailPage() {
                                 }}
                             />
                         )}
-                        {statuses.data && tasks.data && (
+                        {statuses.data && tasks.data && (view === "calendar" || view === "table") && (
+                            (
+view === "calendar" ? (
+                                <CalendarLayout
+                                    projectId={projectId}
+                                    planId={planId}
+                                    statuses={statuses.data}
+                                    tasks={shownTasks}
+                                    onOpenTask={(task) => setOpenTaskId(task.id)}
+                                />
+                            ) : (
+                                <SpreadsheetLayout
+                                    projectId={projectId}
+                                    planId={planId}
+                                    statuses={statuses.data}
+                                    tasks={shownTasks}
+                                    display={display}
+                                    onChangeDisplay={(patch) =>
+                                        updatePlanDisplay(planId, patch)
+                                    }
+                                    onOpenTask={(task) => setOpenTaskId(task.id)}
+                                />
+                            )
+                            )
+                        )}
+                        {statuses.data && tasks.data && (view === "board" || view === "list") && (
                             <TaskBoardDnd
                                 projectId={projectId}
                                 planId={planId}

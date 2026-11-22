@@ -11,11 +11,8 @@ import { createPortal } from "react-dom";
 import { FiCalendar, FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { useDateFormat } from "../hooks/useDateFormat";
 import { useTranslate } from "../hooks/useTranslate";
-import {
-    calendarDays,
-    fromDateInputValue,
-    toDateInputValue,
-} from "../util/date";
+import { calendarDays } from "../util/calendar";
+import { fromDateInputValue, toDateInputValue } from "../util/date";
 import { useDismiss } from "../hooks/useDismiss";
 import { Tooltip } from "./Tooltip";
 

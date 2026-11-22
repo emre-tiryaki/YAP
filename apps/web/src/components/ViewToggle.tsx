@@ -1,9 +1,9 @@
 import type { ComponentType } from "react";
-import { FiColumns, FiList } from "react-icons/fi";
+import { FiCalendar, FiColumns, FiGrid, FiList } from "react-icons/fi";
 import { useTranslate } from "../hooks/useTranslate";
 import { Tooltip } from "./Tooltip";
 
-export type BoardView = "board" | "list";
+export type BoardView = "board" | "list" | "calendar" | "table";
 
 type ViewOption<T extends string> = {
     view: T;
@@ -34,6 +34,8 @@ export function ViewToggle<T extends string = BoardView>({
     const boardOptions = [
         { view: "board", label: t("plan.view.board"), Icon: FiColumns },
         { view: "list", label: t("plan.view.list"), Icon: FiList },
+        { view: "calendar", label: t("plan.view.calendar"), Icon: FiCalendar },
+        { view: "table", label: t("plan.view.table"), Icon: FiGrid },
     ] as unknown as readonly ViewOption<T>[];
 
     return (

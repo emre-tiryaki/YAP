@@ -1,4 +1,4 @@
-import type { DateFormat, TimeFormat, WeekStart } from "../types/settings";
+import type { DateFormat, TimeFormat } from "../types/settings";
 
 // Converts between Date and the local "YYYY-MM-DD" value of <input type="date">.
 
@@ -59,21 +59,4 @@ export function formatTime(
         minute: "2-digit",
         hour12: format === "12h",
     });
-}
-
-// 0 = Sunday ... 6 = Saturday, as returned by Date.getDay().
-export function firstDayIndex(weekStart: WeekStart): number {
-    return weekStart === "sunday" ? 0 : 1;
-}
-
-// The 42 days (6 weeks) shown for the month of `month`, starting on the first
-// day of the week that contains the 1st.
-export function calendarDays(month: Date, weekStart: WeekStart): Date[] {
-    const first = new Date(month.getFullYear(), month.getMonth(), 1);
-    const offset = (first.getDay() - firstDayIndex(weekStart) + 7) % 7;
-    return Array.from(
-        { length: 42 },
-        (_, i) =>
-            new Date(first.getFullYear(), first.getMonth(), 1 - offset + i),
-    );
 }
