@@ -14,6 +14,9 @@ import { TaskProperties } from "./TaskProperties";
 
 type ListRowProps = {
     task: PlanTask;
+    // What the row is dragged by, and the group it sits in.
+    dragId?: string;
+    groupId?: string;
     projectId: string;
     planId: string;
     statuses: Status[];
@@ -28,7 +31,7 @@ type ListRowProps = {
 // A row of the list layout. Sortable unless it is the drag overlay or still
 // being created.
 export function ListRow(props: ListRowProps) {
-    const { task, isOverlay } = props;
+    const { task, isOverlay, dragId = props.task.id, groupId = "" } = props;
     const isTemp = task.id.startsWith("temp-");
     const {
         attributes,
@@ -37,7 +40,11 @@ export function ListRow(props: ListRowProps) {
         transform,
         transition,
         isDragging,
-    } = useSortable({ id: task.id, disabled: isOverlay || isTemp });
+    } = useSortable({
+        id: dragId,
+        data: { type: "task", taskId: task.id, groupId },
+        disabled: isOverlay || isTemp,
+    });
 
     return (
         <li

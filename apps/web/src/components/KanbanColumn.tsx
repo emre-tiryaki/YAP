@@ -10,14 +10,16 @@ import { MdDragIndicator } from "react-icons/md";
 import { useTranslate } from "../hooks/useTranslate";
 import type { CardAction } from "../types/cardAction";
 import type { Status } from "../types/status";
+import type { TaskGroup } from "../util/taskFilter";
+import { dragIdOf } from "../util/taskView";
 import type { PlanTask, TaskPropertyKey } from "../types/task";
 import { KanbanCard } from "./KanbanCard";
 import { QuickAddTask } from "./QuickAddTask";
 import { Tooltip } from "./Tooltip";
 
 type KanbanColumnProps = {
-    status: Status;
-    tasks: PlanTask[];
+    group: TaskGroup;
+    plain: boolean;
     statuses: Status[];
     projectId: string;
     planId: string;
@@ -32,8 +34,8 @@ type KanbanColumnProps = {
 };
 
 export function KanbanColumn({
-    status,
-    tasks,
+    group,
+    plain,
     statuses,
     projectId,
     planId,
@@ -46,6 +48,9 @@ export function KanbanColumn({
     onOpenTask,
 }: KanbanColumnProps) {
     const t = useTranslate();
+    const { status, tasks } = group;
+    const title = group.label;
+    const color = group.color ?? "var(--color-fg-placeholder)";
     const [isAdding, setIsAdding] = useState(false);
     // The column is both a sortable item (dragged by its handle) and the drop
     // target for tasks, so an empty column can still receive a task.
@@ -59,36 +64,42 @@ export function KanbanColumn({
         isDragging,
         isOver,
         active,
-    } = useSortable({ id: status.id, data: { type: "status" } });
+    } = useSortable({
+        // Only status columns can be dragged by their handle; the other
+        // groups are plain drop targets.
+        id: group.id,
+        data: { type: status ? "status" : "group" },
+        disabled: status ? false : { draggable: true },
+    });
     const isTaskOver = isOver && active?.data.current?.type !== "status";
     const style = {
         transform: CSS.Translate.toString(transform),
         transition,
-        "--status": status.color,
+        "--status": color,
     } as CSSProperties;
 
     if (collapsed)
         return (
             <section
                 ref={setNodeRef}
-                aria-label={status.title}
+                aria-label={title}
                 style={style}
                 className="flex w-10 shrink-0 flex-col items-center rounded-lg bg-layer-1 py-2"
             >
                 <button
                     type="button"
                     onClick={onToggleCollapsed}
-                    aria-label={`${t("plan.group.expand")}: ${status.title}`}
+                    aria-label={`${t("plan.group.expand")}: ${title}`}
                     aria-expanded={false}
                     className="flex cursor-pointer flex-col items-center gap-2 text-body-xs font-medium text-fg"
                 >
                     <span
                         aria-hidden
                         className="size-2.5 rounded-full"
-                        style={{ backgroundColor: status.color }}
+                        style={{ backgroundColor: color }}
                     />
                     <span className="[writing-mode:vertical-rl]">
-                        {status.title}
+                        {title}
                     </span>
                     <span className="text-fg-subtle">{tasks.length}</span>
                 </button>
@@ -98,17 +109,18 @@ export function KanbanColumn({
     return (
         <section
             ref={setNodeRef}
-            aria-label={status.title}
+            aria-label={title}
             style={style}
             className={`flex max-h-full w-84 shrink-0 flex-col rounded-lg bg-layer-1 p-2 ${
                 isTaskOver ? "ring-2 ring-accent/40" : ""
             } ${isDragging ? "relative z-10 opacity-80 shadow-overlay" : ""}`}
         >
             <header className="sticky top-0 z-10 flex h-9 shrink-0 items-center gap-2 px-1">
+                {status && (
                 <button
                     type="button"
                     ref={setActivatorNodeRef}
-                    aria-label={`${t("plan.status.reorder")}: ${status.title}`}
+                    aria-label={`${t("plan.status.reorder")}: ${title}`}
                     title={t("plan.status.reorder")}
                     className={`-ml-1 touch-none rounded p-0.5 text-fg-placeholder hover:bg-layer-1-hover hover:text-fg ${
                         isDragging ? "cursor-grabbing" : "cursor-grab"
@@ -118,13 +130,14 @@ export function KanbanColumn({
                 >
                     <MdDragIndicator aria-hidden />
                 </button>
+                )}
                 <span
                     aria-hidden
                     className="size-2.5 shrink-0 rounded-full"
-                    style={{ backgroundColor: status.color }}
+                    style={{ backgroundColor: color }}
                 />
                 <h2 className="truncate text-body-xs font-medium text-fg">
-                    {status.title}
+                    {title}
                 </h2>
                 <span className="text-body-xs text-fg-subtle">
                     {tasks.length}
@@ -134,45 +147,51 @@ export function KanbanColumn({
                         <button
                             type="button"
                             onClick={onToggleCollapsed}
-                            aria-label={`${t("plan.group.collapse")}: ${status.title}`}
+                            aria-label={`${t("plan.group.collapse")}: ${title}`}
                             aria-expanded
                             className="cursor-pointer rounded p-1 text-fg-subtle hover:bg-layer-1-hover hover:text-fg"
                         >
                             <FiChevronsLeft aria-hidden />
                         </button>
                     </Tooltip>
+                    {status && (
                     <Tooltip label={t("plan.task.add")}>
                         <button
                             type="button"
                             onClick={() => setIsAdding(true)}
-                            aria-label={`${t("plan.task.add")}: ${status.title}`}
+                            aria-label={`${t("plan.task.add")}: ${title}`}
                             className="cursor-pointer rounded p-1 text-fg-subtle hover:bg-layer-1-hover hover:text-fg"
                         >
                             <FiPlus aria-hidden />
                         </button>
                     </Tooltip>
+                    )}
+                    {status && (
                     <Tooltip label={t("plan.status.edit.title")}>
                         <button
                             type="button"
                             onClick={onEdit}
-                            aria-label={`${t("plan.status.edit.title")}: ${status.title}`}
+                            aria-label={`${t("plan.status.edit.title")}: ${title}`}
                             className="cursor-pointer rounded p-1 text-fg-subtle hover:bg-layer-1-hover hover:text-fg"
                         >
                             <FiEdit2 aria-hidden />
                         </button>
                     </Tooltip>
+                    )}
                 </div>
             </header>
             <SortableContext
-                id={status.id}
-                items={tasks.map((task) => task.id)}
-                strategy={verticalListSortingStrategy}
+                id={group.id}
+                items={tasks.map((task) => dragIdOf(plain, group.id, task.id))}
+                strategy={plain ? () => null : verticalListSortingStrategy}
             >
                 <ul className="flex min-h-12 flex-1 flex-col gap-2 overflow-y-auto py-1">
                     {tasks.map((task) => (
                         <SortableCard
                             key={task.id}
                             task={task}
+                            dragId={dragIdOf(plain, group.id, task.id)}
+                            groupId={group.id}
                             statuses={statuses}
                             projectId={projectId}
                             planId={planId}
@@ -196,20 +215,24 @@ export function KanbanColumn({
                     )}
                 </ul>
             </SortableContext>
-            <QuickAddTask
-                projectId={projectId}
-                planId={planId}
-                status={status}
-                variant="kanban"
-                isOpen={isAdding}
-                onOpenChange={setIsAdding}
-            />
+            {status && (
+                <QuickAddTask
+                    projectId={projectId}
+                    planId={planId}
+                    status={status}
+                    variant="kanban"
+                    isOpen={isAdding}
+                    onOpenChange={setIsAdding}
+                />
+            )}
         </section>
     );
 }
 
 function SortableCard({
     task,
+    dragId,
+    groupId,
     statuses,
     projectId,
     planId,
@@ -218,6 +241,8 @@ function SortableCard({
     onOpen,
 }: {
     task: PlanTask;
+    dragId: string;
+    groupId: string;
     statuses: Status[];
     projectId: string;
     planId: string;
@@ -233,7 +258,11 @@ function SortableCard({
         transform,
         transition,
         isDragging,
-    } = useSortable({ id: task.id, disabled: isTemp });
+    } = useSortable({
+        id: dragId,
+        data: { type: "task", taskId: task.id, groupId },
+        disabled: isTemp,
+    });
 
     return (
         <li

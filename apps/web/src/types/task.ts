@@ -8,7 +8,10 @@ export type TaskPropertyKey =
   | "labels"
   | "dueDate"
   | "subtasks"
-  | "comments";
+  | "comments"
+  // Only the spreadsheet layout has columns for these two.
+  | "createdAt"
+  | "updatedAt";
 
 export type TaskPriority = "urgent" | "high" | "medium" | "low" | "none";
 
@@ -31,6 +34,8 @@ export type PlanTask = {
   subtaskCount: number;
   doneSubtaskCount: number;
   commentCount: number;
+  createdAt: Date;
+  updatedAt: Date;
 };
 
 // A task outside its plan page (e.g. the upcoming list) also names where it lives.

@@ -145,6 +145,7 @@ func (s *TaskService) Create(ctx context.Context, session model.Session, project
 		task.Position = position.After(last)
 
 		now := nowUTC()
+		task.CreatedAt, task.UpdatedAt = parseStamp(now), parseStamp(now)
 		if task.Number, err = s.tasks.ReserveNumber(ctx, tx, session.WorkspaceID, projectID, now); err != nil {
 			return err
 		}
@@ -312,6 +313,7 @@ func (s *TaskService) Update(ctx context.Context, session model.Session, taskID 
 			task.Priority = *in.Priority
 		}
 		now := nowUTC()
+		task.UpdatedAt = parseStamp(now)
 		if err := s.tasks.Update(ctx, tx, session.WorkspaceID, taskID, task.Title, task.Description, task.DueDate, task.Priority, now); err != nil {
 			return err
 		}
@@ -436,6 +438,7 @@ func (s *TaskService) SetDone(ctx context.Context, session model.Session, taskID
 			return err
 		}
 		task.CompletedAt = completedAt
+		task.UpdatedAt = parseStamp(now)
 		return nil
 	})
 	if err != nil {

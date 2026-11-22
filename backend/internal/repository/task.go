@@ -98,7 +98,8 @@ func (*TaskRepository) InsertAssignee(ctx context.Context, q database.DBTX, work
 func (*TaskRepository) ListUpcoming(ctx context.Context, q database.DBTX, workspaceID, membershipID string, limit int) ([]model.Task, error) {
 	rows, err := q.QueryContext(ctx,
 		`SELECT t.id, t.title, t.description, t.project_id, t.plan_id, t.status_id, t.position,
-			p.name, t.due_date, s.category, t.completed_at, t.priority, COALESCE(t.number, 0)
+			p.name, t.due_date, s.category, t.completed_at, t.priority, COALESCE(t.number, 0),
+			t.created_at, t.updated_at
 		 FROM task_assignees ta
 		 JOIN tasks t ON t.id = ta.task_id AND t.workspace_id = ta.workspace_id
 		 JOIN projects p ON p.id = t.project_id AND p.workspace_id = t.workspace_id
@@ -120,15 +121,18 @@ func (*TaskRepository) ListUpcoming(ctx context.Context, q database.DBTX, worksp
 	for rows.Next() {
 		t := model.Task{WorkspaceID: workspaceID}
 		var description, dueDate, completedAt sql.NullString
-		var category, priority string
+		var category, priority, createdAt, updatedAt string
 		if err := rows.Scan(&t.ID, &t.Title, &description, &t.ProjectID, &t.PlanID, &t.StatusID, &t.Position,
-			&t.ProjectName, &dueDate, &category, &completedAt, &priority, &t.Number); err != nil {
+			&t.ProjectName, &dueDate, &category, &completedAt, &priority, &t.Number, &createdAt, &updatedAt); err != nil {
 			return nil, fmt.Errorf("scan task: %w", err)
 		}
 		t.Description = description.String
 		t.StatusCategory = model.StatusCategory(category)
 		t.Priority = model.TaskPriority(priority)
 		if err := scanTaskTimes(&t, dueDate, completedAt); err != nil {
+			return nil, err
+		}
+		if err := scanTaskStamps(&t, createdAt, updatedAt); err != nil {
 			return nil, err
 		}
 		tasks = append(tasks, t)
@@ -142,7 +146,7 @@ func (*TaskRepository) ListUpcoming(ctx context.Context, q database.DBTX, worksp
 func (*TaskRepository) ListByPlan(ctx context.Context, q database.DBTX, workspaceID, planID string) ([]model.Task, error) {
 	rows, err := q.QueryContext(ctx,
 		`SELECT t.id, t.project_id, t.status_id, t.created_by, t.title, t.description,
-			t.position, t.due_date, s.category, t.completed_at, t.priority, COALESCE(t.number, 0), `+taskCounts+`
+			t.position, t.due_date, s.category, t.completed_at, t.priority, COALESCE(t.number, 0), t.created_at, t.updated_at, `+taskCounts+`
 		 FROM tasks t
 		 JOIN statuses s ON s.id = t.status_id AND s.plan_id = t.plan_id
 		 WHERE t.workspace_id = ? AND t.plan_id = ?
@@ -160,15 +164,18 @@ func (*TaskRepository) ListByPlan(ctx context.Context, q database.DBTX, workspac
 	for rows.Next() {
 		t := model.Task{WorkspaceID: workspaceID, PlanID: planID}
 		var description, dueDate, completedAt sql.NullString
-		var category, priority string
+		var category, priority, createdAt, updatedAt string
 		if err := rows.Scan(&t.ID, &t.ProjectID, &t.StatusID, &t.CreatedBy, &t.Title, &description,
-			&t.Position, &dueDate, &category, &completedAt, &priority, &t.Number, &t.SubtaskCount, &t.DoneSubtaskCount, &t.CommentCount); err != nil {
+			&t.Position, &dueDate, &category, &completedAt, &priority, &t.Number, &createdAt, &updatedAt, &t.SubtaskCount, &t.DoneSubtaskCount, &t.CommentCount); err != nil {
 			return nil, fmt.Errorf("scan task: %w", err)
 		}
 		t.Description = description.String
 		t.StatusCategory = model.StatusCategory(category)
 		t.Priority = model.TaskPriority(priority)
 		if err := scanTaskTimes(&t, dueDate, completedAt); err != nil {
+			return nil, err
+		}
+		if err := scanTaskStamps(&t, createdAt, updatedAt); err != nil {
 			return nil, err
 		}
 		tasks = append(tasks, t)
@@ -303,17 +310,17 @@ func (*TaskRepository) SoftDeleteTree(ctx context.Context, q database.DBTX, work
 func (*TaskRepository) Get(ctx context.Context, q database.DBTX, workspaceID, taskID string) (model.Task, error) {
 	t := model.Task{ID: taskID, WorkspaceID: workspaceID}
 	var description, dueDate, completedAt, parentID sql.NullString
-	var category, priority string
+	var category, priority, createdAt, updatedAt string
 	err := q.QueryRowContext(ctx,
 		`SELECT t.project_id, p.name, t.plan_id, t.status_id, t.parent_id, t.created_by, t.title,
-			t.description, t.position, t.due_date, s.category, t.completed_at, t.priority, COALESCE(t.number, 0), `+taskCounts+`
+			t.description, t.position, t.due_date, s.category, t.completed_at, t.priority, COALESCE(t.number, 0), t.created_at, t.updated_at, `+taskCounts+`
 		 FROM tasks t
 		 JOIN projects p ON p.id = t.project_id AND p.workspace_id = t.workspace_id
 		 JOIN statuses s ON s.id = t.status_id AND s.plan_id = t.plan_id
 		 WHERE t.id = ? AND t.workspace_id = ? AND t.deleted_at IS NULL`,
 		taskID, workspaceID,
 	).Scan(&t.ProjectID, &t.ProjectName, &t.PlanID, &t.StatusID, &parentID, &t.CreatedBy, &t.Title,
-		&description, &t.Position, &dueDate, &category, &completedAt, &priority, &t.Number, &t.SubtaskCount, &t.DoneSubtaskCount, &t.CommentCount)
+		&description, &t.Position, &dueDate, &category, &completedAt, &priority, &t.Number, &createdAt, &updatedAt, &t.SubtaskCount, &t.DoneSubtaskCount, &t.CommentCount)
 	if err != nil {
 		return model.Task{}, fmt.Errorf("get task: %w", err)
 	}
@@ -322,6 +329,9 @@ func (*TaskRepository) Get(ctx context.Context, q database.DBTX, workspaceID, ta
 	t.StatusCategory = model.StatusCategory(category)
 	t.Priority = model.TaskPriority(priority)
 	if err := scanTaskTimes(&t, dueDate, completedAt); err != nil {
+		return model.Task{}, err
+	}
+	if err := scanTaskStamps(&t, createdAt, updatedAt); err != nil {
 		return model.Task{}, err
 	}
 	return t, nil
@@ -453,6 +463,18 @@ func scanTaskTimes(t *model.Task, dueDate, completedAt sql.NullString) error {
 			return fmt.Errorf("parse %s: %w", f.name, err)
 		}
 		*f.dst = &parsed
+	}
+	return nil
+}
+
+// scanTaskStamps parses the created_at and updated_at columns of a task.
+func scanTaskStamps(t *model.Task, createdAt, updatedAt string) error {
+	var err error
+	if t.CreatedAt, err = time.Parse(time.RFC3339, createdAt); err != nil {
+		return fmt.Errorf("parse created_at: %w", err)
+	}
+	if t.UpdatedAt, err = time.Parse(time.RFC3339, updatedAt); err != nil {
+		return fmt.Errorf("parse updated_at: %w", err)
 	}
 	return nil
 }

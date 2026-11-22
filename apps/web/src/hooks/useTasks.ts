@@ -80,6 +80,8 @@ export function useCreateTask() {
                 subtaskCount: 0,
                 doneSubtaskCount: 0,
                 commentCount: 0,
+                createdAt: new Date(),
+                updatedAt: new Date(),
             };
             queryClient.setQueryData<PlanTask[]>(key, (old) =>
                 old ? [...old, temp] : old,
@@ -92,6 +94,13 @@ export function useCreateTask() {
         },
         onSettled: () => invalidateTaskViews(queryClient),
     });
+}
+
+// The plan task lists live at [...planKey, "tasks"]; the upcoming list at
+// ["tasks", "upcoming"] has a different shape.
+function isPlanTasksQuery(query: { queryKey: readonly unknown[] }): boolean {
+    const key = query.queryKey;
+    return key[key.length - 1] === "tasks" && key[0] !== "tasks";
 }
 
 function planTasksKey(projectId: string, planId: string) {
@@ -183,10 +192,35 @@ export function useUpdateTask() {
     return useMutation({
         mutationFn: ({ taskId, input }: UpdateTaskVariables) =>
             updateTask(taskId, input),
+        // Dragging between groups or days should not wait for the server:
+        // the plan lists show the new values at once, and the refetch after
+        // the write brings the real ones.
+        onMutate: ({ taskId, input }) => {
+            queryClient.setQueriesData<PlanTask[]>(
+                { predicate: isPlanTasksQuery },
+                (old) =>
+                    old?.map((task) =>
+                        task.id === taskId
+                            ? {
+                                  ...task,
+                                  ...(input.dueDate !== undefined && {
+                                      dueDate: input.dueDate,
+                                  }),
+                                  ...(input.priority !== undefined && {
+                                      priority: input.priority,
+                                  }),
+                                  ...(input.labelIds !== undefined && {
+                                      labelIds: input.labelIds,
+                                  }),
+                              }
+                            : task,
+                    ),
+            );
+        },
         onSuccess: (task) => {
             relabelPin("task", task.id, task.title);
-            return invalidateTaskViews(queryClient);
         },
+        onSettled: () => invalidateTaskViews(queryClient),
     });
 }
 

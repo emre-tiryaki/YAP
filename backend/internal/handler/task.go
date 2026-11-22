@@ -46,6 +46,8 @@ type taskResponse struct {
 	LabelIDs       []string `json:"label_ids"`
 	StatusCategory string   `json:"status_category"`
 	CompletedAt    *string  `json:"completed_at"`
+	CreatedAt      string   `json:"created_at"`
+	UpdatedAt      string   `json:"updated_at"`
 }
 
 type createTaskRequest struct {
@@ -72,6 +74,8 @@ type planTaskResponse struct {
 	SubtaskCount     int      `json:"subtask_count"`
 	DoneSubtaskCount int      `json:"done_subtask_count"`
 	CommentCount     int      `json:"comment_count"`
+	CreatedAt        string   `json:"created_at"`
+	UpdatedAt        string   `json:"updated_at"`
 }
 
 type subtaskResponse struct {
@@ -129,6 +133,8 @@ func toTaskResponse(t model.Task) taskResponse {
 		Number:         t.Number,
 		LabelIDs:       labelIDs(t.LabelIDs),
 		CompletedAt:    formatTime(t.CompletedAt),
+		CreatedAt:      t.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt:      t.UpdatedAt.UTC().Format(time.RFC3339),
 	}
 }
 
@@ -148,6 +154,8 @@ func toPlanTaskResponse(t model.Task) planTaskResponse {
 		SubtaskCount:     t.SubtaskCount,
 		DoneSubtaskCount: t.DoneSubtaskCount,
 		CommentCount:     t.CommentCount,
+		CreatedAt:        t.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt:        t.UpdatedAt.UTC().Format(time.RFC3339),
 	}
 }
 

@@ -5,13 +5,15 @@ import { useDroppable } from "@dnd-kit/core";
 import { useTranslate } from "../hooks/useTranslate";
 import type { CardAction } from "../types/cardAction";
 import type { Status } from "../types/status";
+import type { TaskGroup } from "../util/taskFilter";
+import { dragIdOf } from "../util/taskView";
 import type { PlanTask, TaskPropertyKey } from "../types/task";
 import { ListRow } from "./ListRow";
 import { QuickAddTask } from "./QuickAddTask";
 
 type ListGroupProps = {
-    status: Status;
-    tasks: PlanTask[];
+    group: TaskGroup;
+    plain: boolean;
     statuses: Status[];
     projectId: string;
     planId: string;
@@ -25,8 +27,8 @@ type ListGroupProps = {
 };
 
 export function ListGroup({
-    status,
-    tasks,
+    group,
+    plain,
     statuses,
     projectId,
     planId,
@@ -39,15 +41,20 @@ export function ListGroup({
     onOpenTask,
 }: ListGroupProps) {
     const t = useTranslate();
+    const { status, tasks } = group;
+    const title = group.label;
     const [isAdding, setIsAdding] = useState(false);
     // The group is the drop target for its tasks, so an empty or collapsed
     // group can still receive one.
-    const { setNodeRef, isOver } = useDroppable({ id: status.id });
+    const { setNodeRef, isOver } = useDroppable({
+        id: group.id,
+        data: { type: "group" },
+    });
 
     return (
         <section
             ref={setNodeRef}
-            aria-label={status.title}
+            aria-label={title}
             className={isOver ? "bg-accent/5" : ""}
         >
             <header className="sticky top-0 z-10 flex h-9 items-center gap-2 border-b border-line bg-layer-1 px-4">
@@ -55,7 +62,7 @@ export function ListGroup({
                     type="button"
                     onClick={onToggleCollapsed}
                     aria-expanded={!collapsed}
-                    aria-label={`${t(collapsed ? "plan.group.expand" : "plan.group.collapse")}: ${status.title}`}
+                    aria-label={`${t(collapsed ? "plan.group.expand" : "plan.group.collapse")}: ${title}`}
                     className="cursor-pointer text-fg-subtle hover:text-fg"
                 >
                     {collapsed ? (
@@ -64,42 +71,48 @@ export function ListGroup({
                         <FiChevronDown aria-hidden />
                     )}
                 </button>
-                <span
-                    aria-hidden
-                    className="size-2.5 shrink-0 rounded-full"
-                    style={{ backgroundColor: status.color }}
-                />
-                <h2 className="text-body-xs font-medium text-fg">
-                    {status.title}
-                </h2>
+                {group.color && (
+                    <span
+                        aria-hidden
+                        className="size-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: group.color }}
+                    />
+                )}
+                <h2 className="text-body-xs font-medium text-fg">{title}</h2>
                 <span className="text-body-xs text-fg-subtle">
                     {tasks.length}
                 </span>
+                {status && (
                 <button
                     type="button"
                     onClick={() => {
                         if (collapsed) onToggleCollapsed();
                         setIsAdding(true);
                     }}
-                    aria-label={`${t("plan.task.add")}: ${status.title}`}
+                    aria-label={`${t("plan.task.add")}: ${title}`}
                     title={t("plan.task.add")}
                     className="ml-auto cursor-pointer rounded p-1 text-fg-subtle hover:bg-layer-1-hover hover:text-fg"
                 >
                     <FiPlus aria-hidden />
                 </button>
+                )}
             </header>
             {!collapsed && (
                 <>
                     <SortableContext
-                        id={status.id}
-                        items={tasks.map((task) => task.id)}
-                        strategy={verticalListSortingStrategy}
+                        id={group.id}
+                        items={tasks.map((task) =>
+                            dragIdOf(plain, group.id, task.id),
+                        )}
+                        strategy={plain ? () => null : verticalListSortingStrategy}
                     >
                         <ul>
                             {tasks.map((task) => (
                                 <ListRow
                                     key={task.id}
                                     task={task}
+                                    dragId={dragIdOf(plain, group.id, task.id)}
+                                    groupId={group.id}
                                     projectId={projectId}
                                     planId={planId}
                                     statuses={statuses}
@@ -119,14 +132,16 @@ export function ListGroup({
                             )}
                         </p>
                     )}
-                    <QuickAddTask
-                        projectId={projectId}
-                        planId={planId}
-                        status={status}
-                        variant="list"
-                        isOpen={isAdding}
-                        onOpenChange={setIsAdding}
-                    />
+                    {status && (
+                        <QuickAddTask
+                            projectId={projectId}
+                            planId={planId}
+                            status={status}
+                            variant="list"
+                            isOpen={isAdding}
+                            onOpenChange={setIsAdding}
+                        />
+                    )}
                 </>
             )}
         </section>

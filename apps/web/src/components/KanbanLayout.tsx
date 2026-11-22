@@ -11,17 +11,21 @@ import { useTranslate } from "../hooks/useTranslate";
 import type { CardAction } from "../types/cardAction";
 import type { Status } from "../types/status";
 import type { PlanTask, TaskPropertyKey } from "../types/task";
+import type { TaskGroup } from "../util/taskFilter";
 import { KanbanColumn } from "./KanbanColumn";
 
 type KanbanLayoutProps = {
     projectId: string;
     planId: string;
     statuses: Status[];
-    // Tasks per status id, in display order.
-    tasksByStatus: Record<string, PlanTask[]>;
-    // Completed tasks left out per status id.
-    hiddenByStatus: Record<string, number>;
+    groups: TaskGroup[];
+    // True when tasks can only be moved between groups, not ordered.
+    plain: boolean;
+    // Completed tasks left out per group id.
+    hiddenByGroup: Record<string, number>;
     visible: ReadonlySet<TaskPropertyKey>;
+    // Only status groups can get a new status column.
+    canAddStatus: boolean;
     onTaskAction: (task: PlanTask, action: CardAction) => void;
     onOpenTask: (task: PlanTask) => void;
     onCreateStatus: () => void;
@@ -32,9 +36,11 @@ export function KanbanLayout({
     projectId,
     planId,
     statuses,
-    tasksByStatus,
-    hiddenByStatus,
+    groups,
+    plain,
+    hiddenByGroup,
     visible,
+    canAddStatus,
     onTaskAction,
     onOpenTask,
     onCreateStatus,
@@ -46,29 +52,30 @@ export function KanbanLayout({
     return (
         <div className="flex min-h-0 flex-1 items-start gap-3 overflow-x-auto pb-2">
             <SortableContext
-                items={statuses.map((status) => status.id)}
+                items={groups.map((group) => group.id)}
                 strategy={horizontalListSortingStrategy}
             >
-                {statuses.map((status) => (
+                {groups.map((group) => (
                     <KanbanColumn
-                        key={status.id}
-                        status={status}
+                        key={group.id}
+                        group={group}
                         statuses={statuses}
                         projectId={projectId}
                         planId={planId}
-                        tasks={tasksByStatus[status.id] ?? []}
-                        hiddenCount={hiddenByStatus[status.id] ?? 0}
-                        collapsed={collapsedIds.includes(status.id)}
+                        plain={plain}
+                        hiddenCount={hiddenByGroup[group.id] ?? 0}
+                        collapsed={collapsedIds.includes(group.id)}
                         visible={visible}
                         onToggleCollapsed={() =>
-                            toggleCollapsedGroup(planId, "collapsed", status.id)
+                            toggleCollapsedGroup(planId, "collapsed", group.id)
                         }
-                        onEdit={() => onEditStatus(status)}
+                        onEdit={() => group.status && onEditStatus(group.status)}
                         onTaskAction={onTaskAction}
                         onOpenTask={onOpenTask}
                     />
                 ))}
             </SortableContext>
+            {canAddStatus && (
             <button
                 type="button"
                 onClick={onCreateStatus}
@@ -77,6 +84,7 @@ export function KanbanLayout({
                 <FiPlus aria-hidden />
                 {t("plan.status.add")}
             </button>
+            )}
         </div>
     );
 }

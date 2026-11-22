@@ -168,3 +168,22 @@ func TestTaskPriorityOverHTTP(t *testing.T) {
 		t.Errorf("plan tasks = %+v, want one urgent task", list)
 	}
 }
+
+func TestTaskTimestampsOverHTTP(t *testing.T) {
+	env := newTestEnv(t)
+	project := createProject(t, env, "Backend")
+
+	rec := env.do(t, http.MethodPost, "/api/projects/"+project.ID+"/tasks", `{"title":"T"}`)
+	wantStatus(t, rec, http.StatusCreated)
+	created := decode[taskResponse](t, rec)
+	if created.CreatedAt == "" || strings.HasPrefix(created.CreatedAt, "0001") || created.UpdatedAt == "" {
+		t.Errorf("created timestamps = %q / %q, want real times", created.CreatedAt, created.UpdatedAt)
+	}
+
+	rec = env.do(t, http.MethodGet, "/api/projects/"+project.ID+"/plans/"+created.PlanID+"/tasks", "")
+	wantStatus(t, rec, http.StatusOK)
+	list := decode[[]planTaskResponse](t, rec)
+	if len(list) != 1 || list[0].CreatedAt != created.CreatedAt || list[0].UpdatedAt == "" {
+		t.Errorf("plan tasks = %+v, want created_at %q and an updated_at", list, created.CreatedAt)
+	}
+}

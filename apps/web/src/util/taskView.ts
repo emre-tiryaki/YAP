@@ -3,14 +3,27 @@ import type { TaskPropertyKey } from "../types/task";
 // How completed tasks are shown inside a status (see the "Categories"
 // settings). Plain functions so the board and the list share them.
 
-export const allTaskProperties: ReadonlySet<TaskPropertyKey> = new Set([
+// Every property, in the order the display menu lists them.
+export const allTaskPropertyKeys: readonly TaskPropertyKey[] = [
     "status",
     "priority",
     "labels",
     "dueDate",
     "subtasks",
     "comments",
-]);
+    "createdAt",
+    "updatedAt",
+];
+
+export const allTaskProperties: ReadonlySet<TaskPropertyKey> = new Set(
+    allTaskPropertyKeys,
+);
+
+// Properties the list and board can show inline.
+export const inlineTaskPropertyKeys: readonly TaskPropertyKey[] =
+    allTaskPropertyKeys.filter(
+        (key) => key !== "createdAt" && key !== "updatedAt",
+    );
 
 export type TaskViewOptions = {
     hideDone: boolean;
@@ -62,4 +75,11 @@ export function storedIndex(
     if (next) return ids.indexOf(next.id);
     if (prev) return ids.indexOf(prev.id) + 1;
     return ids.length;
+}
+
+// The id a card is dragged by: the task id while a status column list is
+// sortable, otherwise unique per group because a task can sit in several
+// label groups.
+export function dragIdOf(plain: boolean, groupId: string, taskId: string) {
+    return plain ? `${groupId}|${taskId}` : taskId;
 }

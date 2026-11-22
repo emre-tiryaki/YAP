@@ -16,6 +16,12 @@ import { HeaderAction } from "../components/HeaderAction";
 import { PageHeader } from "../components/PageHeader";
 import type { BreadcrumbItem } from "../types/breadcrumb";
 import { ViewToggle, type BoardView } from "../components/ViewToggle";
+import { DisplayMenu } from "../components/DisplayMenu";
+import { FilterBar } from "../components/FilterBar";
+import { FilterMenu } from "../components/FilterMenu";
+import { updatePlanDisplay, usePlanDisplay } from "../hooks/usePlanDisplay";
+import { useLabels } from "../hooks/useLabels";
+import { filtersFromParams, paramsWithFilters } from "../util/taskFilterParams";
 import {
     useDeleteStatus,
     useMoveStatus,
@@ -39,6 +45,11 @@ export default function PlanDetailPage() {
     const [searchParams, setSearchParams] = useSearchParams();
     const view: BoardView =
         searchParams.get("view") === "list" ? "list" : "board";
+
+    // The filters live in the URL so a reload or a shared link keeps them.
+    const filters = filtersFromParams(searchParams);
+    const display = usePlanDisplay(planId);
+    const labels = useLabels(projectId);
 
     const project = useProject(projectId);
     const plan = usePlan(projectId, planId);
@@ -111,6 +122,21 @@ export default function PlanDetailPage() {
                 breadcrumb={breadcrumb}
                 actions={
                     <>
+                    <FilterMenu
+                        filters={filters}
+                        onChange={(next) =>
+                            setSearchParams(paramsWithFilters(searchParams, next), {
+                                replace: true,
+                            })
+                        }
+                        statuses={statuses.data}
+                        labels={labels.data}
+                    />
+                    <DisplayMenu
+                        display={display}
+                        layout={view}
+                        onChange={(patch) => updatePlanDisplay(planId, patch)}
+                    />
                     <ViewToggle
                         iconOnly
                         value={view}
@@ -131,6 +157,16 @@ export default function PlanDetailPage() {
                     />
                     </>
                 }
+            />
+            <FilterBar
+                filters={filters}
+                onChange={(next) =>
+                    setSearchParams(paramsWithFilters(searchParams, next), {
+                        replace: true,
+                    })
+                }
+                statuses={statuses.data}
+                labels={labels.data}
             />
             <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto p-8">
                 {plan.isLoading && <PlanHeaderSkeleton />}
@@ -196,6 +232,8 @@ export default function PlanDetailPage() {
                                 activeTaskId={openTaskId}
                                 statuses={statuses.data}
                                 tasks={tasks.data}
+                                filters={filters}
+                                display={display}
                                 layout={view}
                                 onMove={(move) => moveTask.mutate(move)}
                                 onMoveStatus={(move) =>

@@ -130,6 +130,8 @@ type Task struct {
 	SubtaskCount     int
 	DoneSubtaskCount int
 	CommentCount     int
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
 type Comment struct {

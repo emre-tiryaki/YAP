@@ -122,6 +122,8 @@ type TaskDto = {
     label_ids?: string[];
     status_category: StatusCategory;
     completed_at: string | null;
+    created_at: string;
+    updated_at: string;
 };
 
 type PlanDto = {
@@ -162,6 +164,8 @@ type PlanTaskDto = {
     subtask_count?: number;
     done_subtask_count?: number;
     comment_count?: number;
+    created_at: string;
+    updated_at: string;
 };
 
 type SubtaskDto = {
@@ -360,6 +364,8 @@ function toPlanTask(dto: PlanTaskDto): PlanTask {
         subtaskCount: dto.subtask_count ?? 0,
         doneSubtaskCount: dto.done_subtask_count ?? 0,
         commentCount: dto.comment_count ?? 0,
+        createdAt: new Date(dto.created_at),
+        updatedAt: new Date(dto.updated_at),
     };
 }
 

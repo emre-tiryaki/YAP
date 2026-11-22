@@ -50,6 +50,8 @@ export type Background =
   | { kind: "image"; image: BackgroundImage }
   | { kind: "custom"; tint: string; version: number };
 
+import type { DisplayOptions } from "./taskView";
+
 // Per-device interface preferences.
 export type TaskPeekMode = "side" | "modal" | "full";
 
@@ -69,4 +71,6 @@ export type Preferences = {
   sidebarWidth: number;
   // How an opened task shows: a side panel, a centred dialog or nearly full screen.
   taskPeekMode: TaskPeekMode;
+  // Display options (grouping, order, properties) per plan id.
+  planDisplay: Record<string, DisplayOptions>;
 };

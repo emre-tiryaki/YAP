@@ -13,7 +13,10 @@ import type {
   TimeFormat,
   WeekStart,
 } from "../types/settings";
+import type { DisplayOptions, GroupBy, OrderBy, OrderDir } from "../types/taskView";
+import type { TaskPropertyKey } from "../types/task";
 import { backgroundColors, backgroundImages } from "../util/backgrounds";
+import { allTaskPropertyKeys, inlineTaskPropertyKeys } from "../util/taskView";
 
 // Read by the pre-paint script in index.html too; keep the key in sync.
 // Preferences only shape this device's interface, so like pins they live in
@@ -58,11 +61,59 @@ function defaults(): Preferences {
     sidebarCollapsed: localStorage.getItem("yap.sidebar.collapsed") === "true",
     sidebarWidth: SIDEBAR_DEFAULT_WIDTH,
     taskPeekMode: "side",
+    planDisplay: {},
   };
 }
 
 function pick<T>(allowed: readonly T[], value: unknown, fallback: T): T {
   return allowed.includes(value as T) ? (value as T) : fallback;
+}
+
+const groupBys: readonly GroupBy[] = ["status", "priority", "label", "due", "none"];
+const orderBys: readonly OrderBy[] = [
+  "manual",
+  "created",
+  "updated",
+  "due",
+  "priority",
+  "title",
+];
+const orderDirs: readonly OrderDir[] = ["asc", "desc"];
+
+export function defaultDisplay(): DisplayOptions {
+  return {
+    groupBy: "status",
+    orderBy: "manual",
+    orderDir: "asc",
+    properties: [...inlineTaskPropertyKeys],
+    showEmptyGroups: true,
+  };
+}
+
+// Display options of every plan; malformed entries fall back to the defaults.
+function pickPlanDisplay(value: unknown): Record<string, DisplayOptions> {
+  if (typeof value !== "object" || value === null) return {};
+  const result: Record<string, DisplayOptions> = {};
+  for (const [planId, raw] of Object.entries(value)) {
+    if (typeof raw !== "object" || raw === null) continue;
+    const v = raw as Record<string, unknown>;
+    const base = defaultDisplay();
+    result[planId] = {
+      groupBy: pick(groupBys, v.groupBy, base.groupBy),
+      orderBy: pick(orderBys, v.orderBy, base.orderBy),
+      orderDir: pick(orderDirs, v.orderDir, base.orderDir),
+      properties: Array.isArray(v.properties)
+        ? allTaskPropertyKeys.filter((key: TaskPropertyKey) =>
+            (v.properties as unknown[]).includes(key),
+          )
+        : base.properties,
+      showEmptyGroups:
+        typeof v.showEmptyGroups === "boolean"
+          ? v.showEmptyGroups
+          : base.showEmptyGroups,
+    };
+  }
+  return result;
 }
 
 const hexColor = /^#[0-9a-f]{6}$/i;
@@ -139,6 +190,7 @@ function read(): Preferences {
           )
         : base.sidebarWidth,
     taskPeekMode: pick(taskPeekModes, stored.taskPeekMode, base.taskPeekMode),
+    planDisplay: pickPlanDisplay(stored.planDisplay),
   };
   return cache;
 }

@@ -12,6 +12,11 @@ import { useUpcomingTasks } from "../hooks/useTasks";
 import { useTranslate } from "../hooks/useTranslate";
 import type { BreadcrumbItem } from "../types/breadcrumb";
 import { PropertySelect } from "../components/PropertySelect";
+import { FilterBar } from "../components/FilterBar";
+import { FilterMenu } from "../components/FilterMenu";
+import { useLabels } from "../hooks/useLabels";
+import { filterTasks, hasActiveFilters } from "../util/taskFilter";
+import { filtersFromParams, paramsWithFilters } from "../util/taskFilterParams";
 
 export default function UpcomingTasksPage() {
     const t = useTranslate();
@@ -23,11 +28,20 @@ export default function UpcomingTasksPage() {
     const [params, setParams] = useSearchParams();
     const projectId = params.get("project") ?? "";
 
+    const filters = filtersFromParams(params);
+    // Labels belong to one project, so they can only be filtered on once a
+    // project is chosen.
+    const labels = useLabels(projectId);
+    function changeFilters(next: typeof filters) {
+        setParams(paramsWithFilters(params, next), { replace: true });
+    }
+
     const projectItems = projects.data ?? [];
     const allTasks = tasks.data ?? [];
-    const shown = projectId
+    const inProject = projectId
         ? allTasks.filter((task) => task.projectId === projectId)
         : allTasks;
+    const shown = filterTasks(inProject, filters);
 
     const breadcrumb: BreadcrumbItem[] = [
         { label: t("sidebar.home"), to: "/home" },
@@ -39,13 +53,25 @@ export default function UpcomingTasksPage() {
             <PageHeader
                 breadcrumb={breadcrumb}
                 actions={
-                    <HeaderAction
-                        variant="primary"
-                        icon={FiPlus}
-                        label={t("workspace.tasks.create.title")}
-                        onClick={() => setIsCreateOpen(true)}
-                    />
+                    <>
+                        <FilterMenu
+                            filters={filters}
+                            onChange={changeFilters}
+                            labels={labels.data}
+                        />
+                        <HeaderAction
+                            variant="primary"
+                            icon={FiPlus}
+                            label={t("workspace.tasks.create.title")}
+                            onClick={() => setIsCreateOpen(true)}
+                        />
+                    </>
                 }
+            />
+            <FilterBar
+                filters={filters}
+                onChange={changeFilters}
+                labels={labels.data}
             />
             <main className="mx-auto w-full max-w-4xl flex-1 overflow-auto p-8">
                 <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -65,9 +91,15 @@ export default function UpcomingTasksPage() {
                             value={projectId}
                             onChange={(value) =>
                                 typeof value === "string" &&
-                                setParams(value ? { project: value } : {}, {
-                                    replace: true,
-                                })
+                                // Labels are per project, so a new project
+                                // starts without a label filter.
+                                setParams(
+                                    paramsWithFilters(
+                                        new URLSearchParams(value ? { project: value } : {}),
+                                        { ...filters, labels: [] },
+                                    ),
+                                    { replace: true },
+                                )
                             }
                             options={[
                                 { value: "", label: t("tasks.filter.allProjects") },
@@ -86,7 +118,9 @@ export default function UpcomingTasksPage() {
                     onCreate={() => setIsCreateOpen(true)}
                     hideHeader
                     emptyMessage={
-                        projectId ? t("tasks.filter.noMatch") : undefined
+                        projectId || hasActiveFilters(filters)
+                            ? t("tasks.filter.noMatch")
+                            : undefined
                     }
                 />
             </main>

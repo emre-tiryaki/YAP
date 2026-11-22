@@ -19,29 +19,33 @@ import {
     sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
 import { useCurrentUserSettings } from "../hooks/useUserSettings";
+import { useLabels } from "../hooks/useLabels";
+import { useTranslate } from "../hooks/useTranslate";
+import { useUpdateTask } from "../hooks/useTasks";
 import type { CardAction } from "../types/cardAction";
 import type { Status } from "../types/status";
-import type { PlanTask, StatusCategory, TaskPropertyKey } from "../types/task";
-import { groupTasks } from "../util/taskGroups";
-import {
-    allTaskProperties,
-    storedIndex,
-    type TaskViewOptions,
-} from "../util/taskView";
+import type { PlanTask, StatusCategory, TaskPriority } from "../types/task";
+import type { DisplayOptions, TaskFilters } from "../types/taskView";
+import { filterTasks, groupTasks, orderTasks, type GroupContext, type TaskGroup } from "../util/taskFilter";
+import { toDateInputValue } from "../util/date";
+import { storedIndex, type TaskViewOptions, arrangeTasks } from "../util/taskView";
 import { KanbanCard } from "./KanbanCard";
 import { KanbanLayout } from "./KanbanLayout";
 import { ListLayout } from "./ListLayout";
 import { ListRow } from "./ListRow";
 import type { BoardView } from "./ViewToggle";
 
-// Task IDs per status ID, in display order.
+// Task IDs per group ID, in display order.
 type Columns = Record<string, string[]>;
 
 type TaskBoardDndProps = {
     projectId: string;
     planId: string;
     statuses: Status[];
+    // Every task of the plan; the filters are applied here.
     tasks: PlanTask[];
+    filters: TaskFilters;
+    display: DisplayOptions;
     layout: BoardView;
     onMove: (move: {
         taskId: string;
@@ -54,47 +58,29 @@ type TaskBoardDndProps = {
     onOpenTask: (task: PlanTask) => void;
     // The task open in the peek, highlighted in the list.
     activeTaskId: string | null;
-    // Phase 1 shows every property; the display options make it configurable.
-    visible?: ReadonlySet<TaskPropertyKey>;
     onCreateStatus: () => void;
     onEditStatus: (status: Status) => void;
 };
-
-// Task ids per status in display order: the server's order with the
-// completed-task settings applied.
-function toColumns(
-    statuses: Status[],
-    tasks: PlanTask[],
-    view: TaskViewOptions,
-): Columns {
-    const columns: Columns = {};
-    for (const group of groupTasks(tasks, statuses, view))
-        columns[group.id] = group.tasks.map((task) => task.id);
-    return columns;
-}
 
 function isStatusDrag(data: { current?: Record<string, unknown> }) {
     return data.current?.type === "status";
 }
 
-// A dragged column only collides with other columns; a dragged task uses
-// the corners of columns and cards so it can land between two cards.
-const collisionDetection: CollisionDetection = (args) => {
-    if (!isStatusDrag(args.active.data)) return closestCorners(args);
-    return closestCenter({
-        ...args,
-        droppableContainers: args.droppableContainers.filter((container) =>
-            isStatusDrag(container.data),
-        ),
-    });
-};
+function isGroupContainer(data: { current?: Record<string, unknown> }) {
+    return data.current?.type === "status" || data.current?.type === "group";
+}
 
 function findColumn(columns: Columns, id: UniqueIdentifier) {
     const key = String(id);
     if (key in columns) return key;
-    return Object.keys(columns).find((statusId) =>
-        columns[statusId].includes(key),
+    return Object.keys(columns).find((groupId) =>
+        columns[groupId].includes(key),
     );
+}
+
+function addDays(days: number): Date {
+    const date = new Date();
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
 }
 
 export function TaskBoardDnd({
@@ -102,16 +88,20 @@ export function TaskBoardDnd({
     planId,
     statuses,
     tasks,
+    filters,
+    display,
     layout,
     onMove,
     onMoveStatus,
     onTaskAction,
     onOpenTask,
     activeTaskId,
-    visible = allTaskProperties,
     onCreateStatus,
     onEditStatus,
 }: TaskBoardDndProps) {
+    const t = useTranslate();
+    const update = useUpdateTask();
+    const labels = useLabels(projectId);
     const sensors = useSensors(
         // A small distance keeps clicks on buttons inside cards working.
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -148,20 +138,93 @@ export function TaskBoardDnd({
 
     const { hideDone, doneToBottom } = useCurrentUserSettings();
     const view: TaskViewOptions = { hideDone, doneToBottom };
-    const serverColumns = toColumns(statuses, tasks, view);
+
+    // Manual order inside status groups is the only case where a drop also
+    // chooses a position; every other view only moves a task between groups.
+    const plain = !(display.groupBy === "status" && display.orderBy === "manual");
+
+    const context: GroupContext = {
+        statuses: orderedStatuses,
+        labels: labels.data ?? [],
+        names: {
+            all: t("plan.group.all"),
+            noLabel: t("label.none"),
+            priority: {
+                urgent: t("task.priority.urgent"),
+                high: t("task.priority.high"),
+                medium: t("task.priority.medium"),
+                low: t("task.priority.low"),
+                none: t("task.priority.none"),
+            },
+            due: {
+                overdue: t("due.group.overdue"),
+                today: t("due.group.today"),
+                week: t("due.group.week"),
+                later: t("due.group.later"),
+                none: t("due.group.none"),
+            },
+        },
+    };
+    const visibleTasks = orderTasks(
+        filterTasks(tasks, filters),
+        display.orderBy,
+        display.orderDir,
+    );
+    const rawGroups = groupTasks(visibleTasks, display, context);
+    const groups: TaskGroup[] = rawGroups.map((group) => ({
+        ...group,
+        tasks: arrangeTasks(group.tasks, view),
+    }));
+    const hiddenByGroup: Record<string, number> = {};
+    for (const group of rawGroups)
+        hiddenByGroup[group.id] = hideDone
+            ? group.tasks.filter((task) => task.completedAt !== null).length
+            : 0;
+
+    const serverColumns: Columns = {};
+    for (const group of groups)
+        serverColumns[group.id] = group.tasks.map((task) => task.id);
     const columns =
-        override && override.basis === tasks ? override.columns : serverColumns;
+        !plain && override && override.basis === tasks
+            ? override.columns
+            : serverColumns;
     const taskById = new Map(tasks.map((task) => [task.id, task]));
     const activeTask = activeId ? taskById.get(activeId) : undefined;
 
+    // A dragged column only collides with other columns; a dragged task uses
+    // the corners of columns and cards so it can land between two cards. In
+    // plain views a task can only land on a group.
+    const collisionDetection: CollisionDetection = (args) => {
+        if (isStatusDrag(args.active.data))
+            return closestCenter({
+                ...args,
+                droppableContainers: args.droppableContainers.filter(
+                    (container) => isStatusDrag(container.data),
+                ),
+            });
+        if (plain)
+            return closestCorners({
+                ...args,
+                droppableContainers: args.droppableContainers.filter(
+                    (container) => isGroupContainer(container.data),
+                ),
+            });
+        return closestCorners(args);
+    };
+
+    function taskIdOf(active: { id: UniqueIdentifier; data: { current?: Record<string, unknown> } }) {
+        const id = active.data.current?.taskId;
+        return typeof id === "string" ? id : String(active.id);
+    }
+
     function handleDragStart({ active }: DragStartEvent) {
         if (isStatusDrag(active.data)) return;
-        setActiveId(String(active.id));
-        setOverride({ basis: tasks, columns });
+        setActiveId(taskIdOf(active));
+        if (!plain) setOverride({ basis: tasks, columns });
     }
 
     function handleDragOver({ active, over }: DragOverEvent) {
-        if (!over || isStatusDrag(active.data)) return;
+        if (plain || !over || isStatusDrag(active.data)) return;
         setOverride((prev) => {
             if (!prev) return prev;
             const cols = prev.columns;
@@ -196,13 +259,69 @@ export function TaskBoardDnd({
         onMoveStatus({ statusId: String(active.id), index: newIndex });
     }
 
+    // A drop in a view that is not sorted by hand: change the property the
+    // groups are made of.
+    function handlePlainDragEnd({ active, over }: DragEndEvent) {
+        const task = taskById.get(taskIdOf(active));
+        const fromId = active.data.current?.groupId;
+        if (!over || !task || typeof fromId !== "string") return;
+        const toId = String(over.id);
+        if (toId === fromId) return;
+        const target = groups.find((g) => g.id === toId);
+        if (!target) return;
+
+        if (display.groupBy === "status" && target.status) {
+            if (task.statusId === target.status.id) return;
+            onMove({
+                taskId: task.id,
+                statusId: target.status.id,
+                statusCategory: target.status.category,
+                index: tasks.filter(
+                    (x) => x.statusId === toId && x.id !== task.id,
+                ).length,
+            });
+        } else if (display.groupBy === "priority") {
+            const priority = toId.slice("priority:".length) as TaskPriority;
+            update.mutate({ taskId: task.id, input: { priority } });
+        } else if (display.groupBy === "label") {
+            const from = fromId.slice("label:".length);
+            const to = toId.slice("label:".length);
+            const kept = task.labelIds.filter((id) => id !== from);
+            const labelIds = to === "none" ? kept : [...kept, to];
+            update.mutate({ taskId: task.id, input: { labelIds } });
+        } else if (display.groupBy === "due") {
+            const bucket = toId.slice("due:".length);
+            // Overdue is not a date anyone can drop onto.
+            if (bucket === "overdue") return;
+            const dueDate =
+                bucket === "today"
+                    ? addDays(0)
+                    : bucket === "week"
+                      ? addDays(6)
+                      : bucket === "later"
+                        ? addDays(14)
+                        : null;
+            if (
+                dueDate &&
+                task.dueDate &&
+                toDateInputValue(dueDate) === toDateInputValue(task.dueDate)
+            )
+                return;
+            update.mutate({ taskId: task.id, input: { dueDate } });
+        }
+    }
+
     function handleDragEnd(event: DragEndEvent) {
         if (isStatusDrag(event.active.data)) {
             handleStatusDragEnd(event);
             return;
         }
-        const { active, over } = event;
         setActiveId(null);
+        if (plain) {
+            handlePlainDragEnd(event);
+            return;
+        }
+        const { active, over } = event;
         const task = taskById.get(String(active.id));
         const column = findColumn(columns, active.id);
         const status = statuses.find((s) => s.id === column);
@@ -248,20 +367,16 @@ export function TaskBoardDnd({
         setOverride(null);
     }
 
-    const tasksByStatus: Record<string, PlanTask[]> = {};
-    const hiddenByStatus: Record<string, number> = {};
-    for (const status of orderedStatuses) {
-        tasksByStatus[status.id] = (columns[status.id] ?? []).flatMap((id) => {
+    // The groups with the tasks of the (possibly overridden) columns.
+    const shownGroups: TaskGroup[] = groups.map((group) => ({
+        ...group,
+        tasks: (columns[group.id] ?? []).flatMap((id) => {
             const task = taskById.get(id);
             return task ? [task] : [];
-        });
-        hiddenByStatus[status.id] = hideDone
-            ? tasks.filter(
-                  (task) =>
-                      task.statusId === status.id && task.completedAt !== null,
-              ).length
-            : 0;
-    }
+        }),
+    }));
+    const canAddStatus = display.groupBy === "status";
+    const visible = new Set(display.properties);
 
     return (
         <DndContext
@@ -277,9 +392,11 @@ export function TaskBoardDnd({
                     projectId={projectId}
                     planId={planId}
                     statuses={orderedStatuses}
-                    tasksByStatus={tasksByStatus}
-                    hiddenByStatus={hiddenByStatus}
+                    groups={shownGroups}
+                    plain={plain}
+                    hiddenByGroup={hiddenByGroup}
                     visible={visible}
+                    canAddStatus={canAddStatus}
                     onTaskAction={onTaskAction}
                     onOpenTask={onOpenTask}
                     onCreateStatus={onCreateStatus}
@@ -290,9 +407,11 @@ export function TaskBoardDnd({
                     projectId={projectId}
                     planId={planId}
                     statuses={orderedStatuses}
-                    tasksByStatus={tasksByStatus}
-                    hiddenByStatus={hiddenByStatus}
+                    groups={shownGroups}
+                    plain={plain}
+                    hiddenByGroup={hiddenByGroup}
                     visible={visible}
+                    canAddStatus={canAddStatus}
                     activeTaskId={activeTaskId}
                     onTaskAction={onTaskAction}
                     onOpenTask={onOpenTask}
