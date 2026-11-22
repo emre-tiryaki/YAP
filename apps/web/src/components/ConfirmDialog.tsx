@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useTranslate } from "../hooks/useTranslate";
 import { Modal } from "./Modal";
 
@@ -10,6 +11,8 @@ type ConfirmDialogProps = {
     isError?: boolean;
     // Shown instead of the generic error text when isError is set.
     errorMessage?: string;
+    // Extra content under the message, e.g. options.
+    children?: ReactNode;
     onConfirm: () => void;
     onClose: () => void;
 };
@@ -22,6 +25,7 @@ export function ConfirmDialog({
     isPending = false,
     isError = false,
     errorMessage,
+    children,
     onConfirm,
     onClose,
 }: ConfirmDialogProps) {
@@ -30,6 +34,7 @@ export function ConfirmDialog({
     return (
         <Modal isOpen={isOpen} title={title} onClose={onClose}>
             <p className="text-sm text-gray-600">{message}</p>
+            {children}
             {isError && (
                 <p role="alert" className="mt-3 text-sm text-red-600">
                     {errorMessage ?? t("common.error")}

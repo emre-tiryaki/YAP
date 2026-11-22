@@ -37,7 +37,7 @@ func TestImportKeepsTaskPriority(t *testing.T) {
 	}
 
 	archive := e.exportBytes(t)
-	if err := e.svc.Reset(e.ctx, e.session); err != nil {
+	if err := e.svc.Reset(e.ctx, e.session, ResetOptions{}); err != nil {
 		t.Fatalf("Reset() error = %v", err)
 	}
 	e.importBytes(t, archive)
@@ -55,7 +55,7 @@ func TestImportOfOlderExportDefaultsPriority(t *testing.T) {
 			delete(row.(map[string]any), "priority")
 		}
 	})
-	if err := e.svc.Reset(e.ctx, e.session); err != nil {
+	if err := e.svc.Reset(e.ctx, e.session, ResetOptions{}); err != nil {
 		t.Fatalf("Reset() error = %v", err)
 	}
 	e.importBytes(t, archive)

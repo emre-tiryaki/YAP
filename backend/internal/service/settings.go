@@ -29,6 +29,10 @@ const (
 
 	settingRepoAutoUpdate = "repositories.auto_update"
 
+	settingAIInstructions = "ai.instructions"
+
+	maxAIInstructionsLength = 4000
+
 	minAutosaveDelayMs = 300
 	maxAutosaveDelayMs = 10_000
 
@@ -103,6 +107,8 @@ type UserSettings struct {
 	// RepoAutoUpdate keeps GitHub repositories up to date in the background
 	// while the app runs and GitHub can be reached.
 	RepoAutoUpdate bool
+	// AIInstructions are the user's personal instructions for the AI assistant.
+	AIInstructions string
 }
 
 func defaultUserSettings() UserSettings {
@@ -135,6 +141,8 @@ type UpdateSettingsInput struct {
 	NotifySound    *bool
 
 	RepoAutoUpdate *bool
+
+	AIInstructions *string
 }
 
 type SettingsRepository interface {
@@ -203,7 +211,12 @@ func parseUserSettings(values map[string]string) UserSettings {
 	readSetting(values, settingNotifyComments, &n.Comments, nil)
 	readSetting(values, settingNotifySound, &n.Sound, nil)
 	readSetting(values, settingRepoAutoUpdate, &out.RepoAutoUpdate, nil)
+	readSetting(values, settingAIInstructions, &out.AIInstructions, validAIInstructions)
 	return out
+}
+
+func validAIInstructions(v string) bool {
+	return utf8.RuneCountInString(v) <= maxAIInstructionsLength
 }
 
 func validDelay(ms int) bool {
@@ -271,6 +284,12 @@ func settingValues(in UpdateSettingsInput) (map[string]any, error) {
 	if in.RepoAutoUpdate != nil {
 		values[settingRepoAutoUpdate] = *in.RepoAutoUpdate
 	}
+	if in.AIInstructions != nil {
+		if !validAIInstructions(*in.AIInstructions) {
+			return nil, fmt.Errorf("%w: ai instructions are too long", ErrInvalidInput)
+		}
+		values[settingAIInstructions] = *in.AIInstructions
+	}
 	return values, nil
 }
 
@@ -307,6 +326,7 @@ func resetUserSettings(ctx context.Context, q database.DBTX, repo SettingsReposi
 		NotifyComments: &n.Comments,
 		NotifySound:    &n.Sound,
 		RepoAutoUpdate: &d.RepoAutoUpdate,
+		AIInstructions: &d.AIInstructions,
 	})
 	if err != nil {
 		return err

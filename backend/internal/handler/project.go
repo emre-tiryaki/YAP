@@ -42,6 +42,7 @@ type projectResponse struct {
 	Icon        string `json:"icon"`
 	Identifier  string `json:"identifier"`
 	TaskCount   int    `json:"task_count"`
+	DoneCount   int    `json:"done_task_count"`
 }
 
 type createProjectRequest struct {
@@ -51,7 +52,7 @@ type createProjectRequest struct {
 }
 
 func toProjectResponse(p model.Project) projectResponse {
-	return projectResponse{ID: p.ID, Name: p.Name, Description: p.Description, Icon: p.Icon, Identifier: p.Identifier, TaskCount: p.TaskCount}
+	return projectResponse{ID: p.ID, Name: p.Name, Description: p.Description, Icon: p.Icon, Identifier: p.Identifier, TaskCount: p.TaskCount, DoneCount: p.DoneCount}
 }
 
 func (h *ProjectHandler) list(w http.ResponseWriter, r *http.Request) {

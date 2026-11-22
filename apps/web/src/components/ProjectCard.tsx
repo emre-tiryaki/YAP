@@ -7,6 +7,7 @@ import type { Project } from "../types/project";
 import { cardAccent as accent, initials } from "../util/accent";
 import { setPinDragData } from "../util/pinDrag";
 import { CardMenu } from "./CardMenu";
+import { ProgressRing } from "./ProgressRing";
 import { ProjectDialogs } from "./ProjectDialogs";
 
 type ProjectCardProps = {
@@ -64,12 +65,15 @@ export function ProjectCard({ project, layout = "row" }: ProjectCardProps) {
                     >
                         {project.description || t("project.noDescription")}
                     </p>
-                    <div className="mt-4 border-t border-gray-100 pt-3 text-xs text-gray-600">
-                        <span className="font-semibold text-gray-900 tabular-nums">
-                            {project.taskCount}
-                        </span>{" "}
-                        {t("workspace.projects.taskCount")}
-                    </div>
+                    {project.taskCount > 0 && (
+                        <div className="mt-4 flex items-center gap-3 border-t border-gray-100 pt-3 text-xs text-gray-600">
+                            <ProgressRing
+                                done={project.doneTaskCount}
+                                total={project.taskCount}
+                            />
+                            <span>{t("workspace.projects.progress")}</span>
+                        </div>
+                    )}
                 </Link>
                 <div className="absolute top-3 right-3">
                     <CardMenu onSelect={setAction} pin={pin} />

@@ -3,6 +3,7 @@ import { ApiError, accountExportUrl } from "../api/client";
 import { useImportAccount, useResetAccount } from "../hooks/useAccount";
 import { type TranslationKey, useTranslate } from "../hooks/useTranslate";
 import { type ImportResult } from "../types/account";
+import { Toggle } from "./Toggle";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { SettingsGroup } from "./SettingsGroup";
 import { SettingRow } from "./SettingRow";
@@ -11,6 +12,9 @@ export function SettingsData() {
     const t = useTranslate();
     const reset = useResetAccount();
     const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+    // What else a reset deletes; on by default, the user may keep it.
+    const [aiChats, setAiChats] = useState(true);
+    const [aiConnections, setAiConnections] = useState(true);
 
     return (
         <SettingsGroup title={t("settings.account.data")}>
@@ -46,12 +50,31 @@ export function SettingsData() {
                 confirmLabel={t("settings.account.reset.action")}
                 isPending={reset.isPending}
                 isError={reset.isError}
-                onConfirm={() => reset.mutate()}
+                onConfirm={() => reset.mutate({ aiChats, aiConnections })}
                 onClose={() => {
                     setIsConfirmOpen(false);
                     reset.reset();
                 }}
-            />
+            >
+                <div className="mt-4 flex flex-col gap-3">
+                    <label className="flex items-center justify-between gap-4 text-sm text-gray-700">
+                        {t("settings.account.reset.ai.chats")}
+                        <Toggle
+                            label={t("settings.account.reset.ai.chats")}
+                            checked={aiChats}
+                            onChange={setAiChats}
+                        />
+                    </label>
+                    <label className="flex items-center justify-between gap-4 text-sm text-gray-700">
+                        {t("settings.account.reset.ai.connections")}
+                        <Toggle
+                            label={t("settings.account.reset.ai.connections")}
+                            checked={aiConnections}
+                            onChange={setAiConnections}
+                        />
+                    </label>
+                </div>
+            </ConfirmDialog>
         </SettingsGroup>
     );
 }
@@ -62,7 +85,7 @@ function importSummary(
 ): string {
     const { added } = result;
     const parts: string[] = [];
-    if (added.projects + added.tasks + added.resources + added.comments === 0) {
+    if (added.projects + added.tasks + added.resources + added.comments + added.chats === 0) {
         parts.push(t("settings.account.import.nothingNew"));
     } else {
         parts.push(

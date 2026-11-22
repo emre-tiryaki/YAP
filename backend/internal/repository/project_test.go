@@ -99,17 +99,28 @@ func TestProjectListTaskCount(t *testing.T) {
 	seedTask(t, db, s, second, secondStatuses[model.StatusToDo], "two", "a1", nil)
 	gone := seedTask(t, db, s, main, mainStatuses[model.StatusToDo], "gone", "a2", nil)
 	mustExec(t, db, `UPDATE tasks SET deleted_at = ? WHERE id = ?`, baseNow, gone.ID)
+	finished := seedTask(t, db, s, second, secondStatuses[model.StatusToDo], "finished", "a3", nil)
+	mustExec(t, db, `UPDATE tasks SET completed_at = ? WHERE id = ?`, baseNow, finished.ID)
 
 	got, err := repo.List(ctx, db, s.WorkspaceID)
 	if err != nil {
 		t.Fatalf("List() error = %v", err)
 	}
 	counts := map[string]int{}
+	done := map[string]int{}
 	for _, pr := range got {
 		counts[pr.ID] = pr.TaskCount
+		done[pr.ID] = pr.DoneCount
 	}
-	if counts[p.ID] != 2 {
-		t.Errorf("TaskCount = %d, want 2 across plans", counts[p.ID])
+	if done[p.ID] != 1 || done[empty.ID] != 0 {
+		t.Errorf("DoneCount = %d / %d, want 1 / 0", done[p.ID], done[empty.ID])
+	}
+	one, err := repo.Get(ctx, db, s.WorkspaceID, p.ID)
+	if err != nil || one.DoneCount != 1 {
+		t.Errorf("Get() DoneCount = %d, err = %v, want 1", one.DoneCount, err)
+	}
+	if counts[p.ID] != 3 {
+		t.Errorf("TaskCount = %d, want 3 across plans", counts[p.ID])
 	}
 	if counts[empty.ID] != 0 {
 		t.Errorf("empty TaskCount = %d, want 0", counts[empty.ID])

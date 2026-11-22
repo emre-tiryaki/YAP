@@ -82,6 +82,7 @@ func TestUserSettingsRejectsInvalidValues(t *testing.T) {
 	svc := NewSettingsService(db, repository.NewSettingsRepository())
 
 	bad := Reminder("2d")
+	longInstructions := strings.Repeat("ş", 4001)
 	tests := []struct {
 		name string
 		in   UpdateSettingsInput
@@ -90,6 +91,7 @@ func TestUserSettingsRejectsInvalidValues(t *testing.T) {
 		{"blank status name", UpdateSettingsInput{StatusNames: map[model.StatusCategory]string{model.StatusToDo: "  "}}},
 		{"long status name", UpdateSettingsInput{StatusNames: map[model.StatusCategory]string{model.StatusDone: strings.Repeat("x", 101)}}},
 		{"unknown category", UpdateSettingsInput{StatusNames: map[model.StatusCategory]string{"later": "Later"}}},
+		{"long ai instructions", UpdateSettingsInput{AIInstructions: &longInstructions}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -108,6 +110,24 @@ func TestUserSettingsRejectsInvalidValues(t *testing.T) {
 	}
 }
 
+func TestUserSettingsAIInstructions(t *testing.T) {
+	db, session := newTestDB(t)
+	ctx := context.Background()
+	svc := NewSettingsService(db, repository.NewSettingsRepository())
+
+	text := strings.Repeat("ş", 4000)
+	got, err := svc.Update(ctx, session, UpdateSettingsInput{AIInstructions: &text})
+	if err != nil || got.AIInstructions != text {
+		t.Fatalf("Update() = %d runes (err %v), want 4000", len([]rune(got.AIInstructions)), err)
+	}
+	if err := resetUserSettings(ctx, db, repository.NewSettingsRepository(), session.UserID, nowUTC()); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := svc.Get(ctx, session); err != nil || got.AIInstructions != "" {
+		t.Errorf("after reset Get() = %q (err %v), want empty", got.AIInstructions, err)
+	}
+}
+
 func TestUserSettingsIgnoreUnreadableStoredValues(t *testing.T) {
 	db, session := newTestDB(t)
 	ctx := context.Background()
@@ -119,6 +139,7 @@ func TestUserSettingsIgnoreUnreadableStoredValues(t *testing.T) {
 		settingStatusNamePrefix + "todo": `""`,
 		settingStatusNamePrefix + "done": `42`,
 		settingRepoAutoUpdate:            `"off"`,
+		settingAIInstructions:            `7`,
 	} {
 		if err := repo.Put(ctx, db, session.UserID, key, value, now); err != nil {
 			t.Fatal(err)

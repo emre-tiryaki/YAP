@@ -89,7 +89,7 @@ func TestImportKeepsActivityRelationsAndStartDate(t *testing.T) {
 		t.Fatalf("seeded snapshot is empty: %+v", before)
 	}
 	archive := e.exportBytes(t)
-	if err := e.svc.Reset(e.ctx, e.session); err != nil {
+	if err := e.svc.Reset(e.ctx, e.session, ResetOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	if got := takeActivity(t, e); len(got.events) != 0 || len(got.relations) != 0 {

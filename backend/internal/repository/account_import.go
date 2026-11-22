@@ -21,6 +21,11 @@ var rowStateQueries = map[string]string{
 	"labels":          `SELECT workspace_id = ?, deleted_at IS NULL FROM labels WHERE id = ?`,
 	"task_events":     `SELECT workspace_id = ?, deleted_at IS NULL FROM task_events WHERE id = ?`,
 	"resource_events": `SELECT workspace_id = ?, deleted_at IS NULL FROM resource_events WHERE id = ?`,
+	"ai_connections":  `SELECT workspace_id = ?, deleted_at IS NULL FROM ai_connections WHERE id = ?`,
+	"ai_chats":        `SELECT workspace_id = ?, deleted_at IS NULL FROM ai_chats WHERE id = ?`,
+	"ai_messages":     `SELECT workspace_id = ?, deleted_at IS NULL FROM ai_messages WHERE id = ?`,
+	// Attachments have no deletion mark: a present row is live.
+	"ai_message_attachments": `SELECT workspace_id = ?, 1 FROM ai_message_attachments WHERE id = ?`,
 	// An item in the trash counts as taken: the import adds a live copy
 	// instead of reaching into the trash.
 	"resources": `SELECT workspace_id = ? AND (trashed_at IS NULL OR deleted_at IS NOT NULL), deleted_at IS NULL
@@ -361,6 +366,63 @@ func (*AccountRepository) InsertTaskRelation(ctx context.Context, q database.DBT
 	)
 	if err != nil {
 		return fmt.Errorf("import task relation: %w", err)
+	}
+	return nil
+}
+
+// The AI inserts add a row, or bring back a deleted row of the same
+// workspace with the same id. Connections come back without a key.
+func (*AccountRepository) InsertAIConnection(ctx context.Context, q database.DBTX, workspaceID, userID string, c model.ImportAIConnection) error {
+	_, err := q.ExecContext(ctx,
+		`INSERT INTO ai_connections (id, workspace_id, user_id, name, provider, preset, base_url, has_key, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+		 ON CONFLICT (id) DO UPDATE SET name = excluded.name, provider = excluded.provider, preset = excluded.preset,
+		     base_url = excluded.base_url, has_key = 0, created_at = excluded.created_at,
+		     updated_at = excluded.updated_at, deleted_at = NULL
+		   WHERE ai_connections.workspace_id = excluded.workspace_id`,
+		c.ID, workspaceID, userID, c.Name, c.Provider, c.Preset, c.BaseURL, c.CreatedAt, c.UpdatedAt)
+	if err != nil {
+		return fmt.Errorf("import ai connection: %w", err)
+	}
+	return nil
+}
+
+func (*AccountRepository) InsertAIChat(ctx context.Context, q database.DBTX, workspaceID, userID string, c model.ImportAIChat) error {
+	_, err := q.ExecContext(ctx,
+		`INSERT INTO ai_chats (id, workspace_id, user_id, title, connection_id, model, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		 ON CONFLICT (id) DO UPDATE SET title = excluded.title, connection_id = excluded.connection_id,
+		     model = excluded.model, created_at = excluded.created_at, updated_at = excluded.updated_at, deleted_at = NULL
+		   WHERE ai_chats.workspace_id = excluded.workspace_id`,
+		c.ID, workspaceID, userID, c.Title, c.ConnectionID, c.Model, c.CreatedAt, c.UpdatedAt)
+	if err != nil {
+		return fmt.Errorf("import ai chat: %w", err)
+	}
+	return nil
+}
+
+func (*AccountRepository) InsertAIMessage(ctx context.Context, q database.DBTX, workspaceID string, m model.ImportAIMessage) error {
+	_, err := q.ExecContext(ctx,
+		`INSERT INTO ai_messages (id, workspace_id, chat_id, role, content, status, error_code, connection_id, model, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		 ON CONFLICT (id) DO UPDATE SET chat_id = excluded.chat_id, role = excluded.role, content = excluded.content,
+		     status = excluded.status, error_code = excluded.error_code, connection_id = excluded.connection_id,
+		     model = excluded.model, created_at = excluded.created_at, updated_at = excluded.updated_at, deleted_at = NULL
+		   WHERE ai_messages.workspace_id = excluded.workspace_id`,
+		m.ID, workspaceID, m.ChatID, m.Role, m.Content, m.Status, m.ErrorCode, m.ConnectionID, m.Model, m.CreatedAt, m.UpdatedAt)
+	if err != nil {
+		return fmt.Errorf("import ai message: %w", err)
+	}
+	return nil
+}
+
+func (*AccountRepository) InsertAIAttachment(ctx context.Context, q database.DBTX, workspaceID string, a model.ImportAIAttachment) error {
+	_, err := q.ExecContext(ctx,
+		`INSERT INTO ai_message_attachments (id, workspace_id, message_id, position, kind, target_id, path, label, last_status, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		a.ID, workspaceID, a.MessageID, a.Position, a.Kind, a.TargetID, a.Path, a.Label, a.LastStatus, a.CreatedAt, a.UpdatedAt)
+	if err != nil {
+		return fmt.Errorf("import ai attachment: %w", err)
 	}
 	return nil
 }

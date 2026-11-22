@@ -12,7 +12,7 @@ import (
 var migrationFS embed.FS
 
 func migrate(ctx context.Context, conn *sql.DB) error {
-	files, err := fs.ReadDir(migrationFS, "migrations/sqlite");
+	files, err := fs.ReadDir(migrationFS, "migrations/sqlite")
 	if err != nil {
 		return err
 	}

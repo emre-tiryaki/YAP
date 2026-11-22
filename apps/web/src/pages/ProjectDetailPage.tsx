@@ -4,8 +4,6 @@ import { useTranslate } from "../hooks/useTranslate";
 import { useProject, useProjectPlans } from "../hooks/useProjects";
 import { ApiError } from "../api/client";
 import NotFoundPage from "./NotFoundPage";
-import { FiPlus } from "react-icons/fi";
-import { HeaderAction } from "../components/HeaderAction";
 import { PageHeader } from "../components/PageHeader";
 import type { BreadcrumbItem } from "../types/breadcrumb";
 import {
@@ -40,17 +38,7 @@ export default function ProjectDetailPage() {
 
     return (
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            <PageHeader
-                breadcrumb={breadcrumb}
-                actions={
-                    <HeaderAction
-                        variant="primary"
-                        icon={FiPlus}
-                        label={t("project.plans.create.title")}
-                        onClick={() => setIsPlanModalOpen(true)}
-                    />
-                }
-            />
+            <PageHeader breadcrumb={breadcrumb} />
             <main className="flex-1 overflow-auto p-8">
                 {project.isLoading && <ProjectHeaderSkeleton />}
                 {project.isError && (

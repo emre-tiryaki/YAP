@@ -103,6 +103,7 @@ func TestSchemaTablesExistAndAreStrict(t *testing.T) {
 		"users", "workspaces", "memberships", "teams", "projects", "plans",
 		"statuses", "project_teams", "team_members", "tasks", "task_assignees",
 		"task_comments", "resource_repositories", "repository_checkouts", "repository_clones",
+		"ai_connections", "ai_chats", "ai_messages", "ai_message_attachments",
 	}
 	for _, name := range want {
 		t.Run(name, func(t *testing.T) {

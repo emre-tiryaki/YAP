@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log/slog"
 	"os"
 	"slices"
 	"strings"
@@ -52,6 +53,29 @@ type AccountRepository interface {
 	InsertTaskEvent(ctx context.Context, q database.DBTX, workspaceID, actorID string, e model.ImportTaskEvent) error
 	InsertTaskRelation(ctx context.Context, q database.DBTX, workspaceID string, r model.ImportTaskRelation, now string) error
 	InsertRepository(ctx context.Context, q database.DBTX, workspaceID, addedBy string, r model.ImportRepository, now string) error
+	InsertAIConnection(ctx context.Context, q database.DBTX, workspaceID, userID string, c model.ImportAIConnection) error
+	InsertAIChat(ctx context.Context, q database.DBTX, workspaceID, userID string, c model.ImportAIChat) error
+	InsertAIMessage(ctx context.Context, q database.DBTX, workspaceID string, m model.ImportAIMessage) error
+	InsertAIAttachment(ctx context.Context, q database.DBTX, workspaceID string, a model.ImportAIAttachment) error
+}
+
+// AIResetRepository deletes the AI data of a user.
+type AIResetRepository interface {
+	SoftDeleteAllChats(ctx context.Context, q database.DBTX, workspaceID, userID, now string) error
+	SoftDeleteAllConnections(ctx context.Context, q database.DBTX, workspaceID, userID, now string) ([]string, error)
+}
+
+// AIStopper ends the answer being written, if any.
+type AIStopper interface {
+	StopAll()
+}
+
+// ResetOptions choose what a reset deletes besides the workspace content.
+type ResetOptions struct {
+	// AIChats deletes the assistant's chats.
+	AIChats bool
+	// AIConnections deletes the assistant's connections and their keys.
+	AIConnections bool
 }
 
 // AccountResources is the part of the resource repository an export needs.
@@ -82,6 +106,11 @@ type AccountService struct {
 	// one the first start gave them.
 	defaultDisplayName string
 	now                func() time.Time
+
+	// The AI parts are optional; see WithAI.
+	ai      AIResetRepository
+	aiKeys  AIKeyStore
+	aiStops AIStopper
 }
 
 func NewAccountService(db *sql.DB, repo AccountRepository, resources AccountResources, workspaces WorkspaceRepository,
@@ -90,6 +119,13 @@ func NewAccountService(db *sql.DB, repo AccountRepository, resources AccountReso
 		db: db, repo: repo, resources: resources, workspaces: workspaces, settings: settings, store: store,
 		defaultDisplayName: defaultDisplayName, now: time.Now,
 	}
+}
+
+// WithAI lets a reset delete the assistant's chats and connections (and
+// their keys) and stop the answer being written.
+func (s *AccountService) WithAI(repo AIResetRepository, keys AIKeyStore, stopper AIStopper) *AccountService {
+	s.ai, s.aiKeys, s.aiStops = repo, keys, stopper
+	return s
 }
 
 // exportDocument is the content of data.json.
@@ -230,12 +266,30 @@ func treePaths(resources []model.Resource) []exportEntry {
 // user, the workspace and the owner membership are kept. Rows are
 // soft-deleted in one transaction; the resource bytes, trash included, are
 // removed from the disk afterwards. A failure there is returned, and running
-// the reset again finishes it.
-func (s *AccountService) Reset(ctx context.Context, session model.Session) error {
+// the reset again finishes it. AI chats and connections are only deleted
+// when opts say so; a running answer is stopped first.
+func (s *AccountService) Reset(ctx context.Context, session model.Session, opts ResetOptions) error {
+	if s.aiStops != nil {
+		s.aiStops.StopAll()
+	}
+	var removedKeys []string
 	err := database.WithTx(ctx, s.db, func(tx *sql.Tx) error {
+		removedKeys = nil
 		now := s.now().UTC().Format(time.RFC3339)
 		if err := s.repo.Reset(ctx, tx, session.WorkspaceID, now); err != nil {
 			return err
+		}
+		if s.ai != nil && opts.AIChats {
+			if err := s.ai.SoftDeleteAllChats(ctx, tx, session.WorkspaceID, session.UserID, now); err != nil {
+				return err
+			}
+		}
+		if s.ai != nil && opts.AIConnections {
+			ids, err := s.ai.SoftDeleteAllConnections(ctx, tx, session.WorkspaceID, session.UserID, now)
+			if err != nil {
+				return err
+			}
+			removedKeys = ids
 		}
 		if err := resetUserSettings(ctx, tx, s.settings, session.UserID, now); err != nil {
 			return err
@@ -247,6 +301,14 @@ func (s *AccountService) Reset(ctx context.Context, session model.Session) error
 	})
 	if err != nil {
 		return err
+	}
+	for _, id := range removedKeys {
+		if s.aiKeys == nil {
+			break
+		}
+		if err := s.aiKeys.Delete(id); err != nil {
+			slog.Error("delete ai key", "error", err)
+		}
 	}
 	if err := s.store.Remove([]string{session.WorkspaceID}); err != nil {
 		return fmt.Errorf("reset resource files: %w", err)

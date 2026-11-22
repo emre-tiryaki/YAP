@@ -9,9 +9,11 @@ import {
     FiTag,
     FiUser,
 } from "react-icons/fi";
+import { TbSparkles } from "react-icons/tb";
 import { useTranslate } from "../hooks/useTranslate";
 import type { SettingsSection } from "../types/settings";
 import { Dialog } from "./Dialog";
+import { SettingsAI } from "./SettingsAI";
 import { SettingsAccount } from "./SettingsAccount";
 import { SettingsAppearance } from "./SettingsAppearance";
 import { SettingsCategories } from "./SettingsCategories";
@@ -29,6 +31,7 @@ const sections: { id: SettingsSection; Icon: IconType }[] = [
     { id: "categories", Icon: FiTag },
     { id: "notifications", Icon: FiBell },
     { id: "github", Icon: FiGithub },
+    { id: "ai", Icon: TbSparkles },
     { id: "shortcuts", Icon: FiCommand },
 ];
 
@@ -110,6 +113,7 @@ function SettingsBody({ initialSection }: { initialSection: SettingsSection }) {
                     {active === "categories" && <SettingsCategories />}
                     {active === "notifications" && <SettingsNotifications />}
                     {active === "github" && <SettingsGitHub />}
+                    {active === "ai" && <SettingsAI />}
                     {active === "shortcuts" && <SettingsShortcuts />}
                 </div>
             </div>

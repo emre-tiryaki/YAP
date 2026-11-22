@@ -5,6 +5,7 @@ export type SettingsSection =
   | "categories"
   | "notifications"
   | "github"
+  | "ai"
   | "shortcuts";
 
 export type Language = "en" | "tr";
@@ -73,4 +74,10 @@ export type Preferences = {
   taskPeekMode: TaskPeekMode;
   // Display options (grouping, order, properties) per plan id.
   planDisplay: Record<string, DisplayOptions>;
+  // Text size in px of rendered documents (markdown).
+  documentFontSize: number;
+  // Text size in px of code and plain text files.
+  codeFontSize: number;
+  // Long lines of code wrap instead of scrolling sideways.
+  codeWrap: boolean;
 };

@@ -4,6 +4,7 @@ export type ImportCounts = {
     tasks: number;
     comments: number;
     resources: number;
+    chats: number;
 };
 
 export type ImportResult = {

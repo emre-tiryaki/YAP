@@ -20,6 +20,7 @@ export const defaultUserSettings: UserSettings = {
         sound: false,
     },
     repositoriesAutoUpdate: true,
+    aiInstructions: "",
 };
 
 export function useUserSettings() {

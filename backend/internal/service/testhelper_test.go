@@ -19,7 +19,7 @@ func newTestDB(t *testing.T) (*sql.DB, model.Session) {
 	if err != nil {
 		t.Fatalf("database.New() err = %v", err)
 	}
-	t.Cleanup(func() {db.Close()})
+	t.Cleanup(func() { db.Close() })
 
 	session, err := NewSessionService(db, repository.NewSessionRepository()).Bootstrap(ctx, "tester")
 	if err != nil {

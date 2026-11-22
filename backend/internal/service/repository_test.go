@@ -734,7 +734,7 @@ func TestRepositoryExportAndImport(t *testing.T) {
 		t.Fatalf("the local checkout state was exported: %v", row)
 	}
 
-	if err := acct.svc.Reset(e.ctx, e.session); err != nil {
+	if err := acct.svc.Reset(e.ctx, e.session, ResetOptions{}); err != nil {
 		t.Fatalf("Reset() error = %v", err)
 	}
 	acct.importBytes(t, archive)

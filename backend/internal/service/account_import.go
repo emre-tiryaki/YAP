@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/emre-tiryaki/YAP/backend/internal/database"
 	"github.com/emre-tiryaki/YAP/backend/internal/model"
@@ -46,6 +47,8 @@ type ImportCounts struct {
 	Comments  int
 	Resources int
 	Labels    int
+	// Chats counts the AI assistant's chats.
+	Chats int
 }
 
 // importDocument is the part of data.json an import reads. Unknown tables
@@ -75,6 +78,10 @@ type importDocument struct {
 		TaskResources  []model.ImportTaskResource `json:"task_resources"`
 		ResourceEvents []model.ImportEvent        `json:"resource_events"`
 		Repositories   []model.ImportRepository   `json:"resource_repositories"`
+		AIConnections  []model.ImportAIConnection `json:"ai_connections"`
+		AIChats        []model.ImportAIChat       `json:"ai_chats"`
+		AIMessages     []model.ImportAIMessage    `json:"ai_messages"`
+		AIAttachments  []model.ImportAIAttachment `json:"ai_message_attachments"`
 		UserSettings   []model.ImportSetting      `json:"user_settings"`
 	} `json:"tables"`
 }
@@ -288,6 +295,7 @@ func (im *importer) run(ctx context.Context, tx *sql.Tx) error {
 	steps := []func(context.Context, *sql.Tx) error{
 		im.projects, im.plans, im.statuses, im.labels, im.tasks, im.taskLabels, im.assignees, im.comments,
 		im.resources, im.repositories, im.taskResources, im.events, im.taskEvents, im.taskRelations,
+		im.aiConnections, im.aiChats, im.aiMessages, im.aiAttachments,
 	}
 	if im.result.Restored {
 		steps = append(steps, im.profile)
@@ -811,6 +819,107 @@ func (im *importer) taskRelations(ctx context.Context, tx *sql.Tx) error {
 	return nil
 }
 
+// The AI steps add the assistant's data. Connections come back without a
+// key (keys are never exported). Messages and attachments are only added for
+// chats the import added, so a chat that is already here is left alone.
+func (im *importer) aiConnections(ctx context.Context, tx *sql.Tx) error {
+	for _, c := range im.doc.Tables.AIConnections {
+		id, add, err := im.keepOrAdd(ctx, tx, "ai_connections", c.ID)
+		if err != nil {
+			return err
+		}
+		if !add {
+			continue
+		}
+		c.ID = id
+		if err := im.s.repo.InsertAIConnection(ctx, tx, im.session.WorkspaceID, im.session.UserID, c); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// aiRef maps an exported id that may point to a row the archive lacks (a
+// removed connection); such a reference becomes empty.
+func (im *importer) aiRef(id *string) *string {
+	if id == nil {
+		return nil
+	}
+	if mapped, ok := im.ids[*id]; ok {
+		return &mapped
+	}
+	return nil
+}
+
+func (im *importer) aiChats(ctx context.Context, tx *sql.Tx) error {
+	for _, c := range im.doc.Tables.AIChats {
+		id, add, err := im.keepOrAdd(ctx, tx, "ai_chats", c.ID)
+		if err != nil {
+			return err
+		}
+		if !add {
+			continue
+		}
+		c.ID = id
+		c.ConnectionID = im.aiRef(c.ConnectionID)
+		if err := im.s.repo.InsertAIChat(ctx, tx, im.session.WorkspaceID, im.session.UserID, c); err != nil {
+			return err
+		}
+		im.result.Added.Chats++
+	}
+	return nil
+}
+
+func (im *importer) aiMessages(ctx context.Context, tx *sql.Tx) error {
+	for _, m := range im.doc.Tables.AIMessages {
+		chatID := im.ids[m.ChatID]
+		if !im.added[chatID] {
+			continue
+		}
+		id, add, err := im.keepOrAdd(ctx, tx, "ai_messages", m.ID)
+		if err != nil {
+			return err
+		}
+		if !add {
+			continue
+		}
+		m.ID, m.ChatID = id, chatID
+		m.ConnectionID = im.aiRef(m.ConnectionID)
+		if model.AIMessageStatus(m.Status) == model.AIStatusStreaming {
+			m.Status = string(model.AIStatusInterrupted)
+		}
+		if err := im.s.repo.InsertAIMessage(ctx, tx, im.session.WorkspaceID, m); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (im *importer) aiAttachments(ctx context.Context, tx *sql.Tx) error {
+	for _, a := range im.doc.Tables.AIAttachments {
+		messageID := im.ids[a.MessageID]
+		if !im.added[messageID] {
+			continue
+		}
+		id, add, err := im.keepOrAdd(ctx, tx, "ai_message_attachments", a.ID)
+		if err != nil {
+			return err
+		}
+		if !add {
+			continue
+		}
+		a.ID, a.MessageID = id, messageID
+		// A target that was not imported keeps its id and shows as missing.
+		if target, ok := im.ids[a.TargetID]; ok {
+			a.TargetID = target
+		}
+		if err := im.s.repo.InsertAIAttachment(ctx, tx, im.session.WorkspaceID, a); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // profile takes the names and settings from the archive; only done when the
 // workspace was empty, so a merge never overwrites them.
 func (im *importer) profile(ctx context.Context, tx *sql.Tx) error {
@@ -1166,6 +1275,123 @@ func validateImport(doc *importDocument) error {
 	for _, st := range tb.UserSettings {
 		if st.Key == "" || !json.Valid([]byte(st.Value)) {
 			return invalid("setting")
+		}
+	}
+	return validateAIImport(tb.AIConnections, tb.AIChats, tb.AIMessages, tb.AIAttachments)
+}
+
+func validateAIImport(conns []model.ImportAIConnection, chats []model.ImportAIChat, msgs []model.ImportAIMessage, atts []model.ImportAIAttachment) error {
+	invalid := func(what string) error { return fmt.Errorf("%w: %s", ErrInvalidInput, what) }
+	seen := map[string]bool{}
+	unique := func(id, what string) error {
+		if id == "" || seen[id] {
+			return invalid(what + " id")
+		}
+		seen[id] = true
+		return nil
+	}
+	for i := range conns {
+		c := &conns[i]
+		if err := unique(c.ID, "ai connection"); err != nil {
+			return err
+		}
+		name, err := normalizeAIConnectionName(c.Name)
+		if err != nil {
+			return err
+		}
+		c.Name = name
+		preset, ok := aiPresets[model.AIPreset(c.Preset)]
+		if !ok || string(preset.provider) != c.Provider {
+			return invalid("ai connection preset")
+		}
+		if c.BaseURL, err = normalizeAIBaseURL(c.BaseURL); err != nil {
+			return err
+		}
+		if err := checkTimes(c.CreatedAt, &c.UpdatedAt); err != nil {
+			return err
+		}
+	}
+	connections := map[string]bool{}
+	for _, c := range conns {
+		connections[c.ID] = true
+	}
+	chatIDs := map[string]bool{}
+	for i := range chats {
+		c := &chats[i]
+		if err := unique(c.ID, "ai chat"); err != nil {
+			return err
+		}
+		c.Title = strings.TrimSpace(c.Title)
+		if n := utf8.RuneCountInString(c.Title); n == 0 || n > maxAIChatTitle {
+			return invalid("ai chat title")
+		}
+		if c.Model == "" || utf8.RuneCountInString(c.Model) > maxAIModelLength {
+			return invalid("ai chat model")
+		}
+		if c.ConnectionID != nil && !connections[*c.ConnectionID] {
+			c.ConnectionID = nil // the connection was not exported
+		}
+		if err := checkTimes(c.CreatedAt, &c.UpdatedAt); err != nil {
+			return err
+		}
+		chatIDs[c.ID] = true
+	}
+	messageIDs := map[string]bool{}
+	for i := range msgs {
+		m := &msgs[i]
+		if err := unique(m.ID, "ai message"); err != nil {
+			return err
+		}
+		if !chatIDs[m.ChatID] {
+			return invalid("ai message without its chat")
+		}
+		switch model.AIMessageRole(m.Role) {
+		case model.AIRoleUser, model.AIRoleAssistant:
+		default:
+			return invalid("ai message role")
+		}
+		switch model.AIMessageStatus(m.Status) {
+		case model.AIStatusComplete, model.AIStatusStreaming, model.AIStatusStopped, model.AIStatusInterrupted, model.AIStatusError:
+		default:
+			return invalid("ai message status")
+		}
+		if m.ErrorCode != nil && model.AIMessageStatus(m.Status) != model.AIStatusError {
+			m.ErrorCode = nil
+		}
+		if m.ConnectionID != nil && !connections[*m.ConnectionID] {
+			m.ConnectionID = nil
+		}
+		if err := checkTimes(m.CreatedAt, &m.UpdatedAt); err != nil {
+			return err
+		}
+		messageIDs[m.ID] = true
+	}
+	for i := range atts {
+		a := &atts[i]
+		if err := unique(a.ID, "ai attachment"); err != nil {
+			return err
+		}
+		if !messageIDs[a.MessageID] {
+			return invalid("ai attachment without its message")
+		}
+		switch model.AIAttachmentKind(a.Kind) {
+		case model.AIAttachTask, model.AIAttachPlan, model.AIAttachProject, model.AIAttachResource, model.AIAttachRepoFile:
+		default:
+			return invalid("ai attachment kind")
+		}
+		switch model.AIAttachmentStatus(a.LastStatus) {
+		case model.AIAttachIncluded, model.AIAttachTruncated, model.AIAttachOmitted, model.AIAttachMissing, model.AIAttachUnreadable:
+		default:
+			return invalid("ai attachment status")
+		}
+		if (model.AIAttachmentKind(a.Kind) == model.AIAttachRepoFile) != (a.Path != nil) || a.TargetID == "" || a.Position < 0 || a.Position >= maxAIAttachments {
+			return invalid("ai attachment")
+		}
+		if a.Label = strings.TrimSpace(a.Label); a.Label == "" {
+			return invalid("ai attachment label")
+		}
+		if err := checkTimes(a.CreatedAt, &a.UpdatedAt); err != nil {
+			return err
 		}
 	}
 	return nil

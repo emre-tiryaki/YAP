@@ -43,6 +43,7 @@ type settingsResponse struct {
 	StatusNames     statusNamesResponse          `json:"status_names"`
 	Notifications   notificationSettingsResponse `json:"notifications"`
 	RepoAutoUpdate  bool                         `json:"repositories_auto_update"`
+	AIInstructions  string                       `json:"ai_instructions"`
 }
 
 type updateNotificationSettingsRequest struct {
@@ -62,6 +63,7 @@ type updateSettingsRequest struct {
 	StatusNames    map[string]string                  `json:"status_names"`
 	Notifications  *updateNotificationSettingsRequest `json:"notifications"`
 	RepoAutoUpdate *bool                              `json:"repositories_auto_update"`
+	AIInstructions *string                            `json:"ai_instructions"`
 }
 
 func toSettingsResponse(s service.UserSettings) settingsResponse {
@@ -84,6 +86,7 @@ func toSettingsResponse(s service.UserSettings) settingsResponse {
 			Sound:    n.Sound,
 		},
 		RepoAutoUpdate: s.RepoAutoUpdate,
+		AIInstructions: s.AIInstructions,
 	}
 }
 
@@ -94,6 +97,7 @@ func (req updateSettingsRequest) toInput() service.UpdateSettingsInput {
 		HideDone:        req.HideDone,
 		DoneToBottom:    req.DoneToBottom,
 		RepoAutoUpdate:  req.RepoAutoUpdate,
+		AIInstructions:  req.AIInstructions,
 	}
 	if len(req.StatusNames) > 0 {
 		in.StatusNames = map[model.StatusCategory]string{}

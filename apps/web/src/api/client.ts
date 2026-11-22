@@ -1,4 +1,22 @@
 import type { ImportCounts, ImportResult } from "../types/account";
+import type {
+    AiAttachment,
+    AiAttachmentKind,
+    AiAttachmentStatus,
+    AiChat,
+    AiChatDetail,
+    AiConnection,
+    AiMessage,
+    AiMessageStatus,
+    AiPreset,
+    AiProvider,
+    AiSendInput,
+    AiSendResult,
+    AiStreamHandlers,
+    CreateAiConnectionInput,
+    TestAiConnectionInput,
+    UpdateAiConnectionInput,
+} from "../types/ai";
 import type { Comment } from "../types/comment";
 import type {
     RelationKind,
@@ -112,6 +130,7 @@ type ProjectDto = {
     icon: string;
     identifier: string;
     task_count: number;
+    done_task_count: number;
 };
 
 type TaskDto = {
@@ -259,6 +278,7 @@ type UserSettingsDto = {
         sound: boolean;
     };
     repositories_auto_update: boolean;
+    ai_instructions: string;
 };
 
 type UpdateUserSettingsDto = Partial<
@@ -323,6 +343,7 @@ function toProject(dto: ProjectDto): Project {
         icon: dto.icon,
         identifier: dto.identifier,
         taskCount: dto.task_count,
+        doneTaskCount: dto.done_task_count ?? 0,
     };
 }
 
@@ -1070,6 +1091,7 @@ function toUserSettings(dto: UserSettingsDto): UserSettings {
             sound: n.sound,
         },
         repositoriesAutoUpdate: dto.repositories_auto_update,
+        aiInstructions: dto.ai_instructions,
     };
 }
 
@@ -1100,6 +1122,8 @@ export async function updateUserSettings(
     }
     if (input.repositoriesAutoUpdate !== undefined)
         body.repositories_auto_update = input.repositoriesAutoUpdate;
+    if (input.aiInstructions !== undefined)
+        body.ai_instructions = input.aiInstructions;
     const dto = await request<UserSettingsDto>("/api/settings", {
         method: "PATCH",
         body: JSON.stringify(body),
@@ -1160,8 +1184,21 @@ export async function importAccount(file: File): Promise<ImportResult> {
     };
 }
 
-export async function resetAccount(): Promise<void> {
-    await request<void>("/api/account/reset", { method: "POST" });
+export type ResetAccountOptions = {
+    aiChats: boolean;
+    aiConnections: boolean;
+};
+
+export async function resetAccount(
+    options: ResetAccountOptions = { aiChats: false, aiConnections: false },
+): Promise<void> {
+    await request<void>("/api/account/reset", {
+        method: "POST",
+        body: JSON.stringify({
+            ai_chats: options.aiChats,
+            ai_connections: options.aiConnections,
+        }),
+    });
 }
 
 type GitHubAccountDto = {
@@ -1483,4 +1520,319 @@ export async function updateLabel(
 
 export async function deleteLabel(labelId: string): Promise<void> {
     await request<void>(`/api/labels/${labelId}`, { method: "DELETE" });
+}
+
+// --- AI assistant ---
+
+type AiConnectionDto = {
+    id: string;
+    name: string;
+    provider: AiProvider;
+    preset: AiPreset;
+    base_url: string;
+    has_key: boolean;
+    created_at: string;
+    updated_at: string;
+};
+
+type AiChatDto = {
+    id: string;
+    title: string;
+    connection_id: string | null;
+    model: string;
+    generating: boolean;
+    created_at: string;
+    updated_at: string;
+};
+
+type AiAttachmentDto = {
+    id: string;
+    kind: AiAttachmentKind;
+    target_id: string;
+    path: string | null;
+    label: string;
+    last_status: AiAttachmentStatus;
+    missing: boolean;
+    project_id: string | null;
+    plan_id: string | null;
+};
+
+type AiMessageDto = {
+    id: string;
+    role: "user" | "assistant";
+    content: string;
+    status: AiMessageStatus;
+    error_code: string | null;
+    connection_id: string | null;
+    model: string | null;
+    created_at: string;
+    attachments: AiAttachmentDto[];
+};
+
+function toAiConnection(dto: AiConnectionDto): AiConnection {
+    return {
+        id: dto.id,
+        name: dto.name,
+        provider: dto.provider,
+        preset: dto.preset,
+        baseUrl: dto.base_url,
+        hasKey: dto.has_key,
+        createdAt: new Date(dto.created_at),
+        updatedAt: new Date(dto.updated_at),
+    };
+}
+
+function toAiChat(dto: AiChatDto): AiChat {
+    return {
+        id: dto.id,
+        title: dto.title,
+        connectionId: dto.connection_id,
+        model: dto.model,
+        generating: dto.generating,
+        createdAt: new Date(dto.created_at),
+        updatedAt: new Date(dto.updated_at),
+    };
+}
+
+function toAiAttachment(dto: AiAttachmentDto): AiAttachment {
+    return {
+        id: dto.id,
+        kind: dto.kind,
+        targetId: dto.target_id,
+        path: dto.path,
+        label: dto.label,
+        lastStatus: dto.last_status,
+        missing: dto.missing,
+        projectId: dto.project_id,
+        planId: dto.plan_id,
+    };
+}
+
+function toAiMessage(dto: AiMessageDto): AiMessage {
+    return {
+        id: dto.id,
+        role: dto.role,
+        content: dto.content,
+        status: dto.status,
+        errorCode: dto.error_code,
+        connectionId: dto.connection_id,
+        model: dto.model,
+        createdAt: new Date(dto.created_at),
+        attachments: dto.attachments.map(toAiAttachment),
+    };
+}
+
+export async function listAiConnections(): Promise<AiConnection[]> {
+    const dtos = await request<AiConnectionDto[]>("/api/ai/connections");
+    return dtos.map(toAiConnection);
+}
+
+export async function createAiConnection(
+    input: CreateAiConnectionInput,
+): Promise<AiConnection> {
+    const dto = await request<AiConnectionDto>("/api/ai/connections", {
+        method: "POST",
+        body: JSON.stringify({
+            name: input.name,
+            preset: input.preset,
+            base_url: input.baseUrl,
+            api_key: input.apiKey ?? "",
+        }),
+    });
+    return toAiConnection(dto);
+}
+
+export async function updateAiConnection(
+    id: string,
+    input: UpdateAiConnectionInput,
+): Promise<AiConnection> {
+    const dto = await request<AiConnectionDto>(`/api/ai/connections/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+            name: input.name,
+            base_url: input.baseUrl,
+            api_key: input.apiKey,
+        }),
+    });
+    return toAiConnection(dto);
+}
+
+export async function deleteAiConnection(id: string): Promise<void> {
+    await request<void>(`/api/ai/connections/${id}`, { method: "DELETE" });
+}
+
+export async function listAiModels(id: string): Promise<string[]> {
+    const dto = await request<{ models: string[] }>(
+        `/api/ai/connections/${id}/models`,
+    );
+    return dto.models;
+}
+
+// Lists the models of settings that are not saved (the Test button).
+export async function testAiConnection(
+    input: TestAiConnectionInput,
+): Promise<string[]> {
+    const dto = await request<{ models: string[] }>(
+        "/api/ai/connections/test",
+        {
+            method: "POST",
+            body: JSON.stringify({
+                preset: input.preset,
+                base_url: input.baseUrl,
+                api_key: input.apiKey ?? "",
+            }),
+        },
+    );
+    return dto.models;
+}
+
+export async function listAiChats(
+    query: string,
+    signal?: AbortSignal,
+): Promise<AiChat[]> {
+    const params = new URLSearchParams({ q: query });
+    const dtos = await request<AiChatDto[]>(`/api/ai/chats?${params}`, {
+        signal,
+    });
+    return dtos.map(toAiChat);
+}
+
+export async function getAiChat(id: string): Promise<AiChatDetail> {
+    const dto = await request<{ chat: AiChatDto; messages: AiMessageDto[] }>(
+        `/api/ai/chats/${id}`,
+    );
+    return { chat: toAiChat(dto.chat), messages: dto.messages.map(toAiMessage) };
+}
+
+function aiSendBody(input: AiSendInput) {
+    return JSON.stringify({
+        connection_id: input.connectionId,
+        model: input.model,
+        content: input.content,
+        attachments: input.attachments.map((a) => ({
+            kind: a.kind,
+            target_id: a.targetId,
+            path: a.path ?? "",
+        })),
+    });
+}
+
+export async function createAiChat(input: AiSendInput): Promise<AiSendResult> {
+    const dto = await request<{
+        chat: AiChatDto;
+        user_message: { id: string };
+        assistant_message: { id: string };
+    }>("/api/ai/chats", { method: "POST", body: aiSendBody(input) });
+    return {
+        chat: toAiChat(dto.chat),
+        userMessageId: dto.user_message.id,
+        assistantMessageId: dto.assistant_message.id,
+    };
+}
+
+export async function sendAiMessage(
+    chatId: string,
+    input: AiSendInput,
+): Promise<void> {
+    await request<unknown>(`/api/ai/chats/${chatId}/messages`, {
+        method: "POST",
+        body: aiSendBody(input),
+    });
+}
+
+export async function regenerateAiMessage(
+    chatId: string,
+    input: { connectionId: string; model: string },
+): Promise<void> {
+    await request<unknown>(`/api/ai/chats/${chatId}/regenerate`, {
+        method: "POST",
+        body: JSON.stringify({
+            connection_id: input.connectionId,
+            model: input.model,
+        }),
+    });
+}
+
+export async function stopAiChat(chatId: string): Promise<void> {
+    await request<void>(`/api/ai/chats/${chatId}/stop`, { method: "POST" });
+}
+
+export async function renameAiChat(
+    chatId: string,
+    title: string,
+): Promise<AiChat> {
+    const dto = await request<AiChatDto>(`/api/ai/chats/${chatId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ title }),
+    });
+    return toAiChat(dto);
+}
+
+export async function deleteAiChat(chatId: string): Promise<void> {
+    await request<void>(`/api/ai/chats/${chatId}`, { method: "DELETE" });
+}
+
+export async function getAiStatus(): Promise<string | null> {
+    const dto = await request<{ active_chat_id: string | null }>(
+        "/api/ai/status",
+    );
+    return dto.active_chat_id;
+}
+
+// Reads the answer being written for a chat: what exists so far, then every
+// new piece, then the end. Resolves when the stream ends or nothing is being
+// written (204); closing the stream (abort) does not stop the answer.
+export async function streamAiChat(
+    chatId: string,
+    handlers: AiStreamHandlers,
+    signal: AbortSignal,
+): Promise<void> {
+    const response = await fetch(`/api/ai/chats/${chatId}/stream`, { signal });
+    if (response.status === 204) return;
+    if (!response.ok || !response.body) {
+        const body: unknown = await response.json().catch(() => null);
+        const code =
+            typeof body === "object" &&
+            body !== null &&
+            "error" in body &&
+            typeof body.error === "string"
+                ? body.error
+                : "unknown";
+        throw new ApiError(response.status, code);
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    for (;;) {
+        const { done, value } = await reader.read();
+        if (done) return;
+        buffer += decoder.decode(value, { stream: true });
+        let end = buffer.indexOf("\n\n");
+        while (end !== -1) {
+            dispatchAiEvent(buffer.slice(0, end), handlers);
+            buffer = buffer.slice(end + 2);
+            end = buffer.indexOf("\n\n");
+        }
+    }
+}
+
+function dispatchAiEvent(block: string, handlers: AiStreamHandlers) {
+    let event = "";
+    let data = "";
+    for (const line of block.split("\n")) {
+        if (line.startsWith("event:")) event = line.slice(6).trim();
+        else if (line.startsWith("data:")) data += line.slice(5).trim();
+    }
+    if (event === "" || data === "") return; // a comment (ping)
+    const payload: unknown = JSON.parse(data);
+    if (typeof payload !== "object" || payload === null) return;
+    const field = (name: string) =>
+        name in payload && typeof (payload as Record<string, unknown>)[name] === "string"
+            ? ((payload as Record<string, unknown>)[name] as string)
+            : "";
+    if (event === "snapshot")
+        handlers.onSnapshot(field("message_id"), field("content"));
+    else if (event === "delta") handlers.onDelta(field("text"));
+    else if (event === "done")
+        handlers.onDone(field("message_id"), field("status") as AiMessageStatus);
 }

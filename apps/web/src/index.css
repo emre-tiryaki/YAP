@@ -462,3 +462,103 @@
         margin-top: 0;
     }
 }
+
+/* Syntax highlighting (highlight.js tokens) for source files and fenced
+   code in markdown. Colors are variables so the dark theme swaps them. */
+:root {
+    --hl-comment: #6a737d;
+    --hl-keyword: #cf222e;
+    --hl-string: #0a3069;
+    --hl-number: #0550ae;
+    --hl-title: #8250df;
+    --hl-builtin: #bc4c00;
+    --hl-tag: #116329;
+    --hl-meta: #7d5a00;
+    --hl-addition: #116329;
+    --hl-deletion: #a40e26;
+}
+:root.dark {
+    --hl-comment: #8b949e;
+    --hl-keyword: #ff7b72;
+    --hl-string: #a5d6ff;
+    --hl-number: #79c0ff;
+    --hl-title: #d2a8ff;
+    --hl-builtin: #ffa657;
+    --hl-tag: #7ee787;
+    --hl-meta: #e3b341;
+    --hl-addition: #7ee787;
+    --hl-deletion: #ffa198;
+}
+@layer components {
+    .hljs-comment,
+    .hljs-quote {
+        color: var(--hl-comment);
+        font-style: italic;
+    }
+    .hljs-keyword,
+    .hljs-selector-tag,
+    .hljs-doctag,
+    .hljs-template-tag,
+    .hljs-template-variable {
+        color: var(--hl-keyword);
+    }
+    .hljs-string,
+    .hljs-regexp,
+    .hljs-template-string,
+    .hljs-meta .hljs-string {
+        color: var(--hl-string);
+    }
+    .hljs-number,
+    .hljs-literal,
+    .hljs-attr,
+    .hljs-attribute,
+    .hljs-symbol,
+    .hljs-bullet,
+    .hljs-selector-id,
+    .hljs-selector-class,
+    .hljs-selector-attr,
+    .hljs-selector-pseudo {
+        color: var(--hl-number);
+    }
+    .hljs-title,
+    .hljs-title.class_,
+    .hljs-title.function_,
+    .hljs-section {
+        color: var(--hl-title);
+    }
+    .hljs-built_in,
+    .hljs-type,
+    .hljs-variable,
+    .hljs-params,
+    .hljs-property {
+        color: var(--hl-builtin);
+    }
+    .hljs-name,
+    .hljs-tag {
+        color: var(--hl-tag);
+    }
+    .hljs-meta,
+    .hljs-link {
+        color: var(--hl-meta);
+    }
+    .hljs-addition {
+        color: var(--hl-addition);
+    }
+    .hljs-deletion {
+        color: var(--hl-deletion);
+    }
+    .hljs-emphasis {
+        font-style: italic;
+    }
+    .hljs-strong,
+    .hljs-section {
+        font-weight: 600;
+    }
+    /* Fenced code in markdown follows the surface instead of prose's dark block. */
+    .markdown-body {
+        --tw-prose-pre-bg: var(--color-gray-100);
+        --tw-prose-pre-code: var(--color-gray-900);
+        --tw-prose-invert-pre-bg: var(--color-gray-100);
+        --tw-prose-invert-pre-code: var(--color-gray-900);
+    }
+}

@@ -13,8 +13,9 @@ type ResourcePickerDialogProps = {
     confirmLabel: string;
     index: ResourceIndex;
     // "folder" picks a target folder (the top of the tree included); "any"
-    // picks a file or folder to link.
-    mode: "folder" | "any";
+    // picks a file or folder to link; "textFile" picks a text file only
+    // (folders just open).
+    mode: "folder" | "any" | "textFile";
     // Items that cannot be picked, with everything inside them.
     excludedIds?: Set<string>;
     isPending?: boolean;
@@ -53,7 +54,12 @@ export function ResourcePickerDialog({
 
     function renderLevel(parentId: string | null, depth: number) {
         const items = childrenOf(index, parentId).filter(
-            (r) => (mode === "any" || r.kind === "folder") && !excludedIds?.has(r.id),
+            (r) =>
+                (mode !== "folder" || r.kind === "folder") &&
+                // The files of a repository are not resources; the
+                // repository picker handles them.
+                !(mode === "textFile" && r.isRepository) &&
+                !excludedIds?.has(r.id),
         );
         return items.map((r) => (
             <PickerRow
@@ -63,8 +69,11 @@ export function ResourcePickerDialog({
                 isPicked={picked === r.id}
                 isExpanded={expanded.has(r.id)}
                 hasChildren={childrenOf(index, r.id).some(
-                    (c) => mode === "any" || c.kind === "folder",
+                    (c) =>
+                        (mode !== "folder" || c.kind === "folder") &&
+                        !(mode === "textFile" && c.isRepository),
                 )}
+                pickable={mode !== "textFile" || (r.kind === "file" && r.isText)}
                 onPick={() => setPicked(r.id)}
                 onToggle={() => toggle(r.id)}
             >
@@ -130,6 +139,8 @@ type PickerRowProps = {
     isPicked: boolean;
     isExpanded: boolean;
     hasChildren: boolean;
+    // false: clicking only opens it (a folder, or a file that is no text).
+    pickable: boolean;
     onPick: () => void;
     onToggle: () => void;
     children: ReactNode;
@@ -141,6 +152,7 @@ function PickerRow({
     isPicked,
     isExpanded,
     hasChildren,
+    pickable,
     onPick,
     onToggle,
     children,
@@ -162,9 +174,11 @@ function PickerRow({
                 </button>
                 <button
                     type="button"
-                    onClick={onPick}
+                    onClick={pickable ? onPick : onToggle}
                     onDoubleClick={onToggle}
-                    className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 py-1.5 pr-2 text-left"
+                    className={`flex min-w-0 flex-1 cursor-pointer items-center gap-2 py-1.5 pr-2 text-left ${
+                        pickable ? "" : "text-gray-400"
+                    }`}
                 >
                     <ResourceIcon resource={resource} isOpen={isExpanded} />
                     <span className="truncate">{resource.name}</span>

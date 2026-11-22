@@ -55,10 +55,27 @@ var exportQueries = []struct {
 		 WHERE rr.workspace_id = ? AND r.trashed_at IS NULL AND r.deleted_at IS NULL
 		 ORDER BY rr.resource_id`, byWorkspace},
 	{"user_settings", `SELECT * FROM user_settings WHERE user_id = ? ORDER BY key`, byUser},
+	// The AI assistant: the user's connections (their keys live in the OS
+	// keychain and are never exported), live chats, and the messages and
+	// attachments of those chats.
+	{"ai_connections", `SELECT * FROM ai_connections WHERE workspace_id = ? AND user_id = ? AND deleted_at IS NULL ORDER BY id`, byWorkspaceUser},
+	{"ai_chats", `SELECT * FROM ai_chats WHERE workspace_id = ? AND user_id = ? AND deleted_at IS NULL ORDER BY id`, byWorkspaceUser},
+	{"ai_messages", `SELECT m.* FROM ai_messages m
+		 JOIN ai_chats c ON c.id = m.chat_id AND c.workspace_id = m.workspace_id
+		 WHERE m.workspace_id = ? AND c.user_id = ? AND c.deleted_at IS NULL AND m.deleted_at IS NULL
+		 ORDER BY m.id`, byWorkspaceUser},
+	{"ai_message_attachments", `SELECT a.* FROM ai_message_attachments a
+		 JOIN ai_messages m ON m.id = a.message_id AND m.workspace_id = a.workspace_id
+		 JOIN ai_chats c ON c.id = m.chat_id AND c.workspace_id = m.workspace_id
+		 WHERE a.workspace_id = ? AND c.user_id = ? AND c.deleted_at IS NULL AND m.deleted_at IS NULL
+		 ORDER BY a.message_id, a.position, a.id`, byWorkspaceUser},
 }
 
 func byUser(userID, _ string) []any           { return []any{userID} }
 func byWorkspace(_, workspaceID string) []any { return []any{workspaceID} }
+func byWorkspaceUser(userID, workspaceID string) []any {
+	return []any{workspaceID, userID}
+}
 
 // Export reads the live rows of everything the user owns in the workspace.
 // Values are kept as stored: TEXT as string, INTEGER as int64, NULL as nil.

@@ -1,8 +1,20 @@
 import { ViewToggle } from "./ViewToggle";
 import { useEffect, useRef, useState } from "react";
-import { accents, getPreferences, updatePreferences, usePreferences } from "../hooks/usePreferences";
+import {
+    CODE_FONT_DEFAULT,
+    CODE_FONT_MAX,
+    CODE_FONT_MIN,
+    DOCUMENT_FONT_DEFAULT,
+    DOCUMENT_FONT_MAX,
+    DOCUMENT_FONT_MIN,
+    accents,
+    getPreferences,
+    updatePreferences,
+    usePreferences,
+} from "../hooks/usePreferences";
 import { type TranslationKey, useTranslate } from "../hooks/useTranslate";
 import { type Accent, type BackgroundColor, type Density, type Theme } from "../types/settings";
+import { useHighlightedHtml } from "../hooks/useHighlightedHtml";
 import { UnsupportedImageError, prepareBackground } from "../util/backgroundImage";
 import { deleteCustomBackground, loadCustomBackground, saveCustomBackground } from "../util/backgroundStore";
 import { backgroundColors, backgroundName, backgroundPresets, backgroundThumbUrls } from "../util/backgrounds";
@@ -69,6 +81,8 @@ export function SettingsAppearance() {
 
             <BackgroundSettings />
 
+            <ReadingSettings />
+
             <SettingsGroup>
                 <SettingRow
                     label={t("settings.appearance.accent")}
@@ -127,6 +141,111 @@ export function SettingsAppearance() {
                 </SettingRow>
             </SettingsGroup>
         </div>
+    );
+}
+
+type FontSizeControlProps = {
+    label: string;
+    value: number;
+    min: number;
+    max: number;
+    defaultValue: number;
+    onChange: (value: number) => void;
+};
+
+function FontSizeControl({ label, value, min, max, defaultValue, onChange }: FontSizeControlProps) {
+    const t = useTranslate();
+    return (
+        <div className="flex items-center gap-3">
+            <input
+                type="range"
+                aria-label={label}
+                min={min}
+                max={max}
+                step={1}
+                value={value}
+                onChange={(event) => onChange(Number(event.target.value))}
+                className="w-36 cursor-pointer accent-accent"
+            />
+            <span className="w-10 text-right text-sm text-gray-700 tabular-nums">{value}px</span>
+            <button
+                type="button"
+                onClick={() => onChange(defaultValue)}
+                disabled={value === defaultValue}
+                className="cursor-pointer rounded-md px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent"
+            >
+                {t("settings.appearance.reading.reset")}
+            </button>
+        </div>
+    );
+}
+
+const codeSample = `function greet(name: string): string {
+    // Say hello
+    const count = 42;
+    return "Hello, " + name + count;
+}`;
+
+// How documents and code in the resources are read; the sample shows the
+// sizes before opening a file.
+function ReadingSettings() {
+    const t = useTranslate();
+    const { documentFontSize, codeFontSize, codeWrap } = usePreferences();
+    const html = useHighlightedHtml(codeSample, "typescript");
+    return (
+        <SettingsGroup title={t("settings.appearance.reading")}>
+            <SettingRow
+                label={t("settings.appearance.reading.documentSize")}
+                hint={t("settings.appearance.reading.documentSize.hint")}
+            >
+                <FontSizeControl
+                    label={t("settings.appearance.reading.documentSize")}
+                    value={documentFontSize}
+                    min={DOCUMENT_FONT_MIN}
+                    max={DOCUMENT_FONT_MAX}
+                    defaultValue={DOCUMENT_FONT_DEFAULT}
+                    onChange={(size) => updatePreferences({ documentFontSize: size })}
+                />
+            </SettingRow>
+            <SettingRow
+                label={t("settings.appearance.reading.codeSize")}
+                hint={t("settings.appearance.reading.codeSize.hint")}
+            >
+                <FontSizeControl
+                    label={t("settings.appearance.reading.codeSize")}
+                    value={codeFontSize}
+                    min={CODE_FONT_MIN}
+                    max={CODE_FONT_MAX}
+                    defaultValue={CODE_FONT_DEFAULT}
+                    onChange={(size) => updatePreferences({ codeFontSize: size })}
+                />
+            </SettingRow>
+            <SettingRow
+                label={t("settings.appearance.reading.wrap")}
+                hint={t("settings.appearance.reading.wrap.hint")}
+            >
+                <Toggle
+                    label={t("settings.appearance.reading.wrap")}
+                    checked={codeWrap}
+                    onChange={(wrap) => updatePreferences({ codeWrap: wrap })}
+                />
+            </SettingRow>
+            <div aria-hidden className="flex flex-col gap-3 px-5 py-4">
+                <p style={{ fontSize: documentFontSize }} className="text-gray-800">
+                    {t("settings.appearance.reading.sample")}
+                </p>
+                <pre
+                    style={{ fontSize: codeFontSize }}
+                    className="m-0 overflow-x-auto rounded-md bg-gray-50 px-4 py-3 font-mono leading-[1.6] text-gray-900 [tab-size:4]"
+                >
+                    {html === null ? (
+                        codeSample
+                    ) : (
+                        <code dangerouslySetInnerHTML={{ __html: html }} />
+                    )}
+                </pre>
+            </div>
+        </SettingsGroup>
     );
 }
 
