@@ -26,7 +26,7 @@ function AppLayout() {
     const { pathname } = useLocation();
     const settingsSection = useSettingsDialog();
     return (
-        <div className="app-canvas flex h-screen gap-2 bg-canvas p-2">
+        <div className="app-canvas flex h-screen gap-2 p-2">
             <Sidebar />
             <div className="app-frame flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-line bg-surface-1">
                 <ErrorBoundary key={pathname}>
