@@ -491,7 +491,12 @@ func TestAIChatStreamSubscription(t *testing.T) {
 	if !ok || st.MessageID() != res.AssistantMessage.ID {
 		t.Fatalf("Subscribe() = %v, %q", ok, st.MessageID())
 	}
+	// The generation runs in its own goroutine: wait for the deltas.
 	text, next, changed, done, _ := st.Read(0)
+	for next < 2 && !done {
+		<-changed
+		text, next, changed, done, _ = st.Read(0)
+	}
 	if text != "ab" || next != 2 || done {
 		t.Errorf("Read(0) = %q, %d, %v", text, next, done)
 	}
