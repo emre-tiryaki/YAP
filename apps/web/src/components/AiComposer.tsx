@@ -7,6 +7,7 @@ import { useAiMentions, type AiMentionHit } from "../hooks/useAiMentions";
 import { useResources } from "../hooks/useResources";
 import { useTranslate } from "../hooks/useTranslate";
 import type { AiAttachmentInput } from "../types/ai";
+import { attachmentIcons } from "../util/aiAttachmentIcons";
 import { indexResources } from "../util/resources";
 import { AiAttachmentChip } from "./AiAttachmentChip";
 import { AiMentionPopover } from "./AiMentionPopover";
@@ -225,11 +226,11 @@ export function AiComposer({
                                     </Button>
                                 )}
                             >
-                                <MenuItem label={t("assistant.attach.task")} onSelect={() => setPicker("task")} />
-                                <MenuItem label={t("assistant.attach.plan")} onSelect={() => setPicker("plan")} />
-                                <MenuItem label={t("assistant.attach.project")} onSelect={() => setPicker("project")} />
-                                <MenuItem label={t("assistant.attach.file")} onSelect={() => setPicker("file")} />
-                                <MenuItem label={t("assistant.attach.repoFile")} onSelect={() => setPicker("repo")} />
+                                <MenuItem icon={<attachmentIcons.task aria-hidden />} label={t("assistant.attach.task")} onSelect={() => setPicker("task")} />
+                                <MenuItem icon={<attachmentIcons.plan aria-hidden />} label={t("assistant.attach.plan")} onSelect={() => setPicker("plan")} />
+                                <MenuItem icon={<attachmentIcons.project aria-hidden />} label={t("assistant.attach.project")} onSelect={() => setPicker("project")} />
+                                <MenuItem icon={<attachmentIcons.resource aria-hidden />} label={t("assistant.attach.file")} onSelect={() => setPicker("file")} />
+                                <MenuItem icon={<attachmentIcons.repo_file aria-hidden />} label={t("assistant.attach.repoFile")} onSelect={() => setPicker("repo")} />
                             </Menu>
                             <AiModelSelect
                                 value={choice}

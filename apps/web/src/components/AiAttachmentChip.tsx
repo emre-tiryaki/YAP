@@ -1,27 +1,12 @@
-import type { ComponentType } from "react";
 import { Link } from "react-router";
 import {
     FiAlertTriangle,
-    FiCheckSquare,
-    FiFileText,
-    FiFolder,
-    FiGithub,
     FiX,
 } from "react-icons/fi";
-import { TbLayoutKanban } from "react-icons/tb";
 import { useTranslate } from "../hooks/useTranslate";
 import type { AiAttachmentKind, AiAttachmentStatus } from "../types/ai";
+import { attachmentIcons } from "../util/aiAttachmentIcons";
 import { Tooltip } from "./Tooltip";
-
-type IconType = ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
-
-const icons: Record<AiAttachmentKind, IconType> = {
-    task: FiCheckSquare,
-    plan: TbLayoutKanban,
-    project: FiFolder,
-    resource: FiFileText,
-    repo_file: FiGithub,
-};
 
 type AiAttachmentChipProps = {
     kind: AiAttachmentKind;
@@ -45,7 +30,7 @@ export function AiAttachmentChip({
     status,
 }: AiAttachmentChipProps) {
     const t = useTranslate();
-    const Icon = icons[kind];
+    const Icon = attachmentIcons[kind];
     const warning =
         missing || status === "missing"
             ? t("assistant.attachment.missing")
