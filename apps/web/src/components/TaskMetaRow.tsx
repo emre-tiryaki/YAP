@@ -74,6 +74,17 @@ export function TaskMetaRow({ task, projectId, planId, statuses, dueDateRequest 
             />
             <Divider />
             <DatePicker
+                label={t("form.startDate")}
+                value={toDateInputValue(task.startDate)}
+                onChange={(value) =>
+                    update.mutate({
+                        taskId: task.id,
+                        input: { startDate: fromDateInputValue(value) },
+                    })
+                }
+            />
+            <Divider />
+            <DatePicker
                 label={t("form.dueDate")}
                 value={toDateInputValue(task.dueDate)}
                 pill={{ overdue: isOverdue }}

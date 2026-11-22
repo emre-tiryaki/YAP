@@ -69,6 +69,8 @@ type importDocument struct {
 		TaskComments   []model.ImportComment      `json:"task_comments"`
 		Labels         []model.ImportLabel        `json:"labels"`
 		TaskLabels     []model.ImportTaskLabel    `json:"task_labels"`
+		TaskEvents     []model.ImportTaskEvent    `json:"task_events"`
+		TaskRelations  []model.ImportTaskRelation `json:"task_relations"`
 		Resources      []model.ImportResource     `json:"resources"`
 		TaskResources  []model.ImportTaskResource `json:"task_resources"`
 		ResourceEvents []model.ImportEvent        `json:"resource_events"`
@@ -285,7 +287,7 @@ func (im *importer) run(ctx context.Context, tx *sql.Tx) error {
 
 	steps := []func(context.Context, *sql.Tx) error{
 		im.projects, im.plans, im.statuses, im.labels, im.tasks, im.taskLabels, im.assignees, im.comments,
-		im.resources, im.repositories, im.taskResources, im.events,
+		im.resources, im.repositories, im.taskResources, im.events, im.taskEvents, im.taskRelations,
 	}
 	if im.result.Restored {
 		steps = append(steps, im.profile)
@@ -760,6 +762,55 @@ func (im *importer) events(ctx context.Context, tx *sql.Tx) error {
 	return nil
 }
 
+// taskEvents brings along the activity of the tasks the import added. Like
+// resource events, a changed id keeps the original order.
+func (im *importer) taskEvents(ctx context.Context, tx *sql.Tx) error {
+	var last time.Time
+	for _, e := range im.doc.Tables.TaskEvents {
+		taskID := im.ids[e.TaskID]
+		if !im.added[taskID] {
+			continue
+		}
+		id, add, err := im.keepOrAdd(ctx, tx, "task_events", e.ID)
+		if err != nil {
+			return err
+		}
+		if !add {
+			continue
+		}
+		if id != e.ID {
+			created, _ := time.Parse(time.RFC3339, e.CreatedAt) // checked by validateImport
+			if !created.After(last) {
+				created = last.Add(time.Millisecond)
+			}
+			last = created
+			id = model.NewIDAt(created)
+		}
+		e.ID, e.TaskID = id, taskID
+		if err := im.s.repo.InsertTaskEvent(ctx, tx, im.session.WorkspaceID, im.session.MembershipID, e); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// taskRelations adds the relations that touch a task the import added, when
+// the two tasks are not already related.
+func (im *importer) taskRelations(ctx context.Context, tx *sql.Tx) error {
+	for _, r := range im.doc.Tables.TaskRelations {
+		taskID, okTask := im.ids[r.TaskID]
+		relatedID, okRelated := im.ids[r.RelatedTaskID]
+		if !okTask || !okRelated || !(im.added[taskID] || im.added[relatedID]) {
+			continue
+		}
+		r.TaskID, r.RelatedTaskID = taskID, relatedID
+		if err := im.s.repo.InsertTaskRelation(ctx, tx, im.session.WorkspaceID, r, im.now); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // profile takes the names and settings from the archive; only done when the
 // workspace was empty, so a merge never overwrites them.
 func (im *importer) profile(ctx context.Context, tx *sql.Tx) error {
@@ -921,8 +972,15 @@ func validateImport(doc *importDocument) error {
 		if t.Position == "" {
 			return invalid("task position")
 		}
-		if err := checkTimes(t.CreatedAt, t.DueDate, t.CompletedAt); err != nil {
+		if err := checkTimes(t.CreatedAt, t.DueDate, t.StartDate, t.CompletedAt); err != nil {
 			return err
+		}
+		if t.StartDate != nil && t.DueDate != nil {
+			start, _ := time.Parse(time.RFC3339, *t.StartDate)
+			due, _ := time.Parse(time.RFC3339, *t.DueDate)
+			if err := checkDateRange(&start, &due); err != nil {
+				return err
+			}
 		}
 		tasks[t.ID] = *t
 	}
@@ -958,6 +1016,35 @@ func validateImport(doc *importDocument) error {
 			return err
 		}
 		if err := checkTimes(c.CreatedAt, &c.UpdatedAt); err != nil {
+			return err
+		}
+	}
+
+	for i := range tb.TaskEvents {
+		e := &tb.TaskEvents[i]
+		if err := unique(e.ID, "task event"); err != nil {
+			return err
+		}
+		if _, ok := tasks[e.TaskID]; !ok {
+			return invalid("task event without its task")
+		}
+		if !validTaskAction(model.TaskEventAction(e.Action)) {
+			return invalid("task event action")
+		}
+		if !json.Valid([]byte(e.Details)) {
+			return invalid("task event details")
+		}
+		if err := checkTimes(e.CreatedAt); err != nil {
+			return err
+		}
+	}
+	for _, r := range tb.TaskRelations {
+		_, okTask := tasks[r.TaskID]
+		_, okRelated := tasks[r.RelatedTaskID]
+		if !okTask || !okRelated || r.TaskID == r.RelatedTaskID || !model.RelationKind(r.Kind).Valid() {
+			return invalid("task relation")
+		}
+		if err := checkTimes(r.CreatedAt); err != nil {
 			return err
 		}
 	}
@@ -1117,6 +1204,16 @@ func checkTimes(required string, optional ...*string) error {
 		}
 	}
 	return nil
+}
+
+func validTaskAction(a model.TaskEventAction) bool {
+	switch a {
+	case model.EventCreated, model.EventRenamed, model.EventDescribed, model.EventStatusChanged,
+		model.EventPriorityChanged, model.EventDueChanged, model.EventStartChanged, model.EventLabelsChanged,
+		model.EventDone, model.EventReopened, model.EventRelationAdded, model.EventRelationRemoved:
+		return true
+	}
+	return false
 }
 
 func validAction(a model.ResourceAction) bool {

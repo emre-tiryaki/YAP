@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { FiAlertTriangle, FiCalendar, FiCheck, FiFlag, FiLayers, FiTag } from "react-icons/fi";
+import { FiAlertTriangle, FiCalendar, FiCheck, FiFlag, FiLayers, FiPlay, FiTag } from "react-icons/fi";
 import { Link } from "react-router";
 import { ApiError } from "../api/client";
 import { useChangeTaskStatus } from "../hooks/useChangeTaskStatus";
@@ -13,7 +13,6 @@ import type { Status } from "../types/status";
 import type { PlanTask, UpdateTaskInput } from "../types/task";
 import { fromDateInputValue, toDateInputValue } from "../util/date";
 import { taskKey } from "../util/taskKey";
-import { CommentSection } from "./CommentSection";
 import { DatePicker } from "./DatePicker";
 import { FormError } from "./FormError";
 import { LabelsSelect } from "./LabelsSelect";
@@ -22,7 +21,9 @@ import { PrioritySelect } from "./PrioritySelect";
 import { PropertySelect } from "./PropertySelect";
 import { Skeleton } from "./Skeleton";
 import { SubtaskList } from "./SubtaskList";
+import { TaskActivity } from "./TaskActivity";
 import { TaskMetaRow } from "./TaskMetaRow";
+import { TaskRelations } from "./TaskRelations";
 import { TaskPropertyRow } from "./TaskPropertyRow";
 import { TaskResourceSection } from "./TaskResourceSection";
 import { TaskSection } from "./TaskSection";
@@ -93,10 +94,13 @@ export function TaskBody({ projectId, planId, task, statuses, full }: TaskBodyPr
         if (description !== task.description) save({ description });
     }
 
+    const touchedDates =
+        update.variables?.input.startDate !== undefined ||
+        update.variables?.input.dueDate !== undefined;
     const errorMessage =
         update.error instanceof ApiError &&
         update.error.message === "invalid_input"
-            ? t("plan.task.create.invalid")
+            ? t(touchedDates ? "task.detail.dateRangeError" : "plan.task.create.invalid")
             : update.error || setDone.error || changeStatus.error
               ? t("task.detail.saveError")
               : null;
@@ -192,8 +196,11 @@ export function TaskBody({ projectId, planId, task, statuses, full }: TaskBodyPr
             <TaskSection title={t("resources.title")}>
                 <TaskResourceSection taskId={task.id} />
             </TaskSection>
-            <TaskSection title={t("task.detail.comments")} count={task.commentCount}>
-                <CommentSection taskId={task.id} />
+            <TaskSection title={t("task.relations.title")}>
+                <TaskRelations taskId={task.id} />
+            </TaskSection>
+            <TaskSection title={t("task.activity.title")} count={task.commentCount}>
+                <TaskActivity taskId={task.id} />
             </TaskSection>
         </div>
     );
@@ -260,6 +267,18 @@ export function TaskBody({ projectId, planId, task, statuses, full }: TaskBodyPr
                     label={t("task.property.category")}
                 >
                     <Pill>{t(`status.category.${task.statusCategory}`)}</Pill>
+                </TaskPropertyRow>
+                <TaskPropertyRow
+                    icon={<FiPlay />}
+                    label={t("task.property.startDate")}
+                >
+                    <DatePicker
+                        label={t("form.startDate")}
+                        value={toDateInputValue(task.startDate)}
+                        onChange={(value) =>
+                            save({ startDate: fromDateInputValue(value) })
+                        }
+                    />
                 </TaskPropertyRow>
                 <TaskPropertyRow
                     icon={<FiCalendar />}

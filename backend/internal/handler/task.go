@@ -29,6 +29,7 @@ func (h *TaskHandler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/tasks/{id}/subtasks", h.listSubtasks)
 	mux.HandleFunc("POST /api/tasks/{id}/subtasks", h.createSubtask)
 	mux.HandleFunc("POST /api/tasks/{id}/done", h.setDone)
+	h.registerActivity(mux)
 }
 
 type taskResponse struct {
@@ -41,6 +42,8 @@ type taskResponse struct {
 	StatusID       string   `json:"status_id"`
 	Position       string   `json:"position"`
 	DueDate        *string  `json:"due_date"`
+	StartDate      *string  `json:"start_date"`
+	Blocked        bool     `json:"blocked"`
 	Priority       string   `json:"priority"`
 	Number         int      `json:"number"`
 	LabelIDs       []string `json:"label_ids"`
@@ -54,6 +57,7 @@ type createTaskRequest struct {
 	Title       string  `json:"title"`
 	Description string  `json:"description"`
 	DueDate     *string `json:"due_date"`
+	StartDate   *string `json:"start_date"`
 	Priority    string  `json:"priority"`
 	PlanID      string  `json:"plan_id"`
 	StatusID    string  `json:"status_id"`
@@ -67,6 +71,8 @@ type planTaskResponse struct {
 	StatusCategory   string   `json:"status_category"`
 	Position         string   `json:"position"`
 	DueDate          *string  `json:"due_date"`
+	StartDate        *string  `json:"start_date"`
+	Blocked          bool     `json:"blocked"`
 	Priority         string   `json:"priority"`
 	Number           int      `json:"number"`
 	LabelIDs         []string `json:"label_ids"`
@@ -129,6 +135,8 @@ func toTaskResponse(t model.Task) taskResponse {
 		Position:       t.Position,
 		StatusCategory: string(t.StatusCategory),
 		DueDate:        formatTime(t.DueDate),
+		StartDate:      formatTime(t.StartDate),
+		Blocked:        t.Blocked,
 		Priority:       string(t.Priority),
 		Number:         t.Number,
 		LabelIDs:       labelIDs(t.LabelIDs),
@@ -147,6 +155,8 @@ func toPlanTaskResponse(t model.Task) planTaskResponse {
 		StatusCategory:   string(t.StatusCategory),
 		Position:         t.Position,
 		DueDate:          formatTime(t.DueDate),
+		StartDate:        formatTime(t.StartDate),
+		Blocked:          t.Blocked,
 		Priority:         string(t.Priority),
 		Number:           t.Number,
 		LabelIDs:         labelIDs(t.LabelIDs),
@@ -201,10 +211,21 @@ func (h *TaskHandler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var rawStart string
+	if req.StartDate != nil {
+		rawStart = *req.StartDate
+	}
+	start, err := parseDueDate(rawStart)
+	if err != nil {
+		writeError(w, r, fmt.Errorf("%w: start_date", service.ErrInvalidInput))
+		return
+	}
+
 	task, err := h.svc.Create(r.Context(), h.session, r.PathValue("id"), service.CreateTaskInput{
 		Title:       req.Title,
 		Description: req.Description,
 		DueDate:     due,
+		StartDate:   start,
 		Priority:    model.TaskPriority(req.Priority),
 		PlanID:      req.PlanID,
 		StatusID:    req.StatusID,
@@ -273,6 +294,7 @@ type updateTaskRequest struct {
 	Title       *string         `json:"title"`
 	Description *string         `json:"description"`
 	DueDate     json.RawMessage `json:"due_date"`
+	StartDate   json.RawMessage `json:"start_date"`
 	Priority    *string         `json:"priority"`
 	LabelIDs    *[]string       `json:"label_ids"`
 }
@@ -305,6 +327,23 @@ func (h *TaskHandler) update(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		in.DueDate, in.DueDateSet = due, true
+	}
+	if req.StartDate != nil {
+		var raw *string
+		if err := json.Unmarshal(req.StartDate, &raw); err != nil {
+			writeError(w, r, fmt.Errorf("%w: start_date", service.ErrInvalidInput))
+			return
+		}
+		var v string
+		if raw != nil {
+			v = *raw
+		}
+		start, err := parseDueDate(v)
+		if err != nil {
+			writeError(w, r, fmt.Errorf("%w: start_date", service.ErrInvalidInput))
+			return
+		}
+		in.StartDate, in.StartDateSet = start, true
 	}
 
 	task, err := h.svc.Update(r.Context(), h.session, r.PathValue("id"), in)

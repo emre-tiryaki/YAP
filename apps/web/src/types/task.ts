@@ -6,6 +6,7 @@ export type TaskPropertyKey =
   | "status"
   | "priority"
   | "labels"
+  | "startDate"
   | "dueDate"
   | "subtasks"
   | "comments"
@@ -23,6 +24,7 @@ export type PlanTask = {
   statusCategory: StatusCategory;
   position: string;
   dueDate: Date | null;
+  startDate: Date | null;
   priority: TaskPriority;
   // The task's number in its project (the 12 of ABC-12); 0 while it is
   // still being created.
@@ -34,6 +36,8 @@ export type PlanTask = {
   subtaskCount: number;
   doneSubtaskCount: number;
   commentCount: number;
+  // True while an open task blocks this one.
+  blocked: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -48,6 +52,7 @@ export type Task = PlanTask & {
 export type CreateTaskInput = {
   title: string
   dueDate: Date | null
+  startDate?: Date | null
   priority?: TaskPriority
   description?: string
   planId?: string
@@ -65,6 +70,8 @@ export type UpdateTaskInput = {
   title?: string
   description?: string
   dueDate?: Date | null
+  // A null start date clears it.
+  startDate?: Date | null
   priority?: TaskPriority
   // Replaces the task's labels.
   labelIds?: string[]

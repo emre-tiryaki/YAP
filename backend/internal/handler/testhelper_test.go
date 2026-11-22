@@ -41,7 +41,7 @@ func newTestEnv(t *testing.T) testEnv {
 	projectRepo := repository.NewProjectRepository()
 	projectSvc := service.NewProjectService(db, projectRepo, repository.NewSettingsRepository())
 	taskRepo := repository.NewTaskRepository()
-	taskSvc := service.NewTaskService(db, projectRepo, taskRepo)
+	taskSvc := service.NewTaskService(db, projectRepo, taskRepo, repository.NewTaskActivityRepository())
 	commentSvc := service.NewCommentService(db, taskRepo, repository.NewCommentRepository())
 	labelSvc := service.NewLabelService(db, projectRepo, repository.NewLabelRepository())
 

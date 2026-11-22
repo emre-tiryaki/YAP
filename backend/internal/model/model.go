@@ -117,7 +117,9 @@ type Task struct {
 	Position       string
 	StatusCategory StatusCategory
 	DueDate        *time.Time
-	Priority       TaskPriority
+	// StartDate is optional; when both are set it is not after DueDate.
+	StartDate *time.Time
+	Priority  TaskPriority
 	// Number is the task's number within its project (the 12 of ABC-12).
 	Number int
 	// LabelIDs are the task's labels, in label order.
@@ -130,8 +132,10 @@ type Task struct {
 	SubtaskCount     int
 	DoneSubtaskCount int
 	CommentCount     int
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	// Blocked is true while an open task blocks this one.
+	Blocked   bool
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 type Comment struct {
@@ -326,6 +330,7 @@ type ImportTask struct {
 	DueDate     *string `json:"due_date"`
 	CreatedAt   string  `json:"created_at"`
 	CompletedAt *string `json:"completed_at"`
+	StartDate   *string `json:"start_date"`
 	// Empty in exports made before priorities existed.
 	Priority string `json:"priority"`
 	// Task number in the exporting database; the import numbers added tasks
@@ -397,4 +402,90 @@ type RecentComment struct {
 	PlanID    string
 	// ParentID is the top-level task of a subtask's comment; empty otherwise.
 	ParentID string
+}
+
+// TaskEventAction says what a task event records.
+type TaskEventAction string
+
+const (
+	EventCreated         TaskEventAction = "created"
+	EventRenamed         TaskEventAction = "renamed"
+	EventDescribed       TaskEventAction = "described"
+	EventStatusChanged   TaskEventAction = "status_changed"
+	EventPriorityChanged TaskEventAction = "priority_changed"
+	EventDueChanged      TaskEventAction = "due_changed"
+	EventStartChanged    TaskEventAction = "start_changed"
+	EventLabelsChanged   TaskEventAction = "labels_changed"
+	EventDone            TaskEventAction = "done"
+	EventReopened        TaskEventAction = "reopened"
+	EventRelationAdded   TaskEventAction = "relation_added"
+	EventRelationRemoved TaskEventAction = "relation_removed"
+)
+
+// TaskEvent is one entry of a task's activity log. Details holds strings:
+// from and to for a changed field, kind and task for a relation.
+type TaskEvent struct {
+	ID          string
+	WorkspaceID string
+	TaskID      string
+	ActorID     string
+	Action      TaskEventAction
+	Details     map[string]string
+	CreatedAt   time.Time
+}
+
+// RelationKind is how a task relates to another, as stored: the task blocks,
+// relates to or duplicates the related task.
+type RelationKind string
+
+const (
+	RelationBlocks     RelationKind = "blocks"
+	RelationRelates    RelationKind = "relates"
+	RelationDuplicates RelationKind = "duplicates"
+)
+
+func (k RelationKind) Valid() bool {
+	switch k {
+	case RelationBlocks, RelationRelates, RelationDuplicates:
+		return true
+	}
+	return false
+}
+
+// RelationView is a task's relation as the task itself reads it.
+type RelationView string
+
+const (
+	ViewBlocking     RelationView = "blocking"
+	ViewBlockedBy    RelationView = "blocked_by"
+	ViewRelates      RelationView = "relates"
+	ViewDuplicateOf  RelationView = "duplicate_of"
+	ViewDuplicatedBy RelationView = "duplicated_by"
+)
+
+// TaskRelation is a relation of one task, seen from that task, with a
+// summary of the other task.
+type TaskRelation struct {
+	View        RelationView
+	TaskID      string
+	Title       string
+	Number      int
+	ProjectID   string
+	PlanID      string
+	CompletedAt *time.Time
+}
+
+type ImportTaskEvent struct {
+	ID        string `json:"id"`
+	TaskID    string `json:"task_id"`
+	Action    string `json:"action"`
+	Details   string `json:"details"`
+	CreatedAt string `json:"created_at"`
+}
+
+type ImportTaskRelation struct {
+	TaskID        string `json:"task_id"`
+	RelatedTaskID string `json:"related_task_id"`
+	Kind          string `json:"kind"`
+	CreatedAt     string `json:"created_at"`
 }

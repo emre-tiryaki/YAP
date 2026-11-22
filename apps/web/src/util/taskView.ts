@@ -8,6 +8,7 @@ export const allTaskPropertyKeys: readonly TaskPropertyKey[] = [
     "status",
     "priority",
     "labels",
+    "startDate",
     "dueDate",
     "subtasks",
     "comments",

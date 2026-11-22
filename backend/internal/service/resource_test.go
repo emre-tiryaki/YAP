@@ -522,7 +522,7 @@ func newTask(t *testing.T, e resourceEnv) (projectID string, task model.Task) {
 	if err != nil {
 		t.Fatalf("Create project error = %v", err)
 	}
-	task, err = NewTaskService(e.db, projectRepo, repository.NewTaskRepository()).Create(e.ctx, e.session, project.ID, CreateTaskInput{Title: "T"})
+	task, err = NewTaskService(e.db, projectRepo, repository.NewTaskRepository(), repository.NewTaskActivityRepository()).Create(e.ctx, e.session, project.ID, CreateTaskInput{Title: "T"})
 	if err != nil {
 		t.Fatalf("Create task error = %v", err)
 	}
@@ -603,7 +603,7 @@ func TestDeletingTaskClosesLinks(t *testing.T) {
 	if err := e.svc.Link(e.ctx, e.session, task.ID, f.ID); err != nil {
 		t.Fatalf("Link() error = %v", err)
 	}
-	taskSvc := NewTaskService(e.db, repository.NewProjectRepository(), repository.NewTaskRepository())
+	taskSvc := NewTaskService(e.db, repository.NewProjectRepository(), repository.NewTaskRepository(), repository.NewTaskActivityRepository())
 	if err := taskSvc.Delete(e.ctx, e.session, task.ID); err != nil {
 		t.Fatalf("Delete task error = %v", err)
 	}

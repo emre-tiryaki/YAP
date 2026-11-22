@@ -22,6 +22,13 @@ const notNestedSubtask = `NOT EXISTS (
 
 // taskCounts selects the direct subtask, finished subtask and comment counts
 // of a task `t`.
+// taskBlocked is true while a live task that is not completed blocks the task.
+const taskBlocked = `EXISTS (SELECT 1 FROM task_relations r
+	JOIN tasks b ON b.id = r.task_id AND b.workspace_id = r.workspace_id
+	WHERE r.related_task_id = t.id AND r.workspace_id = t.workspace_id
+	  AND r.kind = 'blocks' AND r.removed_at IS NULL
+	  AND b.deleted_at IS NULL AND b.completed_at IS NULL)`
+
 const taskCounts = `(SELECT COUNT(*) FROM tasks c
 	 JOIN statuses cs ON cs.id = c.status_id AND cs.plan_id = c.plan_id
 	 WHERE c.parent_id = t.id AND c.workspace_id = t.workspace_id
@@ -70,10 +77,10 @@ func (*TaskRepository) Insert(ctx context.Context, q database.DBTX, t model.Task
 
 	_, err := q.ExecContext(ctx,
 		`INSERT INTO tasks
-			(id, workspace_id, project_id, plan_id, status_id, parent_id, created_by, title, description, position, due_date, priority, number, completed_at, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			(id, workspace_id, project_id, plan_id, status_id, parent_id, created_by, title, description, position, due_date, start_date, priority, number, completed_at, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		t.ID, t.WorkspaceID, t.ProjectID, t.PlanID, t.StatusID, nullIfEmpty(t.ParentID), t.CreatedBy, t.Title,
-		nullIfEmpty(t.Description), t.Position, dueDate, priorityOrNone(t.Priority), nullIfZero(t.Number), formatTime(t.CompletedAt), now, now,
+		nullIfEmpty(t.Description), t.Position, dueDate, formatTime(t.StartDate), priorityOrNone(t.Priority), nullIfZero(t.Number), formatTime(t.CompletedAt), now, now,
 	)
 	if err != nil {
 		return fmt.Errorf("insert task: %w", err)
@@ -99,7 +106,7 @@ func (*TaskRepository) ListUpcoming(ctx context.Context, q database.DBTX, worksp
 	rows, err := q.QueryContext(ctx,
 		`SELECT t.id, t.title, t.description, t.project_id, t.plan_id, t.status_id, t.position,
 			p.name, t.due_date, s.category, t.completed_at, t.priority, COALESCE(t.number, 0),
-			t.created_at, t.updated_at
+			t.created_at, t.updated_at, t.start_date, `+taskBlocked+`
 		 FROM task_assignees ta
 		 JOIN tasks t ON t.id = ta.task_id AND t.workspace_id = ta.workspace_id
 		 JOIN projects p ON p.id = t.project_id AND p.workspace_id = t.workspace_id
@@ -120,10 +127,10 @@ func (*TaskRepository) ListUpcoming(ctx context.Context, q database.DBTX, worksp
 	tasks := []model.Task{}
 	for rows.Next() {
 		t := model.Task{WorkspaceID: workspaceID}
-		var description, dueDate, completedAt sql.NullString
+		var description, dueDate, completedAt, startDate sql.NullString
 		var category, priority, createdAt, updatedAt string
 		if err := rows.Scan(&t.ID, &t.Title, &description, &t.ProjectID, &t.PlanID, &t.StatusID, &t.Position,
-			&t.ProjectName, &dueDate, &category, &completedAt, &priority, &t.Number, &createdAt, &updatedAt); err != nil {
+			&t.ProjectName, &dueDate, &category, &completedAt, &priority, &t.Number, &createdAt, &updatedAt, &startDate, &t.Blocked); err != nil {
 			return nil, fmt.Errorf("scan task: %w", err)
 		}
 		t.Description = description.String
@@ -132,7 +139,7 @@ func (*TaskRepository) ListUpcoming(ctx context.Context, q database.DBTX, worksp
 		if err := scanTaskTimes(&t, dueDate, completedAt); err != nil {
 			return nil, err
 		}
-		if err := scanTaskStamps(&t, createdAt, updatedAt); err != nil {
+		if err := scanTaskStamps(&t, createdAt, updatedAt, startDate); err != nil {
 			return nil, err
 		}
 		tasks = append(tasks, t)
@@ -146,7 +153,7 @@ func (*TaskRepository) ListUpcoming(ctx context.Context, q database.DBTX, worksp
 func (*TaskRepository) ListByPlan(ctx context.Context, q database.DBTX, workspaceID, planID string) ([]model.Task, error) {
 	rows, err := q.QueryContext(ctx,
 		`SELECT t.id, t.project_id, t.status_id, t.created_by, t.title, t.description,
-			t.position, t.due_date, s.category, t.completed_at, t.priority, COALESCE(t.number, 0), t.created_at, t.updated_at, `+taskCounts+`
+			t.position, t.due_date, s.category, t.completed_at, t.priority, COALESCE(t.number, 0), t.created_at, t.updated_at, t.start_date, `+taskBlocked+`, `+taskCounts+`
 		 FROM tasks t
 		 JOIN statuses s ON s.id = t.status_id AND s.plan_id = t.plan_id
 		 WHERE t.workspace_id = ? AND t.plan_id = ?
@@ -163,10 +170,10 @@ func (*TaskRepository) ListByPlan(ctx context.Context, q database.DBTX, workspac
 	tasks := []model.Task{}
 	for rows.Next() {
 		t := model.Task{WorkspaceID: workspaceID, PlanID: planID}
-		var description, dueDate, completedAt sql.NullString
+		var description, dueDate, completedAt, startDate sql.NullString
 		var category, priority, createdAt, updatedAt string
 		if err := rows.Scan(&t.ID, &t.ProjectID, &t.StatusID, &t.CreatedBy, &t.Title, &description,
-			&t.Position, &dueDate, &category, &completedAt, &priority, &t.Number, &createdAt, &updatedAt, &t.SubtaskCount, &t.DoneSubtaskCount, &t.CommentCount); err != nil {
+			&t.Position, &dueDate, &category, &completedAt, &priority, &t.Number, &createdAt, &updatedAt, &startDate, &t.Blocked, &t.SubtaskCount, &t.DoneSubtaskCount, &t.CommentCount); err != nil {
 			return nil, fmt.Errorf("scan task: %w", err)
 		}
 		t.Description = description.String
@@ -175,7 +182,7 @@ func (*TaskRepository) ListByPlan(ctx context.Context, q database.DBTX, workspac
 		if err := scanTaskTimes(&t, dueDate, completedAt); err != nil {
 			return nil, err
 		}
-		if err := scanTaskStamps(&t, createdAt, updatedAt); err != nil {
+		if err := scanTaskStamps(&t, createdAt, updatedAt, startDate); err != nil {
 			return nil, err
 		}
 		tasks = append(tasks, t)
@@ -296,6 +303,23 @@ func (*TaskRepository) SoftDeleteTree(ctx context.Context, q database.DBTX, work
 		return fmt.Errorf("delete task comments: %w", err)
 	}
 	_, err = q.ExecContext(ctx,
+		tree+` UPDATE task_events SET deleted_at = ?, updated_at = ?
+		 WHERE workspace_id = ? AND deleted_at IS NULL AND task_id IN (SELECT id FROM tree)`,
+		taskID, workspaceID, workspaceID, now, now, workspaceID,
+	)
+	if err != nil {
+		return fmt.Errorf("delete task events: %w", err)
+	}
+	_, err = q.ExecContext(ctx,
+		tree+` UPDATE task_relations SET removed_at = ?, updated_at = ?
+		 WHERE workspace_id = ? AND removed_at IS NULL
+		   AND (task_id IN (SELECT id FROM tree) OR related_task_id IN (SELECT id FROM tree))`,
+		taskID, workspaceID, workspaceID, now, now, workspaceID,
+	)
+	if err != nil {
+		return fmt.Errorf("close task relations: %w", err)
+	}
+	_, err = q.ExecContext(ctx,
 		tree+` UPDATE tasks SET deleted_at = ?, updated_at = ?
 		 WHERE workspace_id = ? AND id IN (SELECT id FROM tree)`,
 		taskID, workspaceID, workspaceID, now, now, workspaceID,
@@ -309,18 +333,18 @@ func (*TaskRepository) SoftDeleteTree(ctx context.Context, q database.DBTX, work
 // Get returns a non-deleted task with its project name and status category.
 func (*TaskRepository) Get(ctx context.Context, q database.DBTX, workspaceID, taskID string) (model.Task, error) {
 	t := model.Task{ID: taskID, WorkspaceID: workspaceID}
-	var description, dueDate, completedAt, parentID sql.NullString
+	var description, dueDate, completedAt, parentID, startDate sql.NullString
 	var category, priority, createdAt, updatedAt string
 	err := q.QueryRowContext(ctx,
 		`SELECT t.project_id, p.name, t.plan_id, t.status_id, t.parent_id, t.created_by, t.title,
-			t.description, t.position, t.due_date, s.category, t.completed_at, t.priority, COALESCE(t.number, 0), t.created_at, t.updated_at, `+taskCounts+`
+			t.description, t.position, t.due_date, s.category, t.completed_at, t.priority, COALESCE(t.number, 0), t.created_at, t.updated_at, t.start_date, `+taskBlocked+`, `+taskCounts+`
 		 FROM tasks t
 		 JOIN projects p ON p.id = t.project_id AND p.workspace_id = t.workspace_id
 		 JOIN statuses s ON s.id = t.status_id AND s.plan_id = t.plan_id
 		 WHERE t.id = ? AND t.workspace_id = ? AND t.deleted_at IS NULL`,
 		taskID, workspaceID,
 	).Scan(&t.ProjectID, &t.ProjectName, &t.PlanID, &t.StatusID, &parentID, &t.CreatedBy, &t.Title,
-		&description, &t.Position, &dueDate, &category, &completedAt, &priority, &t.Number, &createdAt, &updatedAt, &t.SubtaskCount, &t.DoneSubtaskCount, &t.CommentCount)
+		&description, &t.Position, &dueDate, &category, &completedAt, &priority, &t.Number, &createdAt, &updatedAt, &startDate, &t.Blocked, &t.SubtaskCount, &t.DoneSubtaskCount, &t.CommentCount)
 	if err != nil {
 		return model.Task{}, fmt.Errorf("get task: %w", err)
 	}
@@ -331,7 +355,7 @@ func (*TaskRepository) Get(ctx context.Context, q database.DBTX, workspaceID, ta
 	if err := scanTaskTimes(&t, dueDate, completedAt); err != nil {
 		return model.Task{}, err
 	}
-	if err := scanTaskStamps(&t, createdAt, updatedAt); err != nil {
+	if err := scanTaskStamps(&t, createdAt, updatedAt, startDate); err != nil {
 		return model.Task{}, err
 	}
 	return t, nil
@@ -339,12 +363,12 @@ func (*TaskRepository) Get(ctx context.Context, q database.DBTX, workspaceID, ta
 
 // Update overwrites the title, description, due date and priority of a
 // non-deleted task.
-func (*TaskRepository) Update(ctx context.Context, q database.DBTX, workspaceID, taskID, title, description string, dueDate *time.Time, priority model.TaskPriority, now string) error {
+func (*TaskRepository) Update(ctx context.Context, q database.DBTX, workspaceID, taskID, title, description string, dueDate, startDate *time.Time, priority model.TaskPriority, now string) error {
 	due := formatTime(dueDate)
 	_, err := q.ExecContext(ctx,
-		`UPDATE tasks SET title = ?, description = ?, due_date = ?, priority = ?, updated_at = ?
+		`UPDATE tasks SET title = ?, description = ?, due_date = ?, start_date = ?, priority = ?, updated_at = ?
 		 WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`,
-		title, nullIfEmpty(description), due, priorityOrNone(priority), now, taskID, workspaceID,
+		title, nullIfEmpty(description), due, formatTime(startDate), priorityOrNone(priority), now, taskID, workspaceID,
 	)
 	if err != nil {
 		return fmt.Errorf("update task: %w", err)
@@ -467,9 +491,17 @@ func scanTaskTimes(t *model.Task, dueDate, completedAt sql.NullString) error {
 	return nil
 }
 
-// scanTaskStamps parses the created_at and updated_at columns of a task.
-func scanTaskStamps(t *model.Task, createdAt, updatedAt string) error {
+// scanTaskStamps parses the created_at, updated_at and start_date columns of
+// a task.
+func scanTaskStamps(t *model.Task, createdAt, updatedAt string, startDate sql.NullString) error {
 	var err error
+	if startDate.Valid {
+		start, err := time.Parse(time.RFC3339, startDate.String)
+		if err != nil {
+			return fmt.Errorf("parse start date: %w", err)
+		}
+		t.StartDate = &start
+	}
 	if t.CreatedAt, err = time.Parse(time.RFC3339, createdAt); err != nil {
 		return fmt.Errorf("parse created_at: %w", err)
 	}

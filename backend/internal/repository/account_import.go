@@ -19,6 +19,7 @@ var rowStateQueries = map[string]string{
 	"tasks":           `SELECT workspace_id = ?, deleted_at IS NULL FROM tasks WHERE id = ?`,
 	"task_comments":   `SELECT workspace_id = ?, deleted_at IS NULL FROM task_comments WHERE id = ?`,
 	"labels":          `SELECT workspace_id = ?, deleted_at IS NULL FROM labels WHERE id = ?`,
+	"task_events":     `SELECT workspace_id = ?, deleted_at IS NULL FROM task_events WHERE id = ?`,
 	"resource_events": `SELECT workspace_id = ?, deleted_at IS NULL FROM resource_events WHERE id = ?`,
 	// An item in the trash counts as taken: the import adds a live copy
 	// instead of reaching into the trash.
@@ -164,16 +165,16 @@ func (*AccountRepository) ReserveTaskNumber(ctx context.Context, q database.DBTX
 func (*AccountRepository) InsertTask(ctx context.Context, q database.DBTX, workspaceID, createdBy string, t model.ImportTask, number int, now string) error {
 	_, err := q.ExecContext(ctx,
 		`INSERT INTO tasks (id, workspace_id, project_id, plan_id, status_id, parent_id, created_by, title, description,
-		                    position, due_date, priority, number, completed_at, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		                    position, due_date, start_date, priority, number, completed_at, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		 ON CONFLICT (id) DO UPDATE SET project_id = excluded.project_id, plan_id = excluded.plan_id,
 		     status_id = excluded.status_id, parent_id = excluded.parent_id, created_by = excluded.created_by,
 		     title = excluded.title, description = excluded.description, position = excluded.position,
-		     due_date = excluded.due_date, priority = excluded.priority, completed_at = excluded.completed_at, created_at = excluded.created_at,
+		     due_date = excluded.due_date, start_date = excluded.start_date, priority = excluded.priority, completed_at = excluded.completed_at, created_at = excluded.created_at,
 		     updated_at = excluded.updated_at, deleted_at = NULL
 		   WHERE tasks.workspace_id = excluded.workspace_id`,
 		t.ID, workspaceID, t.ProjectID, t.PlanID, t.StatusID, t.ParentID, createdBy, t.Title, t.Description,
-		t.Position, t.DueDate, t.Priority, number, t.CompletedAt, t.CreatedAt, now,
+		t.Position, t.DueDate, t.StartDate, t.Priority, number, t.CompletedAt, t.CreatedAt, now,
 	)
 	if err != nil {
 		return fmt.Errorf("import task: %w", err)
@@ -317,6 +318,49 @@ func (*AccountRepository) InsertEvent(ctx context.Context, q database.DBTX, work
 	)
 	if err != nil {
 		return fmt.Errorf("import resource event: %w", err)
+	}
+	return nil
+}
+
+// InsertTaskEvent adds an exported event of a task, or brings a deleted one
+// back.
+func (*AccountRepository) InsertTaskEvent(ctx context.Context, q database.DBTX, workspaceID, actorID string, e model.ImportTaskEvent) error {
+	_, err := q.ExecContext(ctx,
+		`INSERT INTO task_events (id, workspace_id, task_id, actor_id, action, details, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		 ON CONFLICT (id) DO UPDATE SET task_id = excluded.task_id, actor_id = excluded.actor_id,
+		     action = excluded.action, details = excluded.details,
+		     created_at = excluded.created_at, updated_at = excluded.updated_at, deleted_at = NULL
+		   WHERE task_events.workspace_id = excluded.workspace_id`,
+		e.ID, workspaceID, e.TaskID, actorID, e.Action, e.Details, e.CreatedAt, e.CreatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("import task event: %w", err)
+	}
+	return nil
+}
+
+// InsertTaskRelation adds an exported relation unless the two tasks already
+// have a live one in either direction; a removed one is reopened.
+func (*AccountRepository) InsertTaskRelation(ctx context.Context, q database.DBTX, workspaceID string, r model.ImportTaskRelation, now string) error {
+	_, err := q.ExecContext(ctx,
+		`INSERT INTO task_relations (workspace_id, project_id, task_id, related_task_id, kind, created_at, updated_at)
+		 SELECT t.workspace_id, t.project_id, ?, ?, ?, ?, ?
+		   FROM tasks t
+		  WHERE t.id = ? AND t.workspace_id = ?
+		    AND NOT EXISTS (SELECT 1 FROM task_relations x
+		                     WHERE x.workspace_id = t.workspace_id AND x.removed_at IS NULL
+		                       AND ((x.task_id = ? AND x.related_task_id = ?) OR (x.task_id = ? AND x.related_task_id = ?)))
+		 ON CONFLICT (task_id, related_task_id) DO UPDATE SET
+		     kind = excluded.kind, project_id = excluded.project_id,
+		     created_at = excluded.created_at, updated_at = excluded.updated_at, removed_at = NULL
+		   WHERE task_relations.workspace_id = excluded.workspace_id`,
+		r.TaskID, r.RelatedTaskID, r.Kind, r.CreatedAt, now,
+		r.TaskID, workspaceID,
+		r.TaskID, r.RelatedTaskID, r.RelatedTaskID, r.TaskID,
+	)
+	if err != nil {
+		return fmt.Errorf("import task relation: %w", err)
 	}
 	return nil
 }

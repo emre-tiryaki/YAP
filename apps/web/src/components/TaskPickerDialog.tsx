@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useProjectPlans, useProjects } from "../hooks/useProjects";
 import { usePlanTasks } from "../hooks/useTasks";
 import { useTranslate } from "../hooks/useTranslate";
@@ -8,6 +8,12 @@ import { Button } from "./Button";
 
 type TaskPickerDialogProps = {
     title: string;
+    // Text of the confirm button; defaults to the link label.
+    submitLabel?: string;
+    // Left out of the task list (e.g. the task a relation starts from).
+    excludeTaskId?: string;
+    // Extra controls shown above the pickers.
+    extra?: ReactNode;
     isPending?: boolean;
     errorMessage?: string | null;
     onPick: (taskId: string) => void;
@@ -17,6 +23,9 @@ type TaskPickerDialogProps = {
 // Picks a task by project, plan and title, to link a resource to it.
 export function TaskPickerDialog({
     title,
+    submitLabel,
+    excludeTaskId,
+    extra,
     isPending = false,
     errorMessage,
     onPick,
@@ -35,6 +44,7 @@ export function TaskPickerDialog({
     return (
         <Modal isOpen title={title} onClose={onClose}>
             <div className="flex flex-col gap-3">
+                {extra}
                 <SelectInput
                     label={t("resources.link.project")}
                     value={projectId}
@@ -74,10 +84,12 @@ export function TaskPickerDialog({
                     onChange={(event) => setTaskId(event.target.value)}
                     options={[
                         choose(t("resources.link.task")),
-                        ...(tasks.data ?? []).map((task) => ({
-                            value: task.id,
-                            label: task.title,
-                        })),
+                        ...(tasks.data ?? [])
+                            .filter((task) => task.id !== excludeTaskId)
+                            .map((task) => ({
+                                value: task.id,
+                                label: task.title,
+                            })),
                     ]}
                 />
             </div>
@@ -99,7 +111,7 @@ export function TaskPickerDialog({
                     disabled={taskId === "" || isPending}
                     onClick={() => onPick(taskId)}
                 >
-                    {t("resources.link.submit")}
+                    {submitLabel ?? t("resources.link.submit")}
                 </Button>
             </div>
         </Modal>

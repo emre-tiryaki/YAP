@@ -379,6 +379,13 @@ func (*ProjectRepository) SoftDelete(ctx context.Context, q database.DBTX, works
 		{"task comments", `UPDATE task_comments SET deleted_at = ?, updated_at = ?
 			 WHERE workspace_id = ? AND deleted_at IS NULL
 			   AND task_id IN (SELECT id FROM tasks WHERE workspace_id = task_comments.workspace_id AND project_id = ?)`},
+		{"task events", `UPDATE task_events SET deleted_at = ?, updated_at = ?
+			 WHERE workspace_id = ? AND deleted_at IS NULL
+			   AND task_id IN (SELECT id FROM tasks WHERE workspace_id = task_events.workspace_id AND project_id = ?)`},
+		{"task relations", `UPDATE task_relations SET removed_at = ?, updated_at = ?
+			 WHERE workspace_id = ? AND removed_at IS NULL
+			   AND EXISTS (SELECT 1 FROM tasks x WHERE x.workspace_id = task_relations.workspace_id
+			                 AND x.project_id = ? AND x.id IN (task_relations.task_id, task_relations.related_task_id))`},
 		{"tasks", `UPDATE tasks SET deleted_at = ?, updated_at = ?
 			 WHERE workspace_id = ? AND project_id = ? AND deleted_at IS NULL`},
 		{"statuses", `UPDATE statuses SET deleted_at = ?, updated_at = ?
@@ -424,6 +431,14 @@ func (*ProjectRepository) SoftDeletePlan(ctx context.Context, q database.DBTX, w
 		{"task comments", `UPDATE task_comments SET deleted_at = ?, updated_at = ?
 			 WHERE workspace_id = ? AND deleted_at IS NULL
 			   AND task_id IN (SELECT id FROM tasks WHERE workspace_id = task_comments.workspace_id AND plan_id = ? AND deleted_at IS NULL)`},
+		{"task events", `UPDATE task_events SET deleted_at = ?, updated_at = ?
+			 WHERE workspace_id = ? AND deleted_at IS NULL
+			   AND task_id IN (SELECT id FROM tasks WHERE workspace_id = task_events.workspace_id AND plan_id = ? AND deleted_at IS NULL)`},
+		{"task relations", `UPDATE task_relations SET removed_at = ?, updated_at = ?
+			 WHERE workspace_id = ? AND removed_at IS NULL
+			   AND EXISTS (SELECT 1 FROM tasks x WHERE x.workspace_id = task_relations.workspace_id
+			                 AND x.plan_id = ? AND x.deleted_at IS NULL
+			                 AND x.id IN (task_relations.task_id, task_relations.related_task_id))`},
 		{"tasks", `UPDATE tasks SET deleted_at = ?, updated_at = ?
 			 WHERE workspace_id = ? AND plan_id = ? AND deleted_at IS NULL`},
 		{"statuses", `UPDATE statuses SET deleted_at = ?, updated_at = ?
@@ -458,6 +473,11 @@ func (*ProjectRepository) SoftDeleteStatus(ctx context.Context, q database.DBTX,
 			 WHERE workspace_id = ? AND removed_at IS NULL AND task_id IN (SELECT id FROM tree)`},
 		{"task comments", tree + ` UPDATE task_comments SET deleted_at = ?, updated_at = ?
 			 WHERE workspace_id = ? AND deleted_at IS NULL AND task_id IN (SELECT id FROM tree)`},
+		{"task events", tree + ` UPDATE task_events SET deleted_at = ?, updated_at = ?
+			 WHERE workspace_id = ? AND deleted_at IS NULL AND task_id IN (SELECT id FROM tree)`},
+		{"task relations", tree + ` UPDATE task_relations SET removed_at = ?, updated_at = ?
+			 WHERE workspace_id = ? AND removed_at IS NULL
+			   AND (task_id IN (SELECT id FROM tree) OR related_task_id IN (SELECT id FROM tree))`},
 		{"tasks", tree + ` UPDATE tasks SET deleted_at = ?, updated_at = ?
 			 WHERE workspace_id = ? AND id IN (SELECT id FROM tree)`},
 	}

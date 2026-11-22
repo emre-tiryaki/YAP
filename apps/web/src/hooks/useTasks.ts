@@ -73,6 +73,7 @@ export function useCreateTask() {
                 statusCategory: statusCategory ?? "todo",
                 position: "",
                 dueDate: input.dueDate,
+                startDate: input.startDate ?? null,
                 priority: input.priority ?? "none",
                 number: 0,
                 labelIds: [],
@@ -80,6 +81,7 @@ export function useCreateTask() {
                 subtaskCount: 0,
                 doneSubtaskCount: 0,
                 commentCount: 0,
+                blocked: false,
                 createdAt: new Date(),
                 updatedAt: new Date(),
             };
@@ -205,6 +207,9 @@ export function useUpdateTask() {
                                   ...task,
                                   ...(input.dueDate !== undefined && {
                                       dueDate: input.dueDate,
+                                  }),
+                                  ...(input.startDate !== undefined && {
+                                      startDate: input.startDate,
                                   }),
                                   ...(input.priority !== undefined && {
                                       priority: input.priority,

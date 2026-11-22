@@ -1,4 +1,5 @@
 import { FiCheckSquare, FiMessageSquare } from "react-icons/fi";
+import { TbLock } from "react-icons/tb";
 import { useChangeTaskStatus } from "../hooks/useChangeTaskStatus";
 import { useUpdateTask } from "../hooks/useTasks";
 import { useTranslate } from "../hooks/useTranslate";
@@ -51,6 +52,11 @@ export function TaskProperties({
 
     return (
         <div className="flex flex-wrap items-center gap-1">
+            {task.blocked && !isDone && (
+                <Pill icon={<TbLock aria-hidden />} color="text-red-600">
+                    {t("task.blocked")}
+                </Pill>
+            )}
             {visible.has("status") && statuses && !isTemp && (
                 <StatusPill
                     task={task}
@@ -76,6 +82,19 @@ export function TaskProperties({
                     value={task.labelIds}
                     onChange={(labelIds) =>
                         update.mutate({ taskId: task.id, input: { labelIds } })
+                    }
+                />
+            )}
+            {visible.has("startDate") && task.startDate !== null && !isTemp && (
+                <DatePicker
+                    label={t("form.startDate")}
+                    value={toDateInputValue(task.startDate)}
+                    pill={{ overdue: false }}
+                    onChange={(value) =>
+                        update.mutate({
+                            taskId: task.id,
+                            input: { startDate: fromDateInputValue(value) },
+                        })
                     }
                 />
             )}

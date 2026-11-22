@@ -29,7 +29,7 @@ func newTaskEnv(t *testing.T) taskEnv {
 		session:     session,
 		projectRepo: projectRepo,
 		projects:    NewProjectService(db, projectRepo, repository.NewSettingsRepository()),
-		tasks:       NewTaskService(db, projectRepo, repository.NewTaskRepository()),
+		tasks:       NewTaskService(db, projectRepo, repository.NewTaskRepository(), repository.NewTaskActivityRepository()),
 	}
 }
 

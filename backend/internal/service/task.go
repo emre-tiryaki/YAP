@@ -16,6 +16,21 @@ import (
 
 const upcomingTaskLimit = 50
 
+// TaskActivityRepository is what the task service needs to log changes and
+// to relate tasks.
+type TaskActivityRepository interface {
+	InsertEvent(ctx context.Context, q database.DBTX, e model.TaskEvent, now string) error
+	ListEvents(ctx context.Context, q database.DBTX, workspaceID, taskID string) ([]model.TaskEvent, error)
+	StatusTitle(ctx context.Context, q database.DBTX, workspaceID, statusID string) (string, error)
+	LabelNames(ctx context.Context, q database.DBTX, workspaceID string, ids []string) (map[string]string, error)
+	TaskSummary(ctx context.Context, q database.DBTX, workspaceID, taskID string) (projectID, title string, err error)
+	RelationBetween(ctx context.Context, q database.DBTX, workspaceID, a, b string) (bool, error)
+	InsertRelation(ctx context.Context, q database.DBTX, workspaceID, projectID, taskID, relatedID string, kind model.RelationKind, now string) error
+	RemoveRelation(ctx context.Context, q database.DBTX, workspaceID, a, b, now string) (bool, error)
+	RelationKindBetween(ctx context.Context, q database.DBTX, workspaceID, a, b string) (kind model.RelationKind, holder string, err error)
+	ListRelations(ctx context.Context, q database.DBTX, workspaceID, taskID string) ([]model.TaskRelation, error)
+}
+
 type TaskRepository interface {
 	FirstStatusID(ctx context.Context, q database.DBTX, workspaceID, planID string, category model.StatusCategory) (string, error)
 	LastPosition(ctx context.Context, q database.DBTX, workspaceID, planID, statusID string) (string, error)
@@ -29,7 +44,7 @@ type TaskRepository interface {
 	UpdatePlacement(ctx context.Context, q database.DBTX, workspaceID, taskID, statusID, pos, now string) error
 	SoftDeleteTree(ctx context.Context, q database.DBTX, workspaceID, taskID, now string) error
 	Get(ctx context.Context, q database.DBTX, workspaceID, taskID string) (model.Task, error)
-	Update(ctx context.Context, q database.DBTX, workspaceID, taskID, title, description string, dueDate *time.Time, priority model.TaskPriority, now string) error
+	Update(ctx context.Context, q database.DBTX, workspaceID, taskID, title, description string, dueDate, startDate *time.Time, priority model.TaskPriority, now string) error
 	ListSubtasks(ctx context.Context, q database.DBTX, workspaceID, parentID string) ([]model.Task, error)
 	SetCompletedAt(ctx context.Context, q database.DBTX, workspaceID, taskID string, completedAt *time.Time, now string) error
 	ReserveNumber(ctx context.Context, q database.DBTX, workspaceID, projectID, now string) (int, error)
@@ -42,6 +57,7 @@ type CreateTaskInput struct {
 	Title       string
 	Description string
 	DueDate     *time.Time
+	StartDate   *time.Time
 	// Priority is optional; empty means none.
 	Priority model.TaskPriority
 	PlanID   string
@@ -60,10 +76,11 @@ type TaskService struct {
 	db       *sql.DB
 	projects ProjectRepository
 	tasks    TaskRepository
+	activity TaskActivityRepository
 }
 
-func NewTaskService(db *sql.DB, projects ProjectRepository, tasks TaskRepository) *TaskService {
-	return &TaskService{db: db, projects: projects, tasks: tasks}
+func NewTaskService(db *sql.DB, projects ProjectRepository, tasks TaskRepository, activity TaskActivityRepository) *TaskService {
+	return &TaskService{db: db, projects: projects, tasks: tasks, activity: activity}
 }
 
 func (s *TaskService) Upcoming(ctx context.Context, session model.Session) ([]model.Task, error) {
@@ -104,6 +121,10 @@ func (s *TaskService) Create(ctx context.Context, session model.Session, project
 		return model.Task{}, ErrInvalidPriority
 	}
 
+	if err := checkDateRange(in.StartDate, in.DueDate); err != nil {
+		return model.Task{}, err
+	}
+
 	task := model.Task{
 		ID:          model.NewID(),
 		WorkspaceID: session.WorkspaceID,
@@ -112,6 +133,7 @@ func (s *TaskService) Create(ctx context.Context, session model.Session, project
 		Title:       title,
 		Description: strings.TrimSpace(in.Description),
 		DueDate:     in.DueDate,
+		StartDate:   in.StartDate,
 		Priority:    priority,
 	}
 
@@ -152,12 +174,55 @@ func (s *TaskService) Create(ctx context.Context, session model.Session, project
 		if err := s.tasks.Insert(ctx, tx, task, now); err != nil {
 			return err
 		}
+		if err := s.recordEvent(ctx, tx, session, task.ID, model.EventCreated, nil, now); err != nil {
+			return err
+		}
 		return s.tasks.InsertAssignee(ctx, tx, session.WorkspaceID, task.ID, session.MembershipID, now)
 	})
 	if err != nil {
 		return model.Task{}, err
 	}
 	return task, nil
+}
+
+// checkDateRange rejects a start date after the due date.
+func checkDateRange(start, due *time.Time) error {
+	if start != nil && due != nil && start.After(*due) {
+		return ErrInvalidDateRange
+	}
+	return nil
+}
+
+// recordEvent appends an entry to the task's activity log.
+func (s *TaskService) recordEvent(ctx context.Context, q database.DBTX, session model.Session, taskID string, action model.TaskEventAction, details map[string]string, now string) error {
+	return s.activity.InsertEvent(ctx, q, model.TaskEvent{
+		ID:          model.NewID(),
+		WorkspaceID: session.WorkspaceID,
+		TaskID:      taskID,
+		ActorID:     session.MembershipID,
+		Action:      action,
+		Details:     details,
+	}, now)
+}
+
+// changed returns the from/to details of a change.
+func changed(from, to string) map[string]string {
+	return map[string]string{"from": from, "to": to}
+}
+
+// timeText renders an optional time for an event, "" when unset.
+func timeText(t *time.Time) string {
+	if t == nil {
+		return ""
+	}
+	return t.UTC().Format(time.RFC3339)
+}
+
+func sameTime(a, b *time.Time) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return a.Equal(*b)
 }
 
 func (s *TaskService) resolvePlanID(ctx context.Context, q database.DBTX, workspaceID, projectID, planID string) (string, error) {
@@ -216,7 +281,7 @@ func (s *TaskService) Move(ctx context.Context, session model.Session, taskID st
 		return fmt.Errorf("%w: status_id is required", ErrInvalidInput)
 	}
 	return database.WithTx(ctx, s.db, func(tx *sql.Tx) error {
-		planID, _, err := s.tasks.Placement(ctx, tx, session.WorkspaceID, taskID)
+		planID, oldStatusID, err := s.tasks.Placement(ctx, tx, session.WorkspaceID, taskID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return fmt.Errorf("%w: task", ErrNotFound)
@@ -243,7 +308,22 @@ func (s *TaskService) Move(ctx context.Context, session model.Session, taskID st
 		if err != nil {
 			return fmt.Errorf("%w: cannot place task between %q and %q", ErrConflict, lo, hi)
 		}
-		return s.tasks.UpdatePlacement(ctx, tx, session.WorkspaceID, taskID, statusID, pos, nowUTC())
+		now := nowUTC()
+		if err := s.tasks.UpdatePlacement(ctx, tx, session.WorkspaceID, taskID, statusID, pos, now); err != nil {
+			return err
+		}
+		if oldStatusID == statusID {
+			return nil
+		}
+		from, err := s.activity.StatusTitle(ctx, tx, session.WorkspaceID, oldStatusID)
+		if err != nil {
+			return err
+		}
+		to, err := s.activity.StatusTitle(ctx, tx, session.WorkspaceID, statusID)
+		if err != nil {
+			return err
+		}
+		return s.recordEvent(ctx, tx, session, taskID, model.EventStatusChanged, changed(from, to), now)
 	})
 }
 
@@ -268,7 +348,10 @@ type UpdateTaskInput struct {
 	Description *string
 	DueDate     *time.Time
 	DueDateSet  bool
-	Priority    *model.TaskPriority
+	// StartDate is changed only when StartDateSet is true; nil clears it.
+	StartDate    *time.Time
+	StartDateSet bool
+	Priority     *model.TaskPriority
 	// LabelIDs replaces the task's labels; they must be labels of its project.
 	LabelIDs *[]string
 }
@@ -276,7 +359,7 @@ type UpdateTaskInput struct {
 // Update changes the title, description, due date and/or priority of a task. Its
 // placement (plan, status, position) is left alone; use Move for that.
 func (s *TaskService) Update(ctx context.Context, session model.Session, taskID string, in UpdateTaskInput) (model.Task, error) {
-	if in.Title == nil && in.Description == nil && !in.DueDateSet && in.Priority == nil && in.LabelIDs == nil {
+	if in.Title == nil && in.Description == nil && !in.DueDateSet && !in.StartDateSet && in.Priority == nil && in.LabelIDs == nil {
 		return model.Task{}, fmt.Errorf("%w: nothing to update", ErrInvalidInput)
 	}
 	if in.Priority != nil && !in.Priority.Valid() {
@@ -296,6 +379,7 @@ func (s *TaskService) Update(ctx context.Context, session model.Session, taskID 
 			}
 			return err
 		}
+		old := task
 		if in.Title != nil {
 			task.Title = strings.TrimSpace(*in.Title)
 		}
@@ -309,14 +393,52 @@ func (s *TaskService) Update(ctx context.Context, session model.Session, taskID 
 				task.DueDate = &due
 			}
 		}
+		if in.StartDateSet {
+			task.StartDate = nil
+			if in.StartDate != nil {
+				start := in.StartDate.UTC()
+				task.StartDate = &start
+			}
+		}
+		if err := checkDateRange(task.StartDate, task.DueDate); err != nil {
+			return err
+		}
 		if in.Priority != nil {
 			task.Priority = *in.Priority
 		}
 		now := nowUTC()
 		task.UpdatedAt = parseStamp(now)
-		if err := s.tasks.Update(ctx, tx, session.WorkspaceID, taskID, task.Title, task.Description, task.DueDate, task.Priority, now); err != nil {
+		if err := s.tasks.Update(ctx, tx, session.WorkspaceID, taskID, task.Title, task.Description, task.DueDate, task.StartDate, task.Priority, now); err != nil {
 			return err
 		}
+
+		// One event per changed field, in the same transaction.
+		if task.Title != old.Title {
+			if err := s.recordEvent(ctx, tx, session, taskID, model.EventRenamed, changed(old.Title, task.Title), now); err != nil {
+				return err
+			}
+		}
+		if task.Description != old.Description {
+			if err := s.recordEvent(ctx, tx, session, taskID, model.EventDescribed, nil, now); err != nil {
+				return err
+			}
+		}
+		if task.Priority != old.Priority {
+			if err := s.recordEvent(ctx, tx, session, taskID, model.EventPriorityChanged, changed(string(old.Priority), string(task.Priority)), now); err != nil {
+				return err
+			}
+		}
+		if !sameTime(task.DueDate, old.DueDate) {
+			if err := s.recordEvent(ctx, tx, session, taskID, model.EventDueChanged, changed(timeText(old.DueDate), timeText(task.DueDate)), now); err != nil {
+				return err
+			}
+		}
+		if !sameTime(task.StartDate, old.StartDate) {
+			if err := s.recordEvent(ctx, tx, session, taskID, model.EventStartChanged, changed(timeText(old.StartDate), timeText(task.StartDate)), now); err != nil {
+				return err
+			}
+		}
+
 		if in.LabelIDs != nil {
 			ids := slices.Clone(*in.LabelIDs)
 			slices.Sort(ids)
@@ -328,8 +450,30 @@ func (s *TaskService) Update(ctx context.Context, session model.Session, taskID 
 			if count != len(ids) {
 				return fmt.Errorf("%w: label_ids must be labels of the task's project", ErrInvalidInput)
 			}
+			before, err := s.tasks.LabelIDsByTask(ctx, tx, session.WorkspaceID, []string{taskID})
+			if err != nil {
+				return err
+			}
 			if err := s.tasks.SetLabels(ctx, tx, session.WorkspaceID, task.ProjectID, taskID, ids, now); err != nil {
 				return err
+			}
+			oldIDs := slices.Clone(before[taskID])
+			slices.Sort(oldIDs)
+			if !slices.Equal(oldIDs, ids) {
+				names, err := s.activity.LabelNames(ctx, tx, session.WorkspaceID, append(slices.Clone(oldIDs), ids...))
+				if err != nil {
+					return err
+				}
+				join := func(list []string) string {
+					parts := make([]string, len(list))
+					for i, id := range list {
+						parts[i] = names[id]
+					}
+					return strings.Join(parts, ", ")
+				}
+				if err := s.recordEvent(ctx, tx, session, taskID, model.EventLabelsChanged, changed(join(oldIDs), join(ids)), now); err != nil {
+					return err
+				}
 			}
 		}
 		byTask, err := s.tasks.LabelIDsByTask(ctx, tx, session.WorkspaceID, []string{taskID})
@@ -393,6 +537,9 @@ func (s *TaskService) CreateSubtask(ctx context.Context, session model.Session, 
 		if err := s.tasks.Insert(ctx, tx, task, now); err != nil {
 			return err
 		}
+		if err := s.recordEvent(ctx, tx, session, task.ID, model.EventCreated, nil, now); err != nil {
+			return err
+		}
 		return s.tasks.InsertAssignee(ctx, tx, session.WorkspaceID, task.ID, session.MembershipID, now)
 	})
 	if err != nil {
@@ -439,7 +586,11 @@ func (s *TaskService) SetDone(ctx context.Context, session model.Session, taskID
 		}
 		task.CompletedAt = completedAt
 		task.UpdatedAt = parseStamp(now)
-		return nil
+		action := model.EventReopened
+		if done {
+			action = model.EventDone
+		}
+		return s.recordEvent(ctx, tx, session, taskID, action, nil, now)
 	})
 	if err != nil {
 		return model.Task{}, err

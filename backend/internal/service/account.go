@@ -49,6 +49,8 @@ type AccountRepository interface {
 	InsertResource(ctx context.Context, q database.DBTX, workspaceID, createdBy, nameKey string, r model.ImportResource, now string) error
 	InsertTaskResource(ctx context.Context, q database.DBTX, workspaceID, linkedBy string, l model.ImportTaskResource, now string) error
 	InsertEvent(ctx context.Context, q database.DBTX, workspaceID, actorID string, e model.ImportEvent) error
+	InsertTaskEvent(ctx context.Context, q database.DBTX, workspaceID, actorID string, e model.ImportTaskEvent) error
+	InsertTaskRelation(ctx context.Context, q database.DBTX, workspaceID string, r model.ImportTaskRelation, now string) error
 	InsertRepository(ctx context.Context, q database.DBTX, workspaceID, addedBy string, r model.ImportRepository, now string) error
 }
 

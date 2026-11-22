@@ -34,7 +34,7 @@ func newAccountEnv(t *testing.T) accountEnv {
 		svc: NewAccountService(re.db, repository.NewAccountRepository(), repository.NewResourceRepository(),
 			repository.NewWorkspaceRepository(), repository.NewSettingsRepository(), store, "tester"),
 		projects:  NewProjectService(re.db, projectRepo, repository.NewSettingsRepository()),
-		tasks:     NewTaskService(re.db, projectRepo, taskRepo),
+		tasks:     NewTaskService(re.db, projectRepo, taskRepo, repository.NewTaskActivityRepository()),
 		comments:  NewCommentService(re.db, taskRepo, repository.NewCommentRepository()),
 		settings:  NewSettingsService(re.db, repository.NewSettingsRepository()),
 		workspace: NewWorkspaceService(re.db, repository.NewWorkspaceRepository()),

@@ -121,7 +121,7 @@ func TestSearchFindsTaskByKey(t *testing.T) {
 	env := newResourceEnv(t)
 	projectRepo := repository.NewProjectRepository()
 	projects := NewProjectService(env.db, projectRepo, repository.NewSettingsRepository())
-	tasks := NewTaskService(env.db, projectRepo, repository.NewTaskRepository())
+	tasks := NewTaskService(env.db, projectRepo, repository.NewTaskRepository(), repository.NewTaskActivityRepository())
 	search := NewSearchService(env.db, repository.NewSearchRepository())
 
 	project, err := projects.Create(ctx, env.session.WorkspaceID, CreateProjectInput{Name: "Website"})

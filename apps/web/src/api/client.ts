@@ -1,5 +1,12 @@
 import type { ImportCounts, ImportResult } from "../types/account";
 import type { Comment } from "../types/comment";
+import type {
+    RelationKind,
+    RelationView,
+    TaskEvent,
+    TaskEventAction,
+    TaskRelation,
+} from "../types/taskActivity";
 import type { RecentComment } from "../types/notification";
 import type { SearchResults } from "../types/search";
 import type {
@@ -117,6 +124,8 @@ type TaskDto = {
     status_id: string;
     position: string;
     due_date: string | null;
+    start_date: string | null;
+    blocked: boolean;
     priority: TaskPriority;
     number: number;
     label_ids?: string[];
@@ -156,6 +165,8 @@ type PlanTaskDto = {
     status_category: StatusCategory;
     position: string;
     due_date: string | null;
+    start_date: string | null;
+    blocked: boolean;
     priority: TaskPriority;
     number: number;
     label_ids?: string[];
@@ -357,6 +368,8 @@ function toPlanTask(dto: PlanTaskDto): PlanTask {
         statusCategory: dto.status_category,
         position: dto.position,
         dueDate: dto.due_date ? new Date(dto.due_date) : null,
+        startDate: dto.start_date ? new Date(dto.start_date) : null,
+        blocked: dto.blocked,
         priority: dto.priority,
         number: dto.number,
         labelIds: dto.label_ids ?? [],
@@ -493,6 +506,7 @@ export async function createTask(
             title: input.title,
             description: input.description ?? "",
             due_date: input.dueDate ? input.dueDate.toISOString() : null,
+            start_date: input.startDate ? input.startDate.toISOString() : null,
             priority: input.priority ?? "none",
             plan_id: input.planId ?? "",
             status_id: input.statusId ?? "",
@@ -637,6 +651,8 @@ export async function updateTask(
     if (input.description !== undefined) body.description = input.description;
     if (input.dueDate !== undefined)
         body.due_date = input.dueDate ? input.dueDate.toISOString() : null;
+    if (input.startDate !== undefined)
+        body.start_date = input.startDate ? input.startDate.toISOString() : null;
     if (input.priority !== undefined) body.priority = input.priority;
     if (input.labelIds !== undefined) body.label_ids = input.labelIds;
     const dto = await request<PlanTaskDto>(`/api/tasks/${taskId}`, {
@@ -644,6 +660,68 @@ export async function updateTask(
         body: JSON.stringify(body),
     });
     return toPlanTask(dto);
+}
+
+type TaskEventDto = {
+    id: string;
+    actor_id: string;
+    action: TaskEventAction;
+    details: Record<string, string>;
+    created_at: string;
+};
+
+export async function listTaskActivity(taskId: string): Promise<TaskEvent[]> {
+    const dtos = await request<TaskEventDto[]>(`/api/tasks/${taskId}/activity`);
+    return dtos.map((dto) => ({
+        id: dto.id,
+        action: dto.action,
+        details: dto.details,
+        createdAt: new Date(dto.created_at),
+    }));
+}
+
+type TaskRelationDto = {
+    view: RelationView;
+    task_id: string;
+    title: string;
+    number: number;
+    project_id: string;
+    plan_id: string;
+    completed_at: string | null;
+};
+
+export async function listTaskRelations(taskId: string): Promise<TaskRelation[]> {
+    const dtos = await request<TaskRelationDto[]>(`/api/tasks/${taskId}/relations`);
+    return dtos.map((dto) => ({
+        view: dto.view,
+        taskId: dto.task_id,
+        title: dto.title,
+        number: dto.number,
+        projectId: dto.project_id,
+        planId: dto.plan_id,
+        completedAt: dto.completed_at ? new Date(dto.completed_at) : null,
+    }));
+}
+
+// `taskId` blocks, relates to or duplicates `relatedTaskId`.
+export async function addTaskRelation(
+    taskId: string,
+    relatedTaskId: string,
+    kind: RelationKind,
+): Promise<void> {
+    await request<void>(`/api/tasks/${taskId}/relations`, {
+        method: "POST",
+        body: JSON.stringify({ related_task_id: relatedTaskId, kind }),
+    });
+}
+
+export async function removeTaskRelation(
+    taskId: string,
+    relatedTaskId: string,
+): Promise<void> {
+    await request<void>(`/api/tasks/${taskId}/relations/${relatedTaskId}`, {
+        method: "DELETE",
+    });
 }
 
 export async function listSubtasks(taskId: string): Promise<Subtask[]> {

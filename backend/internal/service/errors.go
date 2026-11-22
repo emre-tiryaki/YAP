@@ -19,6 +19,11 @@ var (
 	ErrLabelNameTaken = fmt.Errorf("%w: label name", ErrConflict)
 	// ErrInvalidPriority is an invalid input: the priority is not a known one.
 	ErrInvalidPriority = fmt.Errorf("%w: priority", ErrInvalidInput)
+	// ErrInvalidDateRange is an invalid input: the start date is after the
+	// due date.
+	ErrInvalidDateRange = fmt.Errorf("%w: start date after due date", ErrInvalidInput)
+	// ErrRelationExists is a conflict: the two tasks already have a relation.
+	ErrRelationExists = fmt.Errorf("%w: relation", ErrConflict)
 	ErrForbidden       = errors.New("forbidden")
 	// ErrStale means the caller changed an older revision than the stored one.
 	ErrStale = errors.New("stale revision")

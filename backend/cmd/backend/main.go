@@ -49,7 +49,7 @@ func main() {
 
 	settingsRepo := repository.NewSettingsRepository()
 	projectSvc := service.NewProjectService(db, projectRepo, settingsRepo)
-	taskSvc := service.NewTaskService(db, projectRepo, taskRepo)
+	taskSvc := service.NewTaskService(db, projectRepo, taskRepo, repository.NewTaskActivityRepository())
 	commentSvc := service.NewCommentService(db, taskRepo, commentRepo)
 	labelSvc := service.NewLabelService(db, projectRepo, repository.NewLabelRepository())
 	workspaceSvc := service.NewWorkspaceService(db, repository.NewWorkspaceRepository())

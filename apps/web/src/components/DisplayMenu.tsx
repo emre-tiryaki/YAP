@@ -39,6 +39,7 @@ const propertyLabels: Record<TaskPropertyKey, TranslationKey> = {
     status: "task.property.status",
     priority: "task.property.priority",
     labels: "task.property.labels",
+    startDate: "task.property.startDate",
     dueDate: "task.property.dueDate",
     subtasks: "display.property.subtasks",
     comments: "display.property.comments",

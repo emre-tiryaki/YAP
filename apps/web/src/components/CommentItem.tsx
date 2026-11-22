@@ -1,119 +1,21 @@
-import { useState, type FormEvent, type KeyboardEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { FiEdit2, FiTrash2 } from "react-icons/fi";
-import {
-    useComments,
-    useCreateComment,
-    useDeleteComment,
-    useUpdateComment,
-} from "../hooks/useComments";
+import { useDeleteComment, useUpdateComment } from "../hooks/useComments";
 import { useTranslate } from "../hooks/useTranslate";
 import type { Comment } from "../types/comment";
 import { useDateFormat } from "../hooks/useDateFormat";
 import { isWithinLastMinute } from "../util/date";
+import { submitOnModEnter } from "../util/submitOnModEnter";
 import { ExpandableText } from "./ExpandableText";
 import { FormError } from "./FormError";
-import { InlineError } from "./InlineError";
 import { Button } from "./Button";
-import { Skeleton } from "./Skeleton";
-
-type CommentSectionProps = {
-    taskId: string;
-};
-
-// Ctrl/Cmd + Enter sends the textarea's form; plain Enter adds a new line.
-function submitOnModEnter(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
-        event.preventDefault();
-        event.currentTarget.form?.requestSubmit();
-    }
-}
-
-export function CommentSection({ taskId }: CommentSectionProps) {
-    const t = useTranslate();
-    const comments = useComments(taskId);
-    const create = useCreateComment(taskId);
-    const [draft, setDraft] = useState("");
-
-    function handleSubmit(event: FormEvent<HTMLFormElement>) {
-        event.preventDefault();
-        const body = draft.trim();
-        if (body === "") return;
-        create.mutate(body, { onSuccess: () => setDraft("") });
-    }
-
-    const items = comments.data ?? [];
-
-    return (
-        <section
-            aria-label={t("task.detail.comments")}
-            className="flex flex-col gap-4"
-        >
-
-            {comments.isLoading && (
-                <Skeleton className="h-16" />
-            )}
-            {comments.isError && (
-                <InlineError
-                    message={t("task.detail.commentsLoadError")}
-                    onRetry={() => void comments.refetch()}
-                />
-            )}
-            {comments.isSuccess && items.length === 0 && (
-                <p className="text-sm text-fg-subtle">
-                    {t("task.detail.commentsEmpty")}
-                </p>
-            )}
-            {items.length > 0 && (
-                <ol className="flex flex-col gap-4">
-                    {items.map((comment) => (
-                        <CommentItem
-                            key={comment.id}
-                            taskId={taskId}
-                            comment={comment}
-                        />
-                    ))}
-                </ol>
-            )}
-
-            <form
-                onSubmit={handleSubmit}
-                className="flex flex-col gap-2 rounded-lg border border-line-strong bg-surface-1 p-2 focus-within:border-gray-500"
-            >
-                <textarea
-                    aria-label={t("task.detail.commentPlaceholder")}
-                    placeholder={t("task.detail.commentPlaceholder")}
-                    value={draft}
-                    rows={2}
-                    disabled={create.isPending}
-                    onChange={(event) => setDraft(event.target.value)}
-                    onKeyDown={submitOnModEnter}
-                    className="field-sizing-content max-h-60 min-h-12 w-full resize-none px-1 text-sm focus:outline-none"
-                />
-                <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs text-fg-placeholder">
-                        {t("task.detail.commentHint")}
-                    </span>
-                    <Button variant="primary" size="lg"
-                        type="submit"
-                        disabled={create.isPending || draft.trim() === ""}
-                    >
-                        {t("task.detail.commentSubmit")}
-                    </Button>
-                </div>
-            </form>
-            <FormError
-                message={create.isError ? t("task.detail.commentError") : null}
-            />
-        </section>
-    );
-}
 
 type CommentItemProps = {
     taskId: string;
     comment: Comment;
 };
 
-function CommentItem({ taskId, comment }: CommentItemProps) {
+export function CommentItem({ taskId, comment }: CommentItemProps) {
     const t = useTranslate();
     const update = useUpdateComment(taskId);
     const remove = useDeleteComment(taskId);

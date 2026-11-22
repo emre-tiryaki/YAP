@@ -13,7 +13,7 @@ func TestTaskCreateErrors(t *testing.T) {
 	db, session := newTestDB(t)
 	projectRepo := repository.NewProjectRepository()
 	projects := NewProjectService(db, projectRepo, repository.NewSettingsRepository())
-	tasks := NewTaskService(db, projectRepo, repository.NewTaskRepository())
+	tasks := NewTaskService(db, projectRepo, repository.NewTaskRepository(), repository.NewTaskActivityRepository())
 
 	project, err := projects.Create(context.Background(), session.WorkspaceID, CreateProjectInput{Name: "Backend"})
 	if err != nil {
@@ -46,7 +46,7 @@ func TestTaskUpcomingOrdersByDueDateWithUndatedLast(t *testing.T) {
 	db, session := newTestDB(t)
 	projectRepo := repository.NewProjectRepository()
 	projects := NewProjectService(db, projectRepo, repository.NewSettingsRepository())
-	tasks := NewTaskService(db, projectRepo, repository.NewTaskRepository())
+	tasks := NewTaskService(db, projectRepo, repository.NewTaskRepository(), repository.NewTaskActivityRepository())
 
 	project, err := projects.Create(ctx, session.WorkspaceID, CreateProjectInput{Name: "Backend"})
 	if err != nil {
