@@ -10,11 +10,11 @@ export function SettingsGroup({
     return (
         <section aria-label={title}>
             {title && (
-                <h4 className="mb-2 text-xs font-semibold tracking-wide text-gray-400 uppercase">
+                <h4 className="mb-2 text-xs font-semibold tracking-wide text-fg-subtle uppercase">
                     {title}
                 </h4>
             )}
-            <div className="divide-y divide-gray-100 rounded-lg border border-gray-200">
+            <div className="divide-y divide-line rounded-lg border border-line bg-layer-2">
                 {children}
             </div>
         </section>

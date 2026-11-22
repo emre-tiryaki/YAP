@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FiMoreHorizontal, FiPlus } from "react-icons/fi";
+import { FiCheckCircle, FiMoreHorizontal, FiPlus } from "react-icons/fi";
 import {
     aiErrorKey,
     useAiConnections,
@@ -13,6 +13,7 @@ import {
 import type { AiConnection } from "../types/ai";
 import { aiPresets } from "../util/aiPresets";
 import { AiConnectionDialog } from "./AiConnectionDialog";
+import { AiProviderIcon } from "./AiProviderIcon";
 import { Button } from "./Button";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { FormError } from "./FormError";
@@ -54,20 +55,32 @@ export function SettingsAI() {
                     (connections.data ?? []).map((c) => (
                         <div
                             key={c.id}
-                            className="flex items-center justify-between gap-4 px-5 py-3"
+                            className="flex items-center gap-3 px-4 py-3"
                         >
-                            <div className="min-w-0">
+                            <AiProviderIcon preset={c.preset} />
+                            <div className="min-w-0 flex-1">
                                 <p className="truncate text-sm font-medium text-fg">
                                     {c.name}
                                 </p>
                                 <p className="truncate text-caption text-fg-muted">
                                     {t(aiPresets[c.preset].labelKey)} ·{" "}
-                                    {c.baseUrl}
+                                    <span className="font-mono">{c.baseUrl}</span>
                                 </p>
                             </div>
                             <div className="flex shrink-0 items-center gap-2">
-                                {c.hasKey && (
-                                    <Pill>{t("settings.ai.keySaved")}</Pill>
+                                {c.hasKey ? (
+                                    <Pill
+                                        icon={<FiCheckCircle aria-hidden />}
+                                        color="text-success"
+                                    >
+                                        {t("settings.ai.keySaved")}
+                                    </Pill>
+                                ) : aiPresets[c.preset].local ? (
+                                    <Pill>{t("settings.ai.local")}</Pill>
+                                ) : (
+                                    <Pill className="border-warning text-warning">
+                                        {t("settings.ai.noKey")}
+                                    </Pill>
                                 )}
                                 <Menu
                                     placement="bottom-end"

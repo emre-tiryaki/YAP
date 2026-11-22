@@ -1,4 +1,5 @@
 import { FiCopy, FiRefreshCw } from "react-icons/fi";
+import { TbSparkles } from "react-icons/tb";
 import { aiErrorCodeKey } from "../hooks/useAi";
 import { pushInfoToast } from "../hooks/useToasts";
 import { useTranslate } from "../hooks/useTranslate";
@@ -52,7 +53,7 @@ export function AiMessage({ message, liveContent, onRegenerate }: AiMessageProps
                         ))}
                     </div>
                 )}
-                <p className="max-w-[80%] rounded-lg bg-layer-3 px-3 py-2 text-sm whitespace-pre-wrap text-fg">
+                <p className="max-w-[80%] rounded-xl rounded-br-sm bg-layer-3 px-3.5 py-2 text-sm whitespace-pre-wrap text-fg">
                     {message.content}
                 </p>
             </div>
@@ -72,7 +73,14 @@ export function AiMessage({ message, liveContent, onRegenerate }: AiMessageProps
     }
 
     return (
-        <div className="flex flex-col gap-1">
+        <div className="flex gap-3">
+            <span
+                aria-hidden
+                className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border border-line bg-layer-1 text-fg-muted"
+            >
+                <TbSparkles />
+            </span>
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
             {/* Plain text while streaming: markdown is parsed once it is whole. */}
             {streaming ? (
                 <p
@@ -99,7 +107,7 @@ export function AiMessage({ message, liveContent, onRegenerate }: AiMessageProps
                 </p>
             )}
             {!streaming && (
-                <div className="flex items-center gap-1 px-1">
+                <div className="flex items-center gap-1 px-1 opacity-60 transition-opacity focus-within:opacity-100 hover:opacity-100">
                     {message.content !== "" && (
                         <Tooltip label={t("assistant.message.copy")} side="top">
                             <Button
@@ -131,6 +139,7 @@ export function AiMessage({ message, liveContent, onRegenerate }: AiMessageProps
                     )}
                 </div>
             )}
+            </div>
         </div>
     );
 }

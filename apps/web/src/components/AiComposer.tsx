@@ -1,6 +1,6 @@
 import { useRef, useState, type KeyboardEvent } from "react";
 import { Link } from "react-router";
-import { FiPlus, FiSend, FiSquare } from "react-icons/fi";
+import { FiArrowUp, FiPlus, FiSquare } from "react-icons/fi";
 import { aiErrorKey } from "../hooks/useAi";
 import type { AiModelChoice } from "../hooks/useAiModelChoice";
 import { useAiMentions, type AiMentionHit } from "../hooks/useAiMentions";
@@ -36,6 +36,8 @@ type AiComposerProps = {
     // Another chat is being answered; sending is blocked until it ends.
     busyChatId: string | null;
     error: unknown;
+    // Text to put in the field (a suggestion); n changes on every request.
+    draft?: { text: string; n: number } | null;
 };
 
 export function AiComposer({
@@ -46,6 +48,7 @@ export function AiComposer({
     generating,
     busyChatId,
     error,
+    draft = null,
 }: AiComposerProps) {
     const t = useTranslate();
     const textRef = useRef<HTMLTextAreaElement>(null);
@@ -57,6 +60,12 @@ export function AiComposer({
     const [dismissed, setDismissed] = useState<string | null>(null);
     const [sending, setSending] = useState(false);
     const resources = useResources();
+    const [seenDraft, setSeenDraft] = useState(draft?.n ?? 0);
+    if (draft && draft.n !== seenDraft) {
+        setSeenDraft(draft.n);
+        setText(draft.text);
+        setCaret(draft.text.length);
+    }
 
     const mention = mentionPattern.exec(text.slice(0, caret));
     const mentionQuery =
@@ -152,7 +161,7 @@ export function AiComposer({
                     </p>
                 )}
                 {error != null && <FormError message={t(aiErrorKey(error))} />}
-                <div className="flex flex-col gap-2 rounded-lg border border-line bg-layer-2 p-2 focus-within:border-accent">
+                <div className="flex flex-col gap-2 rounded-xl border border-line bg-layer-2 p-2.5 shadow-raised transition-colors focus-within:border-line-strong">
                     {attachments.length > 0 && (
                         <div className="flex flex-wrap gap-1.5">
                             {attachments.map((a) => (
@@ -175,6 +184,7 @@ export function AiComposer({
                         rows={2}
                         aria-label={t("assistant.composer.label")}
                         placeholder={t("assistant.composer.placeholder")}
+                        autoFocus
                         onChange={(event) => {
                             setText(event.target.value);
                             setCaret(event.target.selectionStart);
@@ -235,7 +245,7 @@ export function AiComposer({
                             <Button
                                 variant="primary"
                                 size="md"
-                                leadingIcon={FiSend}
+                                leadingIcon={FiArrowUp}
                                 loading={sending}
                                 disabled={!canSend}
                                 title={choice === null ? t("assistant.noModel") : undefined}
