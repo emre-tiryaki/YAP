@@ -24,7 +24,7 @@ var (
 	ErrInvalidDateRange = fmt.Errorf("%w: start date after due date", ErrInvalidInput)
 	// ErrRelationExists is a conflict: the two tasks already have a relation.
 	ErrRelationExists = fmt.Errorf("%w: relation", ErrConflict)
-	ErrForbidden       = errors.New("forbidden")
+	ErrForbidden      = errors.New("forbidden")
 	// ErrStale means the caller changed an older revision than the stored one.
 	ErrStale = errors.New("stale revision")
 	// ErrTooLarge means a request body exceeded the allowed size.

@@ -25,7 +25,7 @@ type SesionService struct {
 }
 
 func NewSessionService(db *sql.DB, repo SessionRepository) *SesionService {
-	return  &SesionService{db: db, repo: repo}
+	return &SesionService{db: db, repo: repo}
 }
 
 // Bootstrap returns the local user's personal workspace session,
