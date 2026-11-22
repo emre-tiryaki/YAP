@@ -21,6 +21,8 @@ import (
 type testEnv struct {
 	mux     *http.ServeMux
 	session model.Session
+	llm     *fakeAILLM
+	keys    *memAIKeys
 }
 
 func newTestEnv(t *testing.T) testEnv {
@@ -71,7 +73,19 @@ func newTestEnv(t *testing.T) testEnv {
 		repository.NewWorkspaceRepository(), repository.NewSettingsRepository(), store, "tester")).Register(mux)
 	NewSearchHandler(session, service.NewSearchService(db, repository.NewSearchRepository())).Register(mux)
 
-	return testEnv{mux: mux, session: session}
+	aiRepo := repository.NewAIRepository()
+	fake, keys := &fakeAILLM{models: []string{"m1", "m2"}}, &memAIKeys{keys: map[string]string{}}
+	conns := service.NewAIConnectionService(db, aiRepo, keys, fake)
+	prompt := service.NewAIPrompt(db, service.AIContextSources{
+		Tasks: taskRepo, Activity: repository.NewTaskActivityRepository(), Comments: repository.NewCommentRepository(),
+		Projects: projectRepo, Resources: resourceSvc, Repos: repoSvc, Placement: aiRepo,
+	})
+	chats := service.NewAIChatService(db, aiRepo, conns, prompt, repository.NewSettingsRepository(), fake)
+	chats.Start(ctx)
+	t.Cleanup(chats.Wait)
+	NewAIHandler(session, chats, conns).Register(mux)
+
+	return testEnv{mux: mux, session: session, llm: fake, keys: keys}
 }
 
 func (e testEnv) do(t *testing.T, method, path, body string) *httptest.ResponseRecorder {

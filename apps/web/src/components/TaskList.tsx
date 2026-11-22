@@ -79,6 +79,17 @@ export function TaskList({
         });
     }
 
+    function dueLabel(date: Date | null) {
+        if (!date) return "";
+        const days = daysFromToday(date);
+        if (days === 0) return t("workspace.tasks.today");
+        if (days === 1) return t("workspace.tasks.tomorrow");
+        return date.toLocaleDateString(format.locale, {
+            day: "numeric",
+            month: "short",
+        });
+    }
+
     return (
         <section>
             {!hideHeader && (
@@ -113,7 +124,43 @@ export function TaskList({
                     }
                 />
             )}
-            {shown.length > 0 && (
+            {shown.length > 0 && compact && (
+                <ul className="flex flex-col divide-y divide-line rounded-xl border border-line bg-layer-1 shadow-sm">
+                    {shown.map((task) => {
+                        const isOverdue =
+                            task.dueDate !== null &&
+                            daysFromToday(task.dueDate) < 0;
+                        return (
+                            <li key={task.id}>
+                                <button
+                                    type="button"
+                                    onClick={() => setOpenTask(task)}
+                                    className="flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-left hover:bg-layer-1-hover focus-visible:outline-2 focus-visible:outline-accent"
+                                >
+                                    <span className="min-w-0 flex-1 truncate text-sm">
+                                        <span className="font-medium">
+                                            {task.title}
+                                        </span>
+                                        <span className="ml-2 text-xs text-fg-subtle">
+                                            {task.projectName}
+                                        </span>
+                                    </span>
+                                    <span
+                                        className={`shrink-0 text-xs ${
+                                            isOverdue
+                                                ? "font-medium text-red-600"
+                                                : "text-fg-subtle"
+                                        }`}
+                                    >
+                                        {dueLabel(task.dueDate)}
+                                    </span>
+                                </button>
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
+            {shown.length > 0 && !compact && (
                 <div className="flex flex-col gap-6">
                     {groupByDueDay(shown).map((group) => {
                         const isOverdue =

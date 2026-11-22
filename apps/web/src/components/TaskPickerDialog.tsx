@@ -1,10 +1,15 @@
 import { useState, type ReactNode } from "react";
-import { useProjectPlans, useProjects } from "../hooks/useProjects";
+import {
+    useProjectIdentifier,
+    useProjectPlans,
+    useProjects,
+} from "../hooks/useProjects";
 import { usePlanTasks } from "../hooks/useTasks";
 import { useTranslate } from "../hooks/useTranslate";
 import { Modal } from "./Modal";
 import { SelectInput } from "./SelectInput";
 import { Button } from "./Button";
+import { taskKey } from "../util/taskKey";
 
 type TaskPickerDialogProps = {
     title: string;
@@ -16,7 +21,8 @@ type TaskPickerDialogProps = {
     extra?: ReactNode;
     isPending?: boolean;
     errorMessage?: string | null;
-    onPick: (taskId: string) => void;
+    // The label is the task's key and title, e.g. "ABC-12 Fix login".
+    onPick: (taskId: string, label: string) => void;
     onClose: () => void;
 };
 
@@ -38,6 +44,14 @@ export function TaskPickerDialog({
     const [planId, setPlanId] = useState("");
     const tasks = usePlanTasks(projectId, planId);
     const [taskId, setTaskId] = useState("");
+    const identifier = useProjectIdentifier(projectId);
+
+    function pick() {
+        const task = tasks.data?.find((candidate) => candidate.id === taskId);
+        if (!task) return;
+        const key = taskKey(identifier, task.number);
+        onPick(taskId, key ? `${key} ${task.title}` : task.title);
+    }
 
     const choose = (label: string) => ({ value: "", label: `— ${label} —` });
 
@@ -109,7 +123,7 @@ export function TaskPickerDialog({
                 <Button variant="primary" size="lg"
                     type="button"
                     disabled={taskId === "" || isPending}
-                    onClick={() => onPick(taskId)}
+                    onClick={pick}
                 >
                     {submitLabel ?? t("resources.link.submit")}
                 </Button>

@@ -22,6 +22,7 @@ import {
     FiX,
     FiCalendar,
     FiHardDrive,
+    FiMessageSquare,
 } from "react-icons/fi";
 import { useChangeTaskStatus } from "../hooks/useChangeTaskStatus";
 import {
@@ -342,6 +343,7 @@ function PaletteDialog({ page, context, projectId, onCreate, onDelete }: Palette
             { id: "nav:tasks", group: nav, label: t("workspace.tasks.title"), icon: <FiCalendar aria-hidden />, shortcut: ["G", "T"], run: () => go("/tasks") },
             { id: "nav:projects", group: nav, label: t("sidebar.projects"), icon: <FiFolder aria-hidden />, shortcut: ["G", "P"], run: () => go("/projects") },
             { id: "nav:resources", group: nav, label: t("sidebar.resources"), icon: <FiHardDrive aria-hidden />, shortcut: ["G", "R"], run: () => go("/resources") },
+            { id: "nav:assistant", group: nav, label: t("sidebar.assistant"), icon: <FiMessageSquare aria-hidden />, run: () => go("/assistant") },
             { id: "nav:settings", group: nav, label: t("palette.settings"), icon: <FiSettings aria-hidden />, shortcut: ["G", "S"], run: () => openSettings("general") },
         );
         for (const project of projects.data ?? [])

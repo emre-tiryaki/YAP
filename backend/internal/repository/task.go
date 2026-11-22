@@ -380,7 +380,7 @@ func (*TaskRepository) Update(ctx context.Context, q database.DBTX, workspaceID,
 func (*TaskRepository) ListSubtasks(ctx context.Context, q database.DBTX, workspaceID, parentID string) ([]model.Task, error) {
 	rows, err := q.QueryContext(ctx,
 		`SELECT t.id, t.project_id, t.plan_id, t.status_id, t.created_by, t.title, t.description,
-			t.position, t.due_date, s.category, t.completed_at
+			t.position, t.due_date, s.category, t.completed_at, COALESCE(t.number, 0), t.priority
 		 FROM tasks t
 		 JOIN statuses s ON s.id = t.status_id AND s.plan_id = t.plan_id
 		 WHERE t.workspace_id = ? AND t.parent_id = ?
@@ -397,11 +397,12 @@ func (*TaskRepository) ListSubtasks(ctx context.Context, q database.DBTX, worksp
 	for rows.Next() {
 		t := model.Task{WorkspaceID: workspaceID, ParentID: parentID}
 		var description, dueDate, completedAt sql.NullString
-		var category string
+		var category, priority string
 		if err := rows.Scan(&t.ID, &t.ProjectID, &t.PlanID, &t.StatusID, &t.CreatedBy, &t.Title, &description,
-			&t.Position, &dueDate, &category, &completedAt); err != nil {
+			&t.Position, &dueDate, &category, &completedAt, &t.Number, &priority); err != nil {
 			return nil, fmt.Errorf("scan subtask: %w", err)
 		}
+		t.Priority = model.TaskPriority(priority)
 		t.Description = description.String
 		t.StatusCategory = model.StatusCategory(category)
 		if err := scanTaskTimes(&t, dueDate, completedAt); err != nil {

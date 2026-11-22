@@ -3,6 +3,7 @@ import WorkspaceHomePage from "./pages/WorkspaceHomePage"
 import NotFoundPage from "./pages/NotFoundPage";
 import ProjectDetailPage from "./pages/ProjectDetailPage";
 import PlanDetailPage from "./pages/PlanDetailPage";
+import AssistantPage from "./pages/AssistantPage";
 import ResourcesPage from "./pages/ResourcesPage";
 import TaskPage from "./pages/TaskPage";
 import ProjectsPage from "./pages/ProjectsPage";
@@ -64,6 +65,8 @@ function App() {
                   <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
                   <Route path="/projects/:projectId/plans/:planId" element={<PlanDetailPage />} />
                   <Route path="/projects/:projectId/plans/:planId/tasks/:taskId" element={<TaskPage />} />
+                  <Route path="/assistant" element={<AssistantPage />} />
+                  <Route path="/assistant/:chatId" element={<AssistantPage />} />
                   <Route path="/resources" element={<ResourcesPage />} />
                   <Route path="/resources/trash" element={<ResourcesPage view="trash" />} />
                   <Route path="/resources/:resourceId" element={<ResourcesPage />} />

@@ -123,7 +123,7 @@ func TestImportRestoresAfterReset(t *testing.T) {
 		t.Fatal(err)
 	}
 	archive := e.exportBytes(t)
-	if err := e.svc.Reset(e.ctx, e.session); err != nil {
+	if err := e.svc.Reset(e.ctx, e.session, ResetOptions{}); err != nil {
 		t.Fatalf("Reset() error = %v", err)
 	}
 
@@ -290,7 +290,7 @@ func TestImportRejectsBadArchives(t *testing.T) {
 	e := newAccountEnv(t)
 	e.seed(t)
 	good := e.exportBytes(t)
-	if err := e.svc.Reset(e.ctx, e.session); err != nil {
+	if err := e.svc.Reset(e.ctx, e.session, ResetOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	first := func(doc map[string]any, table string) map[string]any {
@@ -365,7 +365,7 @@ func TestImportSkipsFilesMissingFromTheArchive(t *testing.T) {
 	e := newAccountEnv(t)
 	e.seed(t)
 	archive := e.exportBytes(t)
-	if err := e.svc.Reset(e.ctx, e.session); err != nil {
+	if err := e.svc.Reset(e.ctx, e.session, ResetOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	// Drop the file entry, keep its row.
@@ -414,7 +414,7 @@ func TestImportRollsBackOnFailure(t *testing.T) {
 	e := newAccountEnv(t)
 	e.seed(t)
 	archive := e.exportBytes(t)
-	if err := e.svc.Reset(e.ctx, e.session); err != nil {
+	if err := e.svc.Reset(e.ctx, e.session, ResetOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	e.svc.store = failingStore{AccountStore: e.svc.store, name: "spec.md"}
@@ -436,7 +436,7 @@ func TestImportAgainAfterRestoreAddsNothing(t *testing.T) {
 	e := newAccountEnv(t)
 	e.seed(t)
 	archive := e.exportBytes(t)
-	if err := e.svc.Reset(e.ctx, e.session); err != nil {
+	if err := e.svc.Reset(e.ctx, e.session, ResetOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	e.importBytes(t, archive)

@@ -13,6 +13,7 @@ import {
     FiFolder,
     FiHardDrive,
     FiHome,
+    FiMessageSquare,
     FiPlus,
 } from "react-icons/fi";
 import {
@@ -226,6 +227,16 @@ export function Sidebar() {
                         label={t("workspace.tasks.title")}
                         icon={FiCalendar}
                         active={pathname === "/tasks"}
+                        collapsed={collapsed}
+                    />
+                    <SidebarNavItem
+                        to="/assistant"
+                        label={t("sidebar.assistant")}
+                        icon={FiMessageSquare}
+                        active={
+                            pathname === "/assistant" ||
+                            pathname.startsWith("/assistant/")
+                        }
                         collapsed={collapsed}
                     />
                     <SidebarNavItem

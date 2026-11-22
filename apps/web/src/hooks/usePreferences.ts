@@ -27,6 +27,13 @@ export const SIDEBAR_MIN_WIDTH = 220;
 export const SIDEBAR_MAX_WIDTH = 360;
 export const SIDEBAR_DEFAULT_WIDTH = 248;
 
+export const DOCUMENT_FONT_MIN = 12;
+export const DOCUMENT_FONT_MAX = 24;
+export const DOCUMENT_FONT_DEFAULT = 14;
+export const CODE_FONT_MIN = 10;
+export const CODE_FONT_MAX = 22;
+export const CODE_FONT_DEFAULT = 13;
+
 const languages: readonly Language[] = ["en", "tr"];
 const weekStarts: readonly WeekStart[] = ["monday", "sunday"];
 const dateFormats: readonly DateFormat[] = ["dmy", "mdy", "iso"];
@@ -62,7 +69,16 @@ function defaults(): Preferences {
     sidebarWidth: SIDEBAR_DEFAULT_WIDTH,
     taskPeekMode: "side",
     planDisplay: {},
+    documentFontSize: DOCUMENT_FONT_DEFAULT,
+    codeFontSize: CODE_FONT_DEFAULT,
+    codeWrap: false,
   };
+}
+
+function pickSize(value: unknown, min: number, max: number, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.min(max, Math.max(min, Math.round(value)))
+    : fallback;
 }
 
 function pick<T>(allowed: readonly T[], value: unknown, fallback: T): T {
@@ -191,6 +207,20 @@ function read(): Preferences {
         : base.sidebarWidth,
     taskPeekMode: pick(taskPeekModes, stored.taskPeekMode, base.taskPeekMode),
     planDisplay: pickPlanDisplay(stored.planDisplay),
+    documentFontSize: pickSize(
+      stored.documentFontSize,
+      DOCUMENT_FONT_MIN,
+      DOCUMENT_FONT_MAX,
+      base.documentFontSize,
+    ),
+    codeFontSize: pickSize(
+      stored.codeFontSize,
+      CODE_FONT_MIN,
+      CODE_FONT_MAX,
+      base.codeFontSize,
+    ),
+    codeWrap:
+      typeof stored.codeWrap === "boolean" ? stored.codeWrap : base.codeWrap,
   };
   return cache;
 }

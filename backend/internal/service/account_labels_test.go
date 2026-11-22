@@ -52,7 +52,7 @@ func TestImportKeepsLabelsAfterReset(t *testing.T) {
 	e.seed(t)
 	e.labelTask(t, "bug", "docs")
 	archive := e.exportBytes(t)
-	if err := e.svc.Reset(e.ctx, e.session); err != nil {
+	if err := e.svc.Reset(e.ctx, e.session, ResetOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	var live int

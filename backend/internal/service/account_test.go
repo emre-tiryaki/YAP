@@ -223,7 +223,7 @@ func TestReset(t *testing.T) {
 	e := newAccountEnv(t)
 	e.seed(t)
 
-	if err := e.svc.Reset(e.ctx, e.session); err != nil {
+	if err := e.svc.Reset(e.ctx, e.session, ResetOptions{}); err != nil {
 		t.Fatalf("Reset() error = %v", err)
 	}
 
@@ -300,7 +300,7 @@ func TestReset(t *testing.T) {
 	})
 
 	t.Run("a second reset succeeds", func(t *testing.T) {
-		if err := e.svc.Reset(e.ctx, e.session); err != nil {
+		if err := e.svc.Reset(e.ctx, e.session, ResetOptions{}); err != nil {
 			t.Errorf("Reset() error = %v", err)
 		}
 	})
@@ -309,7 +309,7 @@ func TestReset(t *testing.T) {
 func TestExportAfterReset(t *testing.T) {
 	e := newAccountEnv(t)
 	e.seed(t)
-	if err := e.svc.Reset(e.ctx, e.session); err != nil {
+	if err := e.svc.Reset(e.ctx, e.session, ResetOptions{}); err != nil {
 		t.Fatalf("Reset() error = %v", err)
 	}
 

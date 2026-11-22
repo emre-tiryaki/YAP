@@ -4,7 +4,9 @@ import { useResourceText, useSaveResourceText } from "../hooks/useResources";
 import { useTranslate } from "../hooks/useTranslate";
 import { defaultUserSettings, useUserSettings } from "../hooks/useUserSettings";
 import type { Resource } from "../types/resource";
+import { codeLanguage } from "../util/codeLanguage";
 import { Button } from "./Button";
+import { CodeEditor } from "./CodeEditor";
 
 // TipTap is only needed for the markdown preview.
 const MarkdownView = lazy(() =>
@@ -204,23 +206,15 @@ function EditorBody({ resource, initialText, isMarkdown, readOnly, onReload }: E
                     <MarkdownView markdown={text} />
                 </Suspense>
             ) : (
-                <textarea
-                    aria-label={resource.name}
+                <CodeEditor
+                    label={resource.name}
                     value={text}
                     readOnly={readOnly}
-                    spellCheck={false}
-                    onChange={(event) => {
-                        setText(event.target.value);
+                    language={codeLanguage(resource.name)}
+                    onChange={(value) => {
+                        setText(value);
                         if (status === "error") setStatus("dirty");
                     }}
-                    onKeyDown={(event) => {
-                        if (event.key !== "Tab" || event.shiftKey || readOnly) return;
-                        event.preventDefault();
-                        const el = event.currentTarget;
-                        el.setRangeText("\t", el.selectionStart, el.selectionEnd, "end");
-                        setText(el.value);
-                    }}
-                    className="min-h-0 flex-1 resize-none bg-white p-4 font-mono text-sm leading-relaxed text-gray-900 [tab-size:4] focus:outline-none"
                 />
             )}
         </div>

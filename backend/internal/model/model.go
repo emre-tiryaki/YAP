@@ -45,6 +45,7 @@ type Project struct {
 	// Identifier is the short project code of task keys, e.g. "ABC" in ABC-12.
 	Identifier string
 	TaskCount  int
+	DoneCount  int
 }
 
 type Plan struct {

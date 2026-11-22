@@ -1,5 +1,9 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { importAccount, resetAccount } from "../api/client";
+import {
+    importAccount,
+    resetAccount,
+    type ResetAccountOptions,
+} from "../api/client";
 
 // Device-only state (pins, preferences, layout) lives under this prefix.
 const LOCAL_STORAGE_PREFIX = "yap.";
@@ -15,7 +19,7 @@ function clearLocalState() {
 
 export function useResetAccount() {
     return useMutation({
-        mutationFn: resetAccount,
+        mutationFn: (options: ResetAccountOptions) => resetAccount(options),
         onSuccess: () => {
             clearLocalState();
             // A full reload drops every cached query and in-memory store, so

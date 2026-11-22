@@ -2,11 +2,6 @@ import { Fragment, type ReactNode } from "react";
 import { Link } from "react-router";
 import { FiChevronRight } from "react-icons/fi";
 import type { BreadcrumbItem } from "../types/breadcrumb";
-import { FiSearch } from "react-icons/fi";
-import { openPalette } from "../hooks/useCommandPalette";
-import { useTranslate } from "../hooks/useTranslate";
-import { Button } from "./Button";
-import { Kbd } from "./Kbd";
 
 type PageHeaderProps = {
     breadcrumb: BreadcrumbItem[];
@@ -14,11 +9,10 @@ type PageHeaderProps = {
     children?: ReactNode;
 };
 
-// The bar on top of every page: breadcrumb on the left, search and the page's
-// actions on the right. It is a container, so HeaderAction labels collapse to
+// The bar on top of every page: breadcrumb on the left, the page's actions on
+// the right. It is a container, so HeaderAction labels collapse to
 // icons when the page is narrow.
 export function PageHeader({ breadcrumb, actions, children }: PageHeaderProps) {
-    const t = useTranslate();
     return (
         <header className="@container flex h-12 shrink-0 items-center gap-2 border-b border-line px-4">
             <nav aria-label="Breadcrumb" className="min-w-0">
@@ -75,18 +69,6 @@ export function PageHeader({ breadcrumb, actions, children }: PageHeaderProps) {
                 </ol>
             </nav>
             <div className="flex-1" />
-            <Button
-                variant="secondary"
-                size="sm"
-                leadingIcon={FiSearch}
-                aria-label={t("palette.search")}
-                onClick={() => openPalette()}
-            >
-                <span className="hidden @3xl:inline">{t("palette.search")}</span>
-                <span className="hidden @3xl:inline">
-                    <Kbd keys={["mod", "K"]} />
-                </span>
-            </Button>
             {children}
             {actions}
         </header>

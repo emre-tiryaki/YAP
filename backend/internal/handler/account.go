@@ -1,6 +1,10 @@
 package handler
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"time"
@@ -30,6 +34,7 @@ type importCountsResponse struct {
 	Tasks     int `json:"tasks"`
 	Comments  int `json:"comments"`
 	Resources int `json:"resources"`
+	Chats     int `json:"chats"`
 }
 
 type importResponse struct {
@@ -56,7 +61,7 @@ func (h *AccountHandler) importArchive(w http.ResponseWriter, r *http.Request) {
 		Restored: res.Restored,
 		Added: importCountsResponse{
 			Projects: res.Added.Projects, Plans: res.Added.Plans, Tasks: res.Added.Tasks,
-			Comments: res.Added.Comments, Resources: res.Added.Resources,
+			Comments: res.Added.Comments, Resources: res.Added.Resources, Chats: res.Added.Chats,
 		},
 		Existing:     res.Existing,
 		Renamed:      res.Renamed,
@@ -77,8 +82,24 @@ func (h *AccountHandler) export(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// resetRequest is optional: without a body nothing of the AI assistant is
+// deleted.
+type resetRequest struct {
+	AIChats       bool `json:"ai_chats"`
+	AIConnections bool `json:"ai_connections"`
+}
+
 func (h *AccountHandler) reset(w http.ResponseWriter, r *http.Request) {
-	if err := h.svc.Reset(r.Context(), h.session); err != nil {
+	var req resetRequest
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil && !errors.Is(err, io.EOF) {
+		writeError(w, r, fmt.Errorf("%w: malformed body", service.ErrInvalidInput))
+		return
+	}
+	opts := service.ResetOptions{AIChats: req.AIChats, AIConnections: req.AIConnections}
+	if err := h.svc.Reset(r.Context(), h.session, opts); err != nil {
 		writeError(w, r, err)
 		return
 	}

@@ -31,7 +31,7 @@ func TestImportKeepsKeysAfterReset(t *testing.T) {
 	e.seed(t)
 	before := projectKeys(t, e)
 	archive := e.exportBytes(t)
-	if err := e.svc.Reset(e.ctx, e.session); err != nil {
+	if err := e.svc.Reset(e.ctx, e.session, ResetOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	e.importBytes(t, archive)
@@ -63,7 +63,7 @@ func TestImportOfOlderExportGetsKeys(t *testing.T) {
 			delete(row.(map[string]any), "number")
 		}
 	})
-	if err := e.svc.Reset(e.ctx, e.session); err != nil {
+	if err := e.svc.Reset(e.ctx, e.session, ResetOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	e.importBytes(t, archive)

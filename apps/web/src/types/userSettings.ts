@@ -24,6 +24,8 @@ export type UserSettings = {
     notifications: NotificationSettings;
     // GitHub repositories are kept up to date while GitHub can be reached.
     repositoriesAutoUpdate: boolean;
+    // Personal instructions added to the AI assistant's system prompt.
+    aiInstructions: string;
 };
 
 export type UpdateUserSettingsInput = Partial<

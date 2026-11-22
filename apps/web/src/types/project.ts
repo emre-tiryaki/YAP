@@ -7,6 +7,8 @@ export type Project = {
   // The project code of task keys, e.g. "ABC" in ABC-12.
   identifier: string;
   taskCount: number;
+  // Tasks that are finished.
+  doneTaskCount: number;
 };
 
 export type CreateProjectInput = {

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { FiChevronRight } from "react-icons/fi";
 import { useTranslate } from "../hooks/useTranslate";
@@ -8,9 +9,11 @@ type SectionHeaderProps = {
     onCreate: () => void;
     // Makes the title a link, e.g. to the section's own page.
     href?: string;
+    // Shown next to the create button, e.g. a view switch.
+    extra?: ReactNode;
 };
 
-export function SectionHeader({ title, onCreate, href }: SectionHeaderProps) {
+export function SectionHeader({ title, onCreate, href, extra }: SectionHeaderProps) {
     const t = useTranslate();
 
     return (
@@ -31,12 +34,12 @@ export function SectionHeader({ title, onCreate, href }: SectionHeaderProps) {
                     title
                 )}
             </h2>
-            <Button variant="primary" size="lg"
-                type="button"
-                onClick={onCreate}
-            >
-                + {t("common.new")}
-            </Button>
+            <div className="flex items-center gap-2">
+                {extra}
+                <Button variant="primary" size="lg" type="button" onClick={onCreate}>
+                    + {t("common.new")}
+                </Button>
+            </div>
         </div>
     );
 }

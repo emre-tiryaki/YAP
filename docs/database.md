@@ -250,6 +250,13 @@ erDiagram
     resource_repositories ||--o| repository_checkouts : "local copy"
     resource_repositories ||--o{ repository_clones : "cloned to"
     users ||--o{ user_settings : "has"
+
+    users ||--o{ ai_connections : "configures"
+    users ||--o{ ai_chats : "owns"
+    ai_connections ||--o{ ai_chats : "last used by"
+    ai_chats ||--o{ ai_messages : "contains"
+    ai_connections ||--o{ ai_messages : "answered with"
+    ai_messages ||--o{ ai_message_attachments : "attaches"
 ```
 
 ## 1. General Structure
@@ -260,7 +267,7 @@ The same logical schema exists in two physical databases.
 | -------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
 | Engine   | SQLite (`modernc.org/sqlite`, `database/sql`, no ORM (Object-Relational Mapping))                          | PostgreSQL                                               |
 | Scope    | The user's own device                                                                                      | Team workspaces, accounts, invitations, synchronization |
-| Tables   | users, workspaces, memberships, teams, team_members, projects, project_teams, plans, statuses, tasks, task_assignees, task_comments, task_events, task_relations, labels, task_labels, resources, task_resources, resource_events, resource_repositories, repository_checkouts, repository_clones, user_settings | All local tables except repository_checkouts and repository_clones, plus accounts and invitations |
+| Tables   | users, workspaces, memberships, teams, team_members, projects, project_teams, plans, statuses, tasks, task_assignees, task_comments, task_events, task_relations, labels, task_labels, resources, task_resources, resource_events, resource_repositories, repository_checkouts, repository_clones, user_settings, ai_connections, ai_chats, ai_messages, ai_message_attachments | All local tables except repository_checkouts and repository_clones, plus accounts and invitations |
 
 DDL (Data Definition Language) is maintained in two separate directories: `migrations/sqlite` and `migrations/postgres`. The logical schema is the same; only type mappings and language-specific differences vary.
 
@@ -404,6 +411,7 @@ All of these rules are protected by unit tests.
 | Comment notifications. | `GET /api/comments/recent?since=` lists live comments on live tasks (of live plans and projects) written by other members at or after `since`, oldest first, at most 50. Which notifications were already shown is remembered per device, not in the database. |
 | Exporting the data. | A ZIP with `data.json` (format `yap-export`, version 1: the live rows of the user, the workspace and every workspace table, plus `user_settings`) and the bytes of the live resources under `files/`, laid out like the tree. Repository folders are exported as empty folders with their `resource_repositories` row; their files, `repository_checkouts` and `repository_clones` are not exported. Importing such a row makes the added folder a repository folder again with a pending copy; nothing in the archive may sit inside a repository folder. Rows are read in one transaction. Trashed resources and their links are left out. Files whose bytes are missing from the disk are listed in `missing_files` instead. |
 | Importing an export. | All or nothing, and nothing is deleted. Rows are checked like rows made in the app (names, colors, icons, times, comment bodies, resource names) and every reference must point to a row of the archive; teams and team plans are rejected because a personal workspace has none. Rows keep their ids: a row whose id is still live is kept as it is, a deleted row of the workspace with that id is brought back (its `deleted_at` cleared, its columns taken from the archive), and a free id is used as it is, so importing the same export twice adds nothing, also after a reset. Only an id taken by another workspace or by an item in the trash gets a new one (the trashed item stays in the trash and a live copy is added). A folder whose name is taken by a folder is merged into it; a file whose name is taken gets a free `name (n).ext`; a plan whose name is taken in a kept project becomes `name (n)`; a project whose identifier is invalid or taken (or missing, in an older export) gets a new one derived from its name; a task that comes back from the deleted rows keeps its number, an added task takes the project's next one; a label whose name a kept project already uses is not added again, its tasks get the existing label. Assignments and task links are only added for tasks or resources the import adds, and go to the importing member. The activity log of added resources comes along, with ids that carry the original times. Files missing from the archive are skipped and reported. Only when the workspace had no live projects and resources are the display name, the workspace name and the user settings taken from the archive. |
+| AI assistant. | Service-enforced: an attachment target must exist and have the right kind (`task`, `plan`, `project`, a live non-trashed text file for `resource`, a text file of a repository resource for `repo_file`); at most 20 attachments per message; at most one `streaming` message in the whole app (a second send gets 409 `ai_busy`); chat titles are 1 to 200 characters; roles and statuses are checked before writing; text read from attachments is capped at 64 KiB each and 256 KiB per request. Targets are read live on every send, also for older messages; a deleted target is skipped. A restart marks every `streaming` message `interrupted`. The export holds connections (without keys, imported with `has_key = 0`), chats, messages and attachments of the user. A reset deletes chats and connections only when asked to. |
 | Resetting the local data. | In one transaction every content row of the workspace (projects, plans, statuses, tasks, comments, labels, teams, resources, live or trashed, task events and resource events) gets `deleted_at`, and every relationship row (`task_assignees`, `task_resources`, `task_labels`, `task_relations`, `project_teams`, `team_members`) gets `removed_at`. The user, the workspace and the owner membership keep their ids; the display name, the workspace name and the user settings go back to their first-run defaults. Afterwards the workspace's directory, trash included, is removed from the disk; a failure there is reported and a second reset finishes it. |
 
 ## 5. Table Reference
@@ -434,6 +442,10 @@ All of these rules are protected by unit tests.
 | resource_repositories | Both | The GitHub repository that fills a resource folder | `github_id` identifies the repository across renames. No `deleted_at`: the row follows its folder. (`method` was dropped by migration 009.) |
 | repository_checkouts | Local | This device's copy of a repository | `state` (`pending`, `fetching`, `ready`), `commit_sha` and `fetched_at` of the copy, `checked_at` (last answer from GitHub), `attempted_at` and `error` of the last attempt. Never synchronized. |
 | repository_clones | Local | Git clones the user made into folders of their choice | `path` is absolute on this computer; `deleted_at` only takes a clone off the list. Never synchronized. |
+| ai_connections | Local    | A model endpoint the user configured for the AI assistant | `provider` is `openai_compatible` or `anthropic`; `preset` names the template used. The API key is in the OS keychain (service `yap-ai`, keyed by connection id); `has_key` only says whether one is stored. Soft-deleted with `deleted_at`. Not synchronized. |
+| ai_chats       | Local    | Assistant conversations of a user in a workspace | `title` is the first message trimmed to 60 characters, never generated by a model. `connection_id` and `model` are the last choice. Soft-deleted with `deleted_at`. Not synchronized. |
+| ai_messages    | Local    | Messages of an assistant chat | `role` is `user` or `assistant`; `status` is `complete`, `streaming`, `stopped`, `interrupted` or `error`. An assistant message stores the connection and model that answered. Soft-deleted with `deleted_at`. Not synchronized. |
+| ai_message_attachments | Local | What the user attached to a message | References only (`kind`, `target_id`, `path`); the content is read live on every send. `label` is a display snapshot for targets that are gone; `last_status` is how the target was included in the latest request. No own soft delete: rows follow their message. Not synchronized. |
 | invitations    | Server   | Workspace invitations | The token is never stored in plaintext; only its hash is stored. |
 
 ## 6. Indexes
@@ -468,6 +480,11 @@ All of these rules are protected by unit tests.
 | `task_resources (resource_id) WHERE removed_at IS NULL` | Tasks a resource is linked to. |
 | `resource_events (workspace_id, id)`, `(resource_id, id)`, `(task_id)` | Page the activity log of a workspace, a resource or a project. |
 | `resources`, `task_resources`, `resource_events`, `resource_repositories (workspace_id, updated_at)` | Retrieve changed records during synchronization. |
+| `ai_connections (workspace_id, user_id) WHERE deleted_at IS NULL` | List a user's connections. |
+| `ai_chats (workspace_id, user_id, updated_at DESC, id DESC) WHERE deleted_at IS NULL` | List a user's chats, most recent first. |
+| `ai_messages (chat_id, created_at, id) WHERE deleted_at IS NULL` | List a chat's messages in order. |
+| `ai_messages (status) WHERE status = 'streaming'` | Mark answers interrupted by a restart. |
+| `ai_message_attachments (message_id, position)` | List a message's attachments in order. |
 
 ## 7. Synchronization Notes
 
@@ -475,7 +492,7 @@ Synchronization is not implemented at this stage; the schema has been designed w
 
 - `updated_at` is based on the client clock. Last-Write-Wins (LWW) conflict resolution may select the wrong winner when clocks are skewed. A monotonically increasing version number (sequence) will be maintained on the server and used as the synchronization cursor.
 - `accounts` and `invitations` are not synchronized.
-- AI chat tables are not synchronized. API keys are not stored in the database; they are stored in the operating system's keychain.
+- AI chat tables (`ai_connections`, `ai_chats`, `ai_messages`, `ai_message_attachments`) are not synchronized. API keys are not stored in the database; they are stored in the operating system's keychain.
 - Resource bytes are not in the database. Synchronizing them needs a blob transfer next to the row sync (the server stores the bytes and hands them only to members allowed to see them).
 - `user_settings` is synchronized per user across all of their devices, not per workspace.
 - `resource_repositories` is synchronized, `repository_checkouts`, `repository_clones` and the repository files are not: every device fetches its own copy from GitHub with its own member's token. GitHub tokens live in the OS keychain (service `yap-github`, keyed by user id) and are never synchronized.
@@ -495,6 +512,7 @@ Synchronization is not implemented at this stage; the schema has been designed w
 | Watching the resources folder for outside changes | Changes made outside the app are not detected or logged; the database is the source of truth and a missing file is reported as such. |
 | Link resources (URLs), folder upload, automatic trash cleanup | Not needed for the first version. |
 | Writing to GitHub repositories, other branches than the default, issues and pull requests | Repositories are read-only copies of their default branch; work happens in a clone the user made. Linking tasks to issues or pull requests and webhooks (which need a server) can come later. |
+| AI write actions (tool calling), RAG/embeddings, AI-generated chat titles, message editing or branching, searching repository files from the chat | The assistant is read-only and the user picks its context by hand; titles never cost a model call. |
 | Revoking the GitHub token | Needs the OAuth app's client secret, which a local app cannot keep. Disconnecting only forgets the token; the user revokes it on GitHub. |
 
 ## 9. Open Decisions

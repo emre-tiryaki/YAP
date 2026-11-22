@@ -5,7 +5,9 @@ import { useRepoText } from "../hooks/useGitHub";
 import { errorKey } from "../hooks/useResourceOperations";
 import { useTranslate } from "../hooks/useTranslate";
 import type { RepoEntry } from "../types/github";
+import { codeLanguage } from "../util/codeLanguage";
 import { fileCategory } from "../util/resources";
+import { CodeView } from "./CodeView";
 import { ResourceIcon } from "./ResourceIcon";
 
 // TipTap is only needed for markdown.
@@ -32,7 +34,7 @@ export function RepoFilePreview({ resourceId, entry, commit }: RepoFilePreviewPr
     switch (category) {
         case "markdown":
         case "text":
-            return <RepoText resourceId={resourceId} path={entry.path} commit={commit} isMarkdown={category === "markdown"} />;
+            return <RepoText resourceId={resourceId} path={entry.path} name={entry.name} commit={commit} isMarkdown={category === "markdown"} />;
         case "image":
             return (
                 <div className="flex min-h-0 flex-1 overflow-auto bg-[repeating-conic-gradient(#f3f4f6_0_25%,#fff_0_50%)] bg-[length:20px_20px] p-4">
@@ -70,7 +72,7 @@ export function RepoFilePreview({ resourceId, entry, commit }: RepoFilePreviewPr
     }
 }
 
-function RepoText({ resourceId, path, commit, isMarkdown }: { resourceId: string; path: string; commit: string; isMarkdown: boolean }) {
+function RepoText({ resourceId, path, name, commit, isMarkdown }: { resourceId: string; path: string; name: string; commit: string; isMarkdown: boolean }) {
     const t = useTranslate();
     const text = useRepoText(resourceId, path, commit);
     if (text.isLoading) return <p className="p-6 text-sm text-gray-400">{t("common.loading")}</p>;
@@ -88,9 +90,5 @@ function RepoText({ resourceId, path, commit, isMarkdown }: { resourceId: string
                 </Suspense>
             </div>
         );
-    return (
-        <pre className="min-h-0 flex-1 overflow-auto bg-gray-50 px-6 py-4 font-mono text-xs leading-5 text-gray-800">
-            {text.data}
-        </pre>
-    );
+    return <CodeView text={text.data} language={codeLanguage(name)} />;
 }

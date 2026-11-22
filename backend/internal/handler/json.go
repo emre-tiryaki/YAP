@@ -47,6 +47,22 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 		writeJSON(w, http.StatusServiceUnavailable, errorResponse{Error: "github_unavailable"})
 	case errors.Is(err, service.ErrKeychainUnavailable):
 		writeJSON(w, http.StatusServiceUnavailable, errorResponse{Error: "keychain_unavailable"})
+	case errors.Is(err, service.ErrAIBusy):
+		writeJSON(w, http.StatusConflict, errorResponse{Error: "ai_busy"})
+	case errors.Is(err, service.ErrAIConnectionMissing):
+		writeJSON(w, http.StatusConflict, errorResponse{Error: "ai_connection_missing"})
+	case errors.Is(err, service.ErrAIKeyMissing):
+		writeJSON(w, http.StatusConflict, errorResponse{Error: "ai_key_missing"})
+	case errors.Is(err, service.ErrAIUnreachable):
+		writeJSON(w, http.StatusBadGateway, errorResponse{Error: "ai_unreachable"})
+	case errors.Is(err, service.ErrAIAuthFailed):
+		writeJSON(w, http.StatusBadGateway, errorResponse{Error: "ai_auth_failed"})
+	case errors.Is(err, service.ErrAIRateLimited):
+		writeJSON(w, http.StatusTooManyRequests, errorResponse{Error: "ai_rate_limited"})
+	case errors.Is(err, service.ErrAIModelNotFound):
+		writeJSON(w, http.StatusBadGateway, errorResponse{Error: "ai_model_not_found"})
+	case errors.Is(err, service.ErrAIRejected):
+		writeJSON(w, http.StatusBadGateway, errorResponse{Error: "ai_rejected"})
 	case errors.Is(err, service.ErrGitMissing):
 		writeJSON(w, http.StatusConflict, errorResponse{Error: "git_missing"})
 	case errors.Is(err, service.ErrInvalidInput):

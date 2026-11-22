@@ -1,13 +1,25 @@
 import { TaskItem, TaskList } from "@tiptap/extension-list";
+import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight";
 import { Markdown } from "@tiptap/markdown";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import { common, createLowlight } from "lowlight";
+import { usePreferences } from "../hooks/usePreferences";
+
+const lowlight = createLowlight(common);
 
 // Read-only rendering of a markdown document.
 export function MarkdownView({ markdown }: { markdown: string }) {
+    const { documentFontSize } = usePreferences();
     const editor = useEditor(
         {
-            extensions: [StarterKit, TaskList, TaskItem.configure({ nested: true }), Markdown],
+            extensions: [
+                StarterKit.configure({ codeBlock: false }),
+                CodeBlockLowlight.configure({ lowlight }),
+                TaskList,
+                TaskItem.configure({ nested: true }),
+                Markdown,
+            ],
             content: markdown,
             contentType: "markdown",
             editable: false,
@@ -19,5 +31,12 @@ export function MarkdownView({ markdown }: { markdown: string }) {
         },
         [markdown],
     );
-    return <EditorContent editor={editor} className="h-full overflow-auto" />;
+    // The prose sizes are in em, so one font size scales the whole document.
+    return (
+        <EditorContent
+            editor={editor}
+            style={{ fontSize: documentFontSize }}
+            className="h-full overflow-auto [&_.markdown-body]:text-[1em]"
+        />
+    );
 }

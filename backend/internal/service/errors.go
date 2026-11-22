@@ -49,4 +49,18 @@ var (
 	ErrKeychainUnavailable = model.ErrSecretStoreUnavailable
 	// ErrGitMissing means the git program is not installed.
 	ErrGitMissing = model.ErrGitMissing
+
+	// AI assistant errors keep their own codes, so they do not wrap ErrConflict.
+	// ErrAIBusy means an answer is already being written.
+	ErrAIBusy = errors.New("ai busy")
+	// ErrAIConnectionMissing means the chosen connection is unknown or removed.
+	ErrAIConnectionMissing = errors.New("ai connection missing")
+	// ErrAIKeyMissing means the connection needs an API key that is not stored.
+	ErrAIKeyMissing = errors.New("ai key missing")
+
+	ErrAIUnreachable   = model.ErrAIUnreachable
+	ErrAIAuthFailed    = model.ErrAIAuthFailed
+	ErrAIRateLimited   = model.ErrAIRateLimited
+	ErrAIModelNotFound = model.ErrAIModelNotFound
+	ErrAIRejected      = model.ErrAIRejected
 )

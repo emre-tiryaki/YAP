@@ -21,7 +21,12 @@ func (*ProjectRepository) List(ctx context.Context, q database.DBTX, workspaceID
 			(SELECT COUNT(*) FROM tasks t
 				WHERE t.project_id = p.id
 				AND t.workspace_id = p.workspace_id
-				AND t.deleted_at IS NULL)
+				AND t.deleted_at IS NULL),
+			(SELECT COUNT(*) FROM tasks t
+				WHERE t.project_id = p.id
+				AND t.workspace_id = p.workspace_id
+				AND t.deleted_at IS NULL
+				AND t.completed_at IS NOT NULL)
 		 FROM projects p
 		 WHERE p.workspace_id = ? AND p.deleted_at IS NULL AND p.archived_at IS NULL
 		 ORDER BY p.created_at DESC, p.id DESC`,
@@ -36,7 +41,7 @@ func (*ProjectRepository) List(ctx context.Context, q database.DBTX, workspaceID
 	for rows.Next() {
 		p := model.Project{WorkspaceID: workspaceID}
 		var description, icon sql.NullString
-		if err := rows.Scan(&p.ID, &p.Name, &description, &icon, &p.Identifier, &p.TaskCount); err != nil {
+		if err := rows.Scan(&p.ID, &p.Name, &description, &icon, &p.Identifier, &p.TaskCount, &p.DoneCount); err != nil {
 			return nil, fmt.Errorf("scan project: %w", err)
 		}
 		p.Description = description.String
@@ -176,11 +181,16 @@ func (*ProjectRepository) Get(ctx context.Context, q database.DBTX, workspaceID,
 			(SELECT COUNT(*) FROM tasks t
 				WHERE t.project_id = p.id
 				AND t.workspace_id = p.workspace_id
-				AND t.deleted_at IS NULL)
+				AND t.deleted_at IS NULL),
+			(SELECT COUNT(*) FROM tasks t
+				WHERE t.project_id = p.id
+				AND t.workspace_id = p.workspace_id
+				AND t.deleted_at IS NULL
+				AND t.completed_at IS NOT NULL)
 		 FROM projects p
 		 WHERE p.id = ? AND p.workspace_id = ? AND p.deleted_at IS NULL`,
 		projectID, workspaceID,
-	).Scan(&p.Name, &description, &icon, &p.Identifier, &p.TaskCount)
+	).Scan(&p.Name, &description, &icon, &p.Identifier, &p.TaskCount, &p.DoneCount)
 	if err != nil {
 		return model.Project{}, fmt.Errorf("get project: %w", err)
 	}

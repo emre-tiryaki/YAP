@@ -12,6 +12,7 @@ import (
 	"github.com/emre-tiryaki/YAP/backend/internal/database"
 	"github.com/emre-tiryaki/YAP/backend/internal/github"
 	"github.com/emre-tiryaki/YAP/backend/internal/handler"
+	"github.com/emre-tiryaki/YAP/backend/internal/llm"
 	"github.com/emre-tiryaki/YAP/backend/internal/repofetch"
 	"github.com/emre-tiryaki/YAP/backend/internal/repository"
 	"github.com/emre-tiryaki/YAP/backend/internal/secrets"
@@ -61,14 +62,29 @@ func main() {
 	resourceRepo := repository.NewResourceRepository()
 	resourceSvc := service.NewResourceService(db, resourceRepo, taskRepo, store)
 	settingsSvc := service.NewSettingsService(db, settingsRepo)
-	accountSvc := service.NewAccountService(db, repository.NewAccountRepository(), resourceRepo,
-		repository.NewWorkspaceRepository(), settingsRepo, store, cfg.DisplayName)
-
+	aiRepo := repository.NewAIRepository()
+	aiKeys := secrets.NewAIKeyring()
+	router := llm.NewRouter()
+	aiConnSvc := service.NewAIConnectionService(db, aiRepo, aiKeys, router)
 	fetcher := repofetch.NewFetcher(repofetch.NewGit(), repofetch.DefaultLimits)
 	githubSvc := service.NewGitHubService(github.New(cfg.GitHubClientID), secrets.NewKeyring(), fetcher.GitAvailable())
 	repositorySvc := service.NewRepositoryService(db, repository.NewRepoRepository(), resourceSvc, githubSvc,
 		settingsRepo, store, fetcher)
 	go repositorySvc.Run(ctx, session)
+
+	activityRepo := repository.NewTaskActivityRepository()
+	aiPrompt := service.NewAIPrompt(db, service.AIContextSources{
+		Tasks: taskRepo, Activity: activityRepo, Comments: commentRepo, Projects: projectRepo,
+		Resources: resourceSvc, Repos: repositorySvc, Placement: aiRepo,
+	})
+	aiChatSvc := service.NewAIChatService(db, aiRepo, aiConnSvc, aiPrompt, settingsRepo, router)
+	if err := aiChatSvc.RecoverInterrupted(ctx); err != nil {
+		log.Fatalf("AI recovery error: %v", err)
+	}
+	aiChatSvc.Start(ctx)
+
+	accountSvc := service.NewAccountService(db, repository.NewAccountRepository(), resourceRepo,
+		repository.NewWorkspaceRepository(), settingsRepo, store, cfg.DisplayName).WithAI(aiRepo, aiKeys, aiChatSvc)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/hello-world", handler.HelloWorld)
@@ -81,6 +97,7 @@ func main() {
 	handler.NewRepositoryHandler(session, repositorySvc).Register(mux)
 	handler.NewGitHubHandler(session, githubSvc).Register(mux)
 	handler.NewSettingsHandler(session, settingsSvc).Register(mux)
+	handler.NewAIHandler(session, aiChatSvc, aiConnSvc).Register(mux)
 	handler.NewAccountHandler(session, accountSvc).Register(mux)
 	handler.NewSearchHandler(session, service.NewSearchService(db, repository.NewSearchRepository())).Register(mux)
 
@@ -102,4 +119,5 @@ func main() {
 		log.Fatal(err)
 	}
 	repositorySvc.Wait()
+	aiChatSvc.Wait()
 }
