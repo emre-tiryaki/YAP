@@ -19,14 +19,23 @@ func (e aiEnv) send(t *testing.T, connID, content string) AISendResult {
 	return res
 }
 
+// waitIdle blocks until the running generation has written its final state.
+// It waits on the service's own work group instead of polling, and fails
+// rather than hangs when a test forgot to open the model's gate.
 func (e aiEnv) waitIdle(t *testing.T) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for e.chats.Status() != "" {
-		if time.Now().After(deadline) {
-			t.Fatal("generation did not finish")
-		}
-		time.Sleep(5 * time.Millisecond)
+	done := make(chan struct{})
+	go func() {
+		e.chats.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("generation did not finish")
+	}
+	if got := e.chats.Status(); got != "" {
+		t.Fatalf("Status() = %q after the generation finished", got)
 	}
 }
 

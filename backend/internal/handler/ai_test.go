@@ -120,23 +120,20 @@ func (e testEnv) aiChat(t *testing.T, connID, content string) aiSendJSON {
 	return decode[aiSendJSON](t, rec)
 }
 
+// waitAIIdle blocks until the running generation has written its final
+// state. It waits on the service's work group instead of polling, and fails
+// rather than hangs when the model's gate was never opened.
 func (e testEnv) waitAIIdle(t *testing.T) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for {
-		var s struct {
-			ActiveChatID *string `json:"active_chat_id"`
-		}
-		s = decode[struct {
-			ActiveChatID *string `json:"active_chat_id"`
-		}](t, e.do(t, http.MethodGet, "/api/ai/status", ""))
-		if s.ActiveChatID == nil {
-			return
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("generation did not finish")
-		}
-		time.Sleep(5 * time.Millisecond)
+	done := make(chan struct{})
+	go func() {
+		e.waitAI()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("generation did not finish")
 	}
 }
 
